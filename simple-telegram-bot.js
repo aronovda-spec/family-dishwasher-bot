@@ -730,6 +730,20 @@ function handleCallback(chatId, userId, userName, data) {
             `• Adele Aronov\n` +
             `• Emma Aronov`;
         sendMessage(chatId, message);
+        
+        // Notify all admins about the authorization request
+        const adminNotification = `🔔 **New Authorization Request**\n\n` +
+            `👤 **User:** ${userName}\n` +
+            `🆔 **User ID:** ${userId}\n` +
+            `📅 **Time:** ${new Date().toLocaleString()}\n\n` +
+            `💡 **To authorize:** \`/authorize ${userName}\``;
+        
+        // Send notification to all admins
+        for (const adminId of admins) {
+            if (adminId !== userId) { // Don't notify the user themselves
+                sendMessage(adminId, adminNotification);
+            }
+        }
     } else if (data === 'swap_menu') {
         const isAuthorized = authorizedUsers.has(userName);
         if (!isAuthorized) {
