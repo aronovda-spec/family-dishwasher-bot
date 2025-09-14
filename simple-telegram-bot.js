@@ -13,6 +13,7 @@ const queue = ['Eden Aronov', 'Adele Aronov', 'Emma Aronov'];
 const admins = new Set(); // Set of admin user IDs
 const adminChatIds = new Set(); // Set of admin chat IDs for notifications
 const authorizedUsers = new Set(); // Set of authorized user IDs (max 3)
+const userChatIds = new Map(); // Map: userName -> chatId for notifications
 
 // Link Telegram users to queue names
 const userQueueMapping = new Map(); // Map: Telegram user ID -> Queue name
@@ -107,6 +108,10 @@ function handleCommand(chatId, userId, userName, text) {
     console.log(`🔍 Processing: "${command}" from ${userName}`);
     
     if (command === '/start') {
+        // Store chat ID for this user (for notifications)
+        userChatIds.set(userName, chatId);
+        userChatIds.set(userName.toLowerCase(), chatId);
+        
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         
@@ -305,9 +310,14 @@ function handleCommand(chatId, userId, userName, text) {
             
             // Notify all authorized users and admins
             [...authorizedUsers, ...admins].forEach(user => {
-                const userChatId = userQueueMapping.get(user) ? queueUserMapping.get(userQueueMapping.get(user)) : null;
-                if (userChatId) {
+                // Try to find chat ID for this user
+                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                
+                if (userChatId && userChatId !== chatId) {
+                    console.log(`🔔 Sending admin DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, adminDoneMessage);
+                } else {
+                    console.log(`🔔 No chat ID found for ${user}`);
                 }
             });
             
@@ -375,9 +385,14 @@ function handleCommand(chatId, userId, userName, text) {
             
             // Notify all authorized users and admins
             [...authorizedUsers, ...admins].forEach(user => {
-                const userChatId = userQueueMapping.get(user) ? queueUserMapping.get(userQueueMapping.get(user)) : null;
-                if (userChatId) {
+                // Try to find chat ID for this user
+                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                
+                if (userChatId && userChatId !== chatId) {
+                    console.log(`🔔 Sending user DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, doneMessage);
+                } else {
+                    console.log(`🔔 No chat ID found for ${user}`);
                 }
             });
         }
@@ -586,6 +601,9 @@ function handleCommand(chatId, userId, userName, text) {
                     userQueueMapping.set(userToAuth, queueMember);
                     userQueueMapping.set(userToAuth.toLowerCase(), queueMember); // Add lowercase mapping
                     queueUserMapping.set(queueMember, userToAuth);
+                    
+                    // Store chat ID for notifications (we'll need to get this from the user when they interact)
+                    // For now, we'll store it when they send /start
                     sendMessage(chatId, `✅ **User Authorized!**\n\n👥 ${userToAuth} → ${queueMember}\n\n📊 **Total authorized users:** ${authorizedUsers.size}/3`);
                 } else {
                     sendMessage(chatId, `❌ **User not in queue!**\n\n👥 **Available queue members:**\n• Eden Aronov\n• Adele Aronov\n• Emma Aronov\n\n💡 **Usage:** \`/authorize Eden\` or \`/authorize Eden Aronov\``);
@@ -683,12 +701,15 @@ function executeSwap(swapRequest, requestId, status) {
         sendMessage(fromUserId, message);
         sendMessage(toUserId, message);
         
-        // Notify all other authorized users
+        // Notify all other authorized users and admins using userChatIds
         [...authorizedUsers, ...admins].forEach(user => {
             if (user !== fromUser && user !== toUser) {
-                const userChatId = userQueueMapping.get(user) ? queueUserMapping.get(userQueueMapping.get(user)) : null;
+                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 if (userChatId) {
+                    console.log(`🔔 Sending swap approval notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, `🔄 **Queue Update:** ${fromUser} ↔ ${toUser} swapped positions!`);
+                } else {
+                    console.log(`🔔 No chat ID found for ${user}`);
                 }
             }
         });
@@ -770,27 +791,47 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
         const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
-        const availableUsers = queue.filter(name => name !== currentUserQueueName);
         
-        if (availableUsers.length === 0) {
-            sendMessage(chatId, '❌ **No users available to swap with!**');
-            return;
-        }
-        
+        // Show all users except the current user (can't swap with yourself)
+        const uniqueUsers = [...new Set(queue)];
+        const availableUsers = uniqueUsers.filter(name => name !== currentUserQueueName);
         const buttons = availableUsers.map(name => [{ text: name, callback_data: `swap_request_${name}` }]);
         
         sendMessageWithButtons(chatId, 
-            `🔄 **Request Swap**\n\n👤 **Your position:** ${currentUserQueueName}\n\n🎯 **Select user to swap with:**`, 
+            `Request Swap - Your position: ${currentUserQueueName} - Select user to swap with:`, 
             buttons
         );
         
     } else if (data.startsWith('swap_request_')) {
         const targetUser = data.replace('swap_request_', '');
-        const currentUserQueueName = userQueueMapping.get(userName);
+        const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
         
         if (!currentUserQueueName) {
             sendMessage(chatId, '❌ **Error:** Could not find your queue position.');
             return;
+        }
+        
+        // Check if it's the current user's turn
+        const currentUserIndex = queue.indexOf(currentUserQueueName);
+        if (currentTurn !== currentUserIndex) {
+            sendMessage(chatId, '❌ **Not your turn!** You can only request swaps during your turn.');
+            return;
+        }
+        
+        // Check if user already has a pending swap request
+        for (const [requestId, request] of pendingSwaps.entries()) {
+            if (request.fromUserId === userId) {
+                sendMessage(chatId, `❌ **You already have a pending swap request!**\n\n🎯 **Current request:** ${request.fromUser} ↔ ${request.toUser}\n⏰ **Request ID:** ${requestId}\n\n💡 **You can cancel your current request before creating a new one.**`);
+                return;
+            }
+        }
+        
+        // Check if target user already has a pending swap request
+        for (const [requestId, request] of pendingSwaps.entries()) {
+            if (request.toUserId === targetUserId || request.fromUserId === targetUserId) {
+                sendMessage(chatId, `❌ **${targetUser} already has a pending swap request!**\n\n🎯 **Current request:** ${request.fromUser} ↔ ${request.toUser}\n⏰ **Request ID:** ${requestId}\n\n💡 **Please wait for this request to be resolved before creating a new one.**`);
+                return;
+            }
         }
         
         // Create swap request
@@ -820,7 +861,27 @@ function handleCallback(chatId, userId, userName, data) {
             );
         }
         
-        sendMessage(chatId, `✅ **Swap request sent!**\n\n🎯 **Requested swap with:** ${targetUser}\n⏰ **Waiting for approval...**`);
+        // Notify all admins about the swap request
+        const adminNotification = `🔄 **New Swap Request**\n\n👤 **From:** ${userName} (${currentUserQueueName})\n🎯 **Wants to swap with:** ${targetUser}\n📅 **Time:** ${new Date().toLocaleString()}\n\n💡 **Request ID:** ${requestId}`;
+        
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId && adminChatId !== targetUserId) { // Don't notify the requester or target user
+                console.log(`🔔 Sending admin swap notification to chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, adminNotification);
+            }
+        }
+        
+        // Send confirmation to the requester with cancel option
+        const cancelButtons = [
+            [
+                { text: "Cancel Request", callback_data: `swap_cancel_${requestId}` }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, 
+            `Swap request sent! Requested swap with: ${targetUser} - Waiting for approval - You can cancel your request if needed`, 
+            cancelButtons
+        );
         
     } else if (data.startsWith('swap_approve_')) {
         const requestId = parseInt(data.replace('swap_approve_', ''));
@@ -858,6 +919,52 @@ function handleCallback(chatId, userId, userName, data) {
         // Notify the requester
         sendMessage(swapRequest.fromUserId, `❌ **Swap request rejected!**\n\n👤 ${userName} declined your swap request.`);
         sendMessage(chatId, `❌ **Swap request rejected!**\n\n👤 You declined ${swapRequest.fromUser}'s swap request.`);
+        
+        // Notify all admins about the rejection
+        const adminNotification = `❌ **Swap Request Rejected**\n\n👤 **From:** ${swapRequest.fromUser}\n👤 **Rejected by:** ${userName}\n📅 **Time:** ${new Date().toLocaleString()}`;
+        
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId && adminChatId !== swapRequest.fromUserId) { // Don't notify the rejector or requester
+                console.log(`🔔 Sending admin swap rejection notification to chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, adminNotification);
+            }
+        }
+        
+        // Remove the request
+        pendingSwaps.delete(requestId);
+        
+    } else if (data.startsWith('swap_cancel_')) {
+        const requestId = parseInt(data.replace('swap_cancel_', ''));
+        const swapRequest = pendingSwaps.get(requestId);
+        
+        if (!swapRequest) {
+            sendMessage(chatId, '❌ **Swap request not found or expired!**');
+            return;
+        }
+        
+        // Check if this is the correct user canceling
+        if (swapRequest.fromUserId !== userId) {
+            sendMessage(chatId, '❌ **This swap request is not yours!**');
+            return;
+        }
+        
+        // Notify the target user that the request was canceled
+        if (swapRequest.toUserId) {
+            sendMessage(swapRequest.toUserId, `❌ **Swap request canceled!**\n\n👤 ${userName} canceled their swap request with you.`);
+        }
+        
+        // Notify the requester
+        sendMessage(chatId, `❌ **Swap request canceled!**\n\n👤 You canceled your swap request with ${swapRequest.toUser}.\n\n🔄 **You keep your current turn.**`);
+        
+        // Notify all admins about the cancellation
+        const adminNotification = `❌ **Swap Request Canceled**\n\n👤 **From:** ${swapRequest.fromUser}\n👤 **Canceled by:** ${userName}\n👤 **Target was:** ${swapRequest.toUser}\n📅 **Time:** ${new Date().toLocaleString()}`;
+        
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId && adminChatId !== swapRequest.toUserId) { // Don't notify the canceler or target user
+                console.log(`🔔 Sending admin swap cancellation notification to chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, adminNotification);
+            }
+        }
         
         // Remove the request
         pendingSwaps.delete(requestId);
@@ -958,11 +1065,14 @@ function handleCallback(chatId, userId, userName, data) {
             // Notify all users
             const message = `⚡ **Admin Force Swap Executed!**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n📋 **New queue order:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ' (CURRENT TURN)' : ''}`).join('\n')}`;
             
-            // Send to all authorized users and admins
+            // Send to all authorized users and admins using userChatIds
             [...authorizedUsers, ...admins].forEach(user => {
-                const userChatId = userQueueMapping.get(user) ? queueUserMapping.get(userQueueMapping.get(user)) : null;
-                if (userChatId) {
+                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                if (userChatId && userChatId !== chatId) { // Don't notify the admin who performed the swap
+                    console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
+                } else {
+                    console.log(`🔔 No chat ID found for ${user} or is the admin who performed swap`);
                 }
             });
             
@@ -989,56 +1099,62 @@ function handleCallback(chatId, userId, userName, data) {
         const buttons = availableUsers.map(name => [{ text: name, callback_data: `punishment_target_${name}` }]);
         
         sendMessageWithButtons(chatId, 
-            `⚡ **Request Punishment**\n\n👤 **Select user to report:**`, 
+            `Request Punishment - Select user to report:`, 
             buttons
         );
         
     } else if (data.startsWith('punishment_target_')) {
         const targetUser = data.replace('punishment_target_', '');
         
-        // Submit punishment request immediately with default reason (no reason input required)
-        const reason = 'User request (no reason provided)';
-        reportUser(targetUser, reason, userName);
-        sendMessage(chatId, `✅ **Punishment Request Submitted!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👤 **Requested by:** ${userName}\n\n📢 **Admins have been notified!**`);
+        // Show reason selection buttons
+        const reasonButtons = [
+            [
+                { text: "Behavior", callback_data: `punishment_reason_${targetUser}_Behavior` },
+                { text: "Household Rules", callback_data: `punishment_reason_${targetUser}_Household Rules` }
+            ],
+            [
+                { text: "Respect", callback_data: `punishment_reason_${targetUser}_Respect` },
+                { text: "Other", callback_data: `punishment_reason_${targetUser}_Other` }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, `Request Punishment - Select reason for ${targetUser}:`, reasonButtons);
         
     } else if (data.startsWith('punishment_reason_')) {
-        const parts = data.replace('punishment_reason_', '').split(' ');
-        const requestId = parseInt(parts[0]);
-        const reason = parts.slice(1).join(' ');
+        const parts = data.replace('punishment_reason_', '').split('_');
+        const targetUser = parts[0];
+        const reason = parts[1];
         
-        const punishmentRequest = pendingPunishments.get(requestId);
-        if (!punishmentRequest) {
-            sendMessage(chatId, '❌ **Punishment request not found or expired!**');
-            return;
-        }
+        // Create punishment request (similar to swap request system)
+        const requestId = ++punishmentRequestCounter;
         
-        if (punishmentRequest.fromUserId !== userId) {
-            sendMessage(chatId, '❌ **This punishment request is not yours!**');
-            return;
-        }
+        pendingPunishments.set(requestId, {
+            fromUser: userName,
+            targetUser: targetUser,
+            reason: reason,
+            fromUserId: userId,
+            timestamp: Date.now()
+        });
         
-        // Update the request with reason
-        punishmentRequest.reason = reason;
-        
-        // Notify all admins
-        const adminMessage = `⚡ **Punishment Request**\n\n👤 **From:** ${userName}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${reason}\n\n⏰ **Request expires in 10 minutes**`;
+        // Notify all admins with approval/rejection buttons (NO EMOJIS)
+        const adminMessage = `Punishment Request\n\nFrom: ${userName}\nTarget: ${targetUser}\nReason: ${reason}`;
         
         const buttons = [
             [
-                { text: "✅ Approve", callback_data: `punishment_approve_${requestId}` },
-                { text: "❌ Reject", callback_data: `punishment_reject_${requestId}` }
+                { text: "Approve", callback_data: `punishment_approve_${requestId}` },
+                { text: "Reject", callback_data: `punishment_reject_${requestId}` }
             ]
         ];
         
         // Send to all admins
-        admins.forEach(admin => {
-            const adminChatId = userQueueMapping.get(admin) ? queueUserMapping.get(userQueueMapping.get(admin)) : null;
-            if (adminChatId) {
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId) { // Don't notify the requester
+                console.log(`🔔 Sending admin punishment notification to chat ID: ${adminChatId}`);
                 sendMessageWithButtons(adminChatId, adminMessage, buttons);
             }
-        });
+        }
         
-        sendMessage(chatId, `✅ **Punishment request sent to admins!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${reason}\n⏰ **Waiting for admin approval...**`);
+        sendMessage(chatId, `Punishment Request Submitted!\n\nTarget: ${targetUser}\nReason: ${reason}\nRequested by: ${userName}\n\nAdmins have been notified!`);
         
     } else if (data.startsWith('punishment_approve_')) {
         const requestId = parseInt(data.replace('punishment_approve_', ''));
@@ -1062,6 +1178,17 @@ function handleCallback(chatId, userId, userName, data) {
         // Notify requester
         sendMessage(punishmentRequest.fromUserId, `✅ **Punishment Approved!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}`);
         
+        // Notify all other authorized users and admins about the approval
+        const approvalMessage = `✅ **Punishment Request Approved!**\n\n👤 **Requested by:** ${punishmentRequest.fromUser}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}\n\n⚡ **3 extra turns applied immediately!**`;
+        
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
+                console.log(`🔔 Sending punishment approval notification to ${user} (${userChatId})`);
+                sendMessage(userChatId, approvalMessage);
+            }
+        });
+        
         // Remove request
         pendingPunishments.delete(requestId);
         
@@ -1084,6 +1211,17 @@ function handleCallback(chatId, userId, userName, data) {
         // Notify requester
         sendMessage(punishmentRequest.fromUserId, `❌ **Punishment Request Rejected!**\n\n👨‍💼 ${userName} declined your punishment request for ${punishmentRequest.targetUser}.`);
         sendMessage(chatId, `❌ **Punishment request rejected!**\n\n👤 You declined ${punishmentRequest.fromUser}'s punishment request.`);
+        
+        // Notify all other authorized users and admins about the rejection
+        const rejectionMessage = `❌ **Punishment Request Rejected!**\n\n👤 **Requested by:** ${punishmentRequest.fromUser}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Rejected by:** ${userName}`;
+        
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
+                console.log(`🔔 Sending punishment rejection notification to ${user} (${userChatId})`);
+                sendMessage(userChatId, rejectionMessage);
+            }
+        });
         
         // Remove request
         pendingPunishments.delete(requestId);
@@ -1111,6 +1249,17 @@ function handleCallback(chatId, userId, userName, data) {
         const reason = 'Admin direct punishment (no reason provided)';
         applyPunishment(targetUser, reason, userName);
         sendMessage(chatId, `✅ **Punishment Applied!**\n\n👤 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}\n\n⚡ **3 extra turns added immediately!**`);
+        
+        // Notify all other authorized users and admins about the direct punishment
+        const directPunishmentMessage = `⚡ **Admin Direct Punishment Applied!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}\n\n⚡ **3 extra turns added immediately!**`;
+        
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            if (userChatId && userChatId !== chatId) {
+                console.log(`🔔 Sending admin direct punishment notification to ${user} (${userChatId})`);
+                sendMessage(userChatId, directPunishmentMessage);
+            }
+        });
         
     } else if (data.startsWith('admin_punishment_reason_')) {
         const parts = data.replace('admin_punishment_reason_', '').split(' ');
