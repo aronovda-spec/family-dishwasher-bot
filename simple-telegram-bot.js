@@ -29,6 +29,14 @@ const pendingPunishments = new Map(); // Map: requestId -> {fromUser, targetUser
 const punishmentTurns = new Map(); // Map: userName -> number of punishment turns remaining
 let punishmentRequestCounter = 0;
 
+// Deduplication for cloud deployment (prevents multiple popups in Render)
+const processedUpdates = new Set(); // Track processed update IDs
+const instanceId = process.env.RENDER_INSTANCE_ID || `local-${Date.now()}`;
+
+// Button click deduplication (prevents rapid multiple clicks on same button)
+const lastUserAction = new Map(); // Map: userId -> {action, timestamp}
+const ACTION_COOLDOWN = 1000; // 1 second cooldown between same actions
+
 // Send message to Telegram
 function sendMessage(chatId, text) {
     const url = `${botUrl}/sendMessage`;
@@ -1381,6 +1389,21 @@ function getUpdates(offset = 0) {
                     response.result.forEach(update => {
                         lastUpdateId = update.update_id;
                         
+                        // Deduplication: Skip if this update was already processed
+                        if (processedUpdates.has(update.update_id)) {
+                            console.log(`🔄 Skipping duplicate update ${update.update_id} (instance: ${instanceId})`);
+                            return;
+                        }
+                        
+                        // Mark this update as processed
+                        processedUpdates.add(update.update_id);
+                        
+                        // Clean up old processed updates (keep only last 1000)
+                        if (processedUpdates.size > 1000) {
+                            const oldestUpdates = Array.from(processedUpdates).slice(0, 100);
+                            oldestUpdates.forEach(id => processedUpdates.delete(id));
+                        }
+                        
                         if (update.message) {
                             const chatId = update.message.chat.id;
                             const userId = update.message.from.id;
@@ -1397,6 +1420,18 @@ function getUpdates(offset = 0) {
                             const userName = update.callback_query.from.first_name + 
                                 (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
                             const data = update.callback_query.data;
+                            
+                            // Button click deduplication: prevent rapid multiple clicks on same button
+                            const now = Date.now();
+                            const lastAction = lastUserAction.get(userId);
+                            
+                            if (lastAction && lastAction.action === data && (now - lastAction.timestamp) < ACTION_COOLDOWN) {
+                                console.log(`🔄 Skipping rapid button click: ${data} by ${userName} (cooldown: ${ACTION_COOLDOWN}ms)`);
+                                return;
+                            }
+                            
+                            // Update last action
+                            lastUserAction.set(userId, { action: data, timestamp: now });
                             
                             handleCallback(chatId, userId, userName, data);
                             
