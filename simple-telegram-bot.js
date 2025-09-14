@@ -313,13 +313,13 @@ function handleCommand(chatId, userId, userName, text) {
             
         } else {
             // Regular user "Done" - Check if user is authorized
-            if (!authorizedUsers.has(userName)) {
+            if (!authorizedUsers.has(userName) && !authorizedUsers.has(userName.toLowerCase())) {
                 sendMessage(chatId, `❌ **Not authorized!**\n\n👤 ${userName} is not authorized to use queue commands.\n\n💡 **Ask an admin to authorize you:**\n\`/authorize ${userName}\``);
                 return;
             }
             
             const currentUser = queue[currentTurn];
-            const userQueueName = userQueueMapping.get(userName);
+            const userQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
             
             // Check if it's actually their turn
             if (userQueueName !== currentUser) {
@@ -769,7 +769,7 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const currentUserQueueName = userQueueMapping.get(userName);
+        const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
         const availableUsers = queue.filter(name => name !== currentUserQueueName);
         
         if (availableUsers.length === 0) {
@@ -972,13 +972,14 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
     } else if (data === 'request_punishment_menu') {
-        const isAuthorized = authorizedUsers.has(userName);
+        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         if (!isAuthorized) {
             sendMessage(chatId, '❌ **Not authorized!** You need to be authorized to request punishments.');
             return;
         }
         
-        const availableUsers = queue.filter(name => name !== userQueueMapping.get(userName));
+        const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
+        const availableUsers = queue.filter(name => name !== currentUserQueueName);
         
         if (availableUsers.length === 0) {
             sendMessage(chatId, '❌ **No users available to report!**');
