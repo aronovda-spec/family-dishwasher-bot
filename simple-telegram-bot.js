@@ -108,7 +108,7 @@ function handleCommand(chatId, userId, userName, text) {
     
     if (command === '/start') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
-        const isAuthorized = authorizedUsers.has(userName);
+        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         
         let text = `Dishwasher Bot Menu`;
         let buttons = [];
@@ -582,7 +582,9 @@ function handleCommand(chatId, userId, userName, text) {
                 
                 if (queueMember) {
                     authorizedUsers.add(userToAuth);
+                    authorizedUsers.add(userToAuth.toLowerCase()); // Add lowercase version for case-insensitive matching
                     userQueueMapping.set(userToAuth, queueMember);
+                    userQueueMapping.set(userToAuth.toLowerCase(), queueMember); // Add lowercase mapping
                     queueUserMapping.set(queueMember, userToAuth);
                     sendMessage(chatId, `✅ **User Authorized!**\n\n👥 ${userToAuth} → ${queueMember}\n\n📊 **Total authorized users:** ${authorizedUsers.size}/3`);
                 } else {
@@ -761,7 +763,7 @@ function handleCallback(chatId, userId, userName, data) {
             }
         }
     } else if (data === 'swap_menu') {
-        const isAuthorized = authorizedUsers.has(userName);
+        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         if (!isAuthorized) {
             sendMessage(chatId, '❌ **Not authorized!** You need to be authorized to use swap features.');
             return;
