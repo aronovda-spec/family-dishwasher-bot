@@ -433,28 +433,40 @@ function handleCommand(chatId, userId, userName, text) {
         }
         
     } else if (command.startsWith('/addadmin ')) {
-        // Check if user is already an admin (allow first admin to be added)
-        if (admins.size > 0 && !admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+        const userToAdd = command.replace('/addadmin ', '').trim();
+        
+        if (!userToAdd) {
+            sendMessage(chatId, '❌ **Usage:** `/addadmin <username>`\n\nExample: `/addadmin Dani`');
+            return;
+        }
+        
+        // Check if this is the first admin (no existing admins)
+        if (admins.size === 0) {
+            // First admin can add themselves or anyone
+            admins.add(userToAdd);
+            admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
+            admins.add(userId.toString()); // Add user ID for the person adding the admin
+            sendMessage(chatId, `✅ **First Admin Added!**\n\n👨‍💼 ${userToAdd} is now the first admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments`);
+            return;
+        }
+        
+        // If there are existing admins, check if current user is an admin
+        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
             sendMessage(chatId, `❌ **Admin access required!**\n\n👤 ${userName} is not an admin.\n\n💡 **Ask an existing admin to add you:**\n\`/addadmin ${userName}\``);
             return;
         }
         
-        const userToAdd = command.replace('/addadmin ', '').trim();
-        if (userToAdd) {
-            // Allow first admin to add themselves, but prevent self-promotion for existing admins
-            if (admins.size > 0 && (userToAdd.toLowerCase() === userName.toLowerCase() || userToAdd === userId.toString())) {
-                sendMessage(chatId, `❌ **Cannot add yourself as admin!**\n\n🛡️ **Security protection:** Only other admins can promote you.\n\n💡 **Ask another admin to add you:**\n\`/addadmin ${userName}\``);
-                return;
-            }
-            
-            // Add both username and user ID for flexibility
-            admins.add(userToAdd);
-            admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
-            admins.add(userId.toString()); // Add user ID for the person adding the admin
-            sendMessage(chatId, `✅ **Admin Added!**\n\n👨‍💼 ${userToAdd} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments`);
-        } else {
-            sendMessage(chatId, '❌ **Usage:** `/addadmin <username>`\n\nExample: `/addadmin Dani`');
+        // Prevent self-promotion for existing admins
+        if (userToAdd.toLowerCase() === userName.toLowerCase() || userToAdd === userId.toString()) {
+            sendMessage(chatId, `❌ **Cannot add yourself as admin!**\n\n🛡️ **Security protection:** Only other admins can promote you.\n\n💡 **Ask another admin to add you:**\n\`/addadmin ${userName}\``);
+            return;
         }
+        
+        // Add the new admin
+        admins.add(userToAdd);
+        admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
+        admins.add(userId.toString()); // Add user ID for the person adding the admin
+        sendMessage(chatId, `✅ **Admin Added!**\n\n👨‍💼 ${userToAdd} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments`);
         
     } else if (command.startsWith('/removeadmin ')) {
         // Check if user is already an admin
