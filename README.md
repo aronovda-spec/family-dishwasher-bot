@@ -1,0 +1,198 @@
+# WhatsApp Dishwasher Bot
+
+A comprehensive WhatsApp bot for managing dishwasher queue with turn tracking, punishments, and admin controls.
+
+## Features
+
+### 🎯 Queue Management
+- **Turn Tracking**: Tracks whose turn it is to empty the dishwasher
+- **User Authorization**: Only 3 chosen users can use queue commands
+- **Turn Completion**: Users can finish their turn (`done`) and the bot moves to the next person
+- **Queue Status**: Real-time queue status with current turn indicator
+
+### 🔄 Turn Flexibility
+- **Position Swapping**: Users can request to switch places in the queue
+- **Approval System**: The other person must approve before the swap happens
+- **Skip Requests**: Users can request to skip their turn (requires admin approval)
+
+### ⚡ Punishment System
+- **Punishment Requests**: Any user can submit punishment requests (e.g., +3 extra turns) with a reason
+- **Request Tracking**: Punishment requests get unique IDs for easy management
+- **Admin Approval**: Only admins can approve or reject punishment requests
+- **Dual Admin Support**: Supports two equal-rights admins for approvals
+
+### 👨‍💼 Admin Controls
+- **Admin Management**: Add/remove admins as needed
+- **User Authorization**: Control who can use queue commands
+- **Request Processing**: Approve/reject punishment and skip requests
+- **Statistics**: View punishment statistics and history
+
+### 📱 WhatsApp Integration
+- **Direct Integration**: All interactions happen directly in WhatsApp chats
+- **Instant Replies**: Users and admins get immediate confirmation of actions
+- **QR Code Authentication**: Easy setup with QR code scanning
+
+## Installation
+
+1. **Clone or download** this repository to your local machine
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Start the bot**:
+   ```bash
+   npm start
+   ```
+
+4. **Scan QR Code**: When the bot starts, scan the QR code with your WhatsApp app
+
+5. **Configure Admins**: Add admins using the `addadmin` command
+
+## Usage
+
+### Basic Commands
+
+#### Queue Management
+- `add` - Add yourself to the queue
+- `remove` - Remove yourself from the queue  
+- `done` - Complete your current turn
+- `status` - Show current queue status
+
+#### Turn Flexibility
+- `swap @username` - Request to swap positions with another user
+- `approve <request_id>` - Approve a swap request
+- `reject <request_id>` - Reject a swap request
+- `skip [reason]` - Request to skip your turn
+
+#### Punishments
+- `punish @username +3 reason` - Submit a punishment request
+- `punishments` - View punishment history
+- `punishments stats` - View punishment statistics
+
+### Admin Commands
+
+#### User Management
+- `addadmin @username` - Add a user as admin
+- `removeadmin @username` - Remove admin privileges
+- `authorize @username` - Authorize user for queue commands
+- `unauthorize @username` - Remove queue authorization
+
+#### Request Processing
+- `approve punishment <id>` - Approve a punishment request
+- `reject punishment <id>` - Reject a punishment request
+- `approve skip <user>` - Approve a skip request
+- `reject skip <user>` - Reject a skip request
+
+#### Information
+- `admins` - List all admins
+- `help` - Show all available commands
+
+## Setup Guide
+
+### 1. Initial Configuration
+
+After starting the bot and scanning the QR code:
+
+1. **Add Admins**:
+   ```
+   addadmin @your_username
+   addadmin @second_admin
+   ```
+
+2. **Authorize Queue Users** (up to 3):
+   ```
+   authorize @user1
+   authorize @user2
+   authorize @user3
+   ```
+
+3. **Add Users to Queue**:
+   ```
+   add
+   ```
+
+### 2. Daily Usage
+
+1. **Check Queue Status**:
+   ```
+   status
+   ```
+
+2. **Complete Your Turn**:
+   ```
+   done
+   ```
+
+3. **Request Position Swap**:
+   ```
+   swap @other_user
+   ```
+
+4. **Submit Punishment**:
+   ```
+   punish @user +2 left dishes dirty
+   ```
+
+## Data Storage
+
+The bot automatically saves all data to the `data/` directory:
+- `queue.json` - Queue state and user data
+- `punishments.json` - Punishment requests and admin data
+- `backups/` - Automatic backups of data files
+
+## File Structure
+
+```
+Dishwasher/
+├── index.js                 # Main bot file
+├── package.json            # Dependencies
+├── README.md               # This file
+├── src/
+│   ├── QueueManager.js     # Queue management logic
+│   ├── PunishmentManager.js # Punishment system
+│   ├── CommandHandler.js   # Command processing
+│   └── DataManager.js      # Data persistence
+└── data/                   # Data storage (created automatically)
+    ├── queue.json
+    ├── punishments.json
+    └── backups/
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **QR Code Not Appearing**:
+   - Make sure you have a stable internet connection
+   - Restart the bot if needed
+
+2. **Commands Not Working**:
+   - Check if you're authorized (for queue commands)
+   - Verify you're using the correct command syntax
+   - Make sure you're an admin (for admin commands)
+
+3. **Data Not Saving**:
+   - Check if the `data/` directory exists
+   - Ensure the bot has write permissions
+
+### Getting Help
+
+- Use the `help` command to see all available commands
+- Check the console output for error messages
+- Ensure all dependencies are properly installed
+
+## Security Notes
+
+- The bot uses WhatsApp Web API, so keep your session secure
+- Admin commands should only be used by trusted users
+- Regular backups are automatically created in the `data/backups/` directory
+
+## Contributing
+
+Feel free to submit issues or pull requests to improve the bot!
+
+## License
+
+MIT License - feel free to use and modify as needed.
