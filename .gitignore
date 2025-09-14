@@ -1,33 +1,14 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Data files
-data/
-*.json
-
-# WhatsApp session data
-.wwebjs_auth/
-.wwebjs_cache/
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Logs
-logs/
 *.log
+npm-debug.log*
 
 # Runtime data
-pids/
+pids
 *.pid
 *.seed
-*.pid.lock
 
 # Coverage directory used by tools like istanbul
 coverage/
@@ -58,7 +39,6 @@ jspm_packages/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS generated files
 .DS_Store
@@ -68,3 +48,20 @@ jspm_packages/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Test files (optional - you can remove these if you want to keep them)
+debug-test.js
+test-bot-v2.js
+test-bot.js
+test-telegram.js
+
+# Unused source files (optional - you can remove these if you want to keep them)
+src/
+index.js
+
+# WhatsApp session data and cache
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Git files
+.git/

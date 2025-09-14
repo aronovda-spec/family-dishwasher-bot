@@ -1,0 +1,11 @@
+{
+  "name": "family-dishwasher-bot",
+  "version": "1.0.0",
+  "description": "A Telegram bot for managing family dishwasher queue",
+  "main": "simple-telegram-bot.js",
+  "scripts": {
+    "start": "node simple-telegram-bot.js"
+  },
+  "dependencies": {},
+  "license": "MIT"
+}
