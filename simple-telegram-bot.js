@@ -11,6 +11,7 @@ const queue = ['Eden Aronov', 'Adele Aronov', 'Emma Aronov'];
 
 // User management
 const admins = new Set(); // Set of admin user IDs
+const adminChatIds = new Set(); // Set of admin chat IDs for notifications
 const authorizedUsers = new Set(); // Set of authorized user IDs (max 3)
 
 // Link Telegram users to queue names
@@ -446,6 +447,7 @@ function handleCommand(chatId, userId, userName, text) {
             admins.add(userToAdd);
             admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
             admins.add(userId.toString()); // Add user ID for the person adding the admin
+            adminChatIds.add(chatId); // Add chat ID for notifications
             sendMessage(chatId, `✅ **First Admin Added!**\n\n👨‍💼 ${userToAdd} is now the first admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments`);
             return;
         }
@@ -466,6 +468,7 @@ function handleCommand(chatId, userId, userName, text) {
         admins.add(userToAdd);
         admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
         admins.add(userId.toString()); // Add user ID for the person adding the admin
+        adminChatIds.add(chatId); // Add chat ID for notifications
         sendMessage(chatId, `✅ **Admin Added!**\n\n👨‍💼 ${userToAdd} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments`);
         
     } else if (command.startsWith('/removeadmin ')) {
@@ -751,9 +754,10 @@ function handleCallback(chatId, userId, userName, data) {
             `💡 **To authorize:** \`/authorize ${userName}\``;
         
         // Send notification to all admins
-        for (const adminId of admins) {
-            if (adminId !== userId) { // Don't notify the user themselves
-                sendMessage(adminId, adminNotification);
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId) { // Don't notify the user themselves
+                console.log(`🔔 Sending admin notification to chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, adminNotification);
             }
         }
     } else if (data === 'swap_menu') {
