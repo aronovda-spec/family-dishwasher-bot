@@ -136,6 +136,9 @@ function handleCommand(chatId, userId, userName, text) {
                 [
                     { text: "Force Swap", callback_data: "force_swap_menu" },
                     { text: "Apply Punishment", callback_data: "apply_punishment_menu" }
+                ],
+                [
+                    { text: "Dishwasher Alert!", callback_data: "dishwasher_alert" }
                 ]
             ];
         } else if (isAuthorized) {
@@ -735,6 +738,49 @@ function handleCallback(chatId, userId, userName, data) {
         handleCommand(chatId, userId, userName, 'admins');
     } else if (data === 'help') {
         handleCommand(chatId, userId, userName, 'help');
+    } else if (data === 'dishwasher_alert') {
+        console.log(`🔍 DEBUG - Dishwasher alert handler triggered by ${userName} (${userId})`);
+        
+        // Check if this is an admin
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        console.log(`🔍 DEBUG - Is admin check: ${isAdmin} (userName: ${userName}, userId: ${userId})`);
+        
+        if (!isAdmin) {
+            console.log(`🔍 DEBUG - Access denied for ${userName}`);
+            sendMessage(chatId, '❌ **Admin access required!**');
+            return;
+        }
+        
+        // Get current turn user
+        const currentUser = queue[currentTurn];
+        if (!currentUser) {
+            sendMessage(chatId, '❌ **No one is currently in the queue!**');
+            return;
+        }
+        
+        // Send alert to all authorized users and admins
+        const alertMessage = `🚨 **DISHWASHER ALERT!** 🚨\n\n👤 **It's ${currentUser}'s turn!**\n⏰ **Time to do the dishes!**\n\n📢 **Reminder sent by:** ${userName}`;
+        
+        // Notify all authorized users and admins
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            if (userChatId && userChatId !== chatId) {
+                console.log(`🔔 Sending dishwasher alert to ${user} (${userChatId})`);
+                sendMessage(userChatId, alertMessage);
+            }
+        });
+        
+        // Also notify admins using adminChatIds (in case they're not in userChatIds)
+        adminChatIds.forEach(adminChatId => {
+            if (adminChatId !== chatId) {
+                console.log(`🔔 Sending dishwasher alert to admin chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, alertMessage);
+            }
+        });
+        
+        // Send confirmation to admin
+        sendMessage(chatId, `✅ **Dishwasher Alert Sent!**\n\n👤 **Alerted:** ${currentUser}\n📢 **Sent to:** All authorized users and admins`);
+        
     } else if (data === 'authorize_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         if (isAdmin) {
@@ -1175,19 +1221,31 @@ function handleCallback(chatId, userId, userName, data) {
         // Apply punishment
         applyPunishment(punishmentRequest.targetUser, punishmentRequest.reason, userName);
         
+        // Send confirmation to admin who approved
+        sendMessage(chatId, `✅ **Punishment Approved!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}\n\n⚡ **3 extra turns applied immediately!**`);
+        
         // Notify requester
         sendMessage(punishmentRequest.fromUserId, `✅ **Punishment Approved!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}`);
         
         // Notify all other authorized users and admins about the approval
         const approvalMessage = `✅ **Punishment Request Approved!**\n\n👤 **Requested by:** ${punishmentRequest.fromUser}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}\n\n⚡ **3 extra turns applied immediately!**`;
         
-        [...authorizedUsers, ...admins].forEach(user => {
+        // Notify all authorized users
+        [...authorizedUsers].forEach(user => {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
                 console.log(`🔔 Sending punishment approval notification to ${user} (${userChatId})`);
                 sendMessage(userChatId, approvalMessage);
             }
         });
+        
+        // Notify all admins using adminChatIds
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId && adminChatId !== punishmentRequest.fromUserId) {
+                console.log(`🔔 Sending punishment approval notification to admin chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, approvalMessage);
+            }
+        }
         
         // Remove request
         pendingPunishments.delete(requestId);
@@ -1215,13 +1273,22 @@ function handleCallback(chatId, userId, userName, data) {
         // Notify all other authorized users and admins about the rejection
         const rejectionMessage = `❌ **Punishment Request Rejected!**\n\n👤 **Requested by:** ${punishmentRequest.fromUser}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Rejected by:** ${userName}`;
         
-        [...authorizedUsers, ...admins].forEach(user => {
+        // Notify all authorized users
+        [...authorizedUsers].forEach(user => {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
                 console.log(`🔔 Sending punishment rejection notification to ${user} (${userChatId})`);
                 sendMessage(userChatId, rejectionMessage);
             }
         });
+        
+        // Notify all admins using adminChatIds
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId && adminChatId !== punishmentRequest.fromUserId) {
+                console.log(`🔔 Sending punishment rejection notification to admin chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, rejectionMessage);
+            }
+        }
         
         // Remove request
         pendingPunishments.delete(requestId);
@@ -1245,45 +1312,48 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data.startsWith('admin_punish_')) {
         const targetUser = data.replace('admin_punish_', '');
         
-        // Apply punishment immediately with default reason (no reason input required)
-        const reason = 'Admin direct punishment (no reason provided)';
+        // Show reason selection for admin punishment
+        const buttons = [
+            [
+                { text: "Behavior", callback_data: `admin_punishment_reason_${targetUser}_Behavior` },
+                { text: "Household Rules", callback_data: `admin_punishment_reason_${targetUser}_Household Rules` }
+            ],
+            [
+                { text: "Respect", callback_data: `admin_punishment_reason_${targetUser}_Respect` },
+                { text: "Other", callback_data: `admin_punishment_reason_${targetUser}_Other` }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, `Apply Punishment - Select reason for ${targetUser}:`, buttons);
+        
+    } else if (data.startsWith('admin_punishment_reason_')) {
+        const parts = data.replace('admin_punishment_reason_', '').split('_');
+        const targetUser = parts[0];
+        const reason = parts[1];
+        
+        // Apply punishment directly with selected reason
         applyPunishment(targetUser, reason, userName);
         sendMessage(chatId, `✅ **Punishment Applied!**\n\n👤 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}\n\n⚡ **3 extra turns added immediately!**`);
         
-        // Notify all other authorized users and admins about the direct punishment
-        const directPunishmentMessage = `⚡ **Admin Direct Punishment Applied!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}\n\n⚡ **3 extra turns added immediately!**`;
+        // Notify all authorized users and admins about the admin direct punishment
+        const notificationMessage = `⚡ **Admin Direct Punishment Applied!**\n\n👤 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}\n\n⚡ **3 extra turns added immediately!**`;
         
-        [...authorizedUsers, ...admins].forEach(user => {
+        // Notify all authorized users
+        [...authorizedUsers].forEach(user => {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId) {
                 console.log(`🔔 Sending admin direct punishment notification to ${user} (${userChatId})`);
-                sendMessage(userChatId, directPunishmentMessage);
+                sendMessage(userChatId, notificationMessage);
             }
         });
         
-    } else if (data.startsWith('admin_punishment_reason_')) {
-        const parts = data.replace('admin_punishment_reason_', '').split(' ');
-        const requestId = parseInt(parts[0]);
-        const reason = parts.slice(1).join(' ');
-        
-        const punishmentRequest = pendingPunishments.get(requestId);
-        if (!punishmentRequest) {
-            sendMessage(chatId, '❌ **Punishment request not found or expired!**');
-            return;
+        // Notify all admins using adminChatIds
+        for (const adminChatId of adminChatIds) {
+            if (adminChatId !== chatId) {
+                console.log(`🔔 Sending admin direct punishment notification to admin chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, notificationMessage);
+            }
         }
-        
-        if (punishmentRequest.fromUserId !== userId) {
-            sendMessage(chatId, '❌ **This punishment request is not yours!**');
-            return;
-        }
-        
-        // Apply punishment directly (admin doesn't need approval)
-        applyPunishment(punishmentRequest.targetUser, reason, userName);
-        
-        sendMessage(chatId, `✅ **Punishment Applied!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}`);
-        
-        // Remove request
-        pendingPunishments.delete(requestId);
         
     } else {
         sendMessage(chatId, '❌ Unknown button action. Please use the main menu.');
