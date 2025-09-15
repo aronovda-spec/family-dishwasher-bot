@@ -123,6 +123,12 @@ function handleCommand(chatId, userId, userName, text) {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         
+        // If this user is an admin, store their chat ID for admin notifications
+        if (isAdmin) {
+            adminChatIds.add(chatId);
+            console.log(`👨‍💼 Admin ${userName} (${userId}) chat ID ${chatId} added to adminChatIds`);
+        }
+        
         let text = `Dishwasher Bot Menu`;
         let buttons = [];
         
@@ -472,9 +478,10 @@ function handleCommand(chatId, userId, userName, text) {
             // First admin can add themselves or anyone
             admins.add(userToAdd);
             admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
-            admins.add(userId.toString()); // Add user ID for the person adding the admin
-            adminChatIds.add(chatId); // Add chat ID for notifications
-            sendMessage(chatId, `✅ **First Admin Added!**\n\n👨‍💼 ${userToAdd} is now the first admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments`);
+            
+            // Note: We don't add chatId here because we don't know the new admin's chat ID yet
+            // The new admin's chat ID will be stored when they send /start or interact with the bot
+            sendMessage(chatId, `✅ **First Admin Added!**\n\n👨‍💼 ${userToAdd} is now the first admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** ${userToAdd} needs to send /start to the bot to receive notifications.`);
             return;
         }
         
@@ -493,9 +500,10 @@ function handleCommand(chatId, userId, userName, text) {
         // Add the new admin
         admins.add(userToAdd);
         admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
-        admins.add(userId.toString()); // Add user ID for the person adding the admin
-        adminChatIds.add(chatId); // Add chat ID for notifications
-        sendMessage(chatId, `✅ **Admin Added!**\n\n👨‍💼 ${userToAdd} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments`);
+        
+        // Note: We don't add chatId here because we don't know the new admin's chat ID yet
+        // The new admin's chat ID will be stored when they send /start or interact with the bot
+        sendMessage(chatId, `✅ **Admin Added!**\n\n👨‍💼 ${userToAdd} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** ${userToAdd} needs to send /start to the bot to receive notifications.`);
         
     } else if (command.startsWith('/removeadmin ')) {
         // Check if user is already an admin
