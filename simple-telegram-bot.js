@@ -2,7 +2,7 @@
 const https = require('https');
 const fs = require('fs');
 
-const token = '8488813166:AAEk3G5Qe8Yw0B3OlAfLLYq8qszdPL0obUI';
+const token = process.env.TELEGRAM_BOT_TOKEN || '8488813166:AAEk3G5Qe8Yw0B3OlAfLLYq8qszdPL0obUI';
 const botUrl = `https://api.telegram.org/bot${token}`;
 
 // Simple queue management
@@ -1503,12 +1503,195 @@ function cleanupExpiredRequests() {
     }
 }
 
-console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
-console.log('📱 Bot is now listening for commands...');
-console.log('🔍 Search for: @aronov_dishwasher_bot');
+// Webhook support for Render deployment
+const http = require('http');
+const url = require('url');
+
+// Keep-alive mechanism to prevent Render from sleeping
+function keepAlive() {
+    const keepAliveUrl = process.env.KEEP_ALIVE_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost'}`;
+    
+    if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+        console.log('🔄 Sending keep-alive ping...');
+        https.get(keepAliveUrl, (res) => {
+            console.log('✅ Keep-alive ping successful');
+        }).on('error', (err) => {
+            console.log('❌ Keep-alive ping failed:', err.message);
+        });
+    }
+}
+
+// HTTP server for webhook and health check
+const server = http.createServer((req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    
+    // Health check endpoint
+    if (parsedUrl.pathname === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            status: 'healthy', 
+            timestamp: new Date().toISOString(),
+            instance: instanceId,
+            queue: queue.length,
+            currentTurn: currentTurn
+        }));
+        return;
+    }
+    
+    // Webhook endpoint for Telegram
+    if (parsedUrl.pathname === '/webhook' && req.method === 'POST') {
+        let body = '';
+        
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        
+        req.on('end', () => {
+            try {
+                const update = JSON.parse(body);
+                
+                // Deduplication: Skip if this update was already processed
+                if (processedUpdates.has(update.update_id)) {
+                    console.log(`🔄 Skipping duplicate webhook update ${update.update_id} (instance: ${instanceId})`);
+                    res.writeHead(200);
+                    res.end('OK');
+                    return;
+                }
+                
+                // Mark this update as processed
+                processedUpdates.add(update.update_id);
+                
+                // Clean up old processed updates (keep only last 1000)
+                if (processedUpdates.size > 1000) {
+                    const oldestUpdates = Array.from(processedUpdates).slice(0, 100);
+                    oldestUpdates.forEach(id => processedUpdates.delete(id));
+                }
+                
+                // Process the update
+                if (update.message) {
+                    const chatId = update.message.chat.id;
+                    const userId = update.message.from.id;
+                    const userName = update.message.from.first_name + 
+                        (update.message.from.last_name ? ' ' + update.message.from.last_name : '');
+                    const text = update.message.text;
+                    
+                    handleCommand(chatId, userId, userName, text);
+                }
+                
+                if (update.callback_query) {
+                    const chatId = update.callback_query.message.chat.id;
+                    const userId = update.callback_query.from.id;
+                    const userName = update.callback_query.from.first_name + 
+                        (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
+                    const data = update.callback_query.data;
+                    
+                    // Button click deduplication: prevent rapid multiple clicks on same button
+                    const now = Date.now();
+                    const lastAction = lastUserAction.get(userId);
+                    
+                    if (lastAction && lastAction.action === data && (now - lastAction.timestamp) < ACTION_COOLDOWN) {
+                        console.log(`🔄 Skipping rapid button click: ${data} by ${userName} (cooldown: ${ACTION_COOLDOWN}ms)`);
+                        res.writeHead(200);
+                        res.end('OK');
+                        return;
+                    }
+                    
+                    // Update last action
+                    lastUserAction.set(userId, { action: data, timestamp: now });
+                    
+                    handleCallback(chatId, userId, userName, data);
+                    
+                    // Answer callback query
+                    const answerUrl = `${botUrl}/answerCallbackQuery`;
+                    const answerData = JSON.stringify({
+                        callback_query_id: update.callback_query.id
+                    });
+                    
+                    const answerOptions = {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': answerData.length
+                        }
+                    };
+                    
+                    const answerReq = https.request(answerUrl, answerOptions);
+                    answerReq.write(answerData);
+                    answerReq.end();
+                }
+                
+                res.writeHead(200);
+                res.end('OK');
+                
+            } catch (error) {
+                console.log('❌ Error processing webhook:', error.message);
+                res.writeHead(400);
+                res.end('Bad Request');
+            }
+        });
+        
+        return;
+    }
+    
+    // Default response
+    res.writeHead(404);
+    res.end('Not Found');
+});
+
+// Start server on Render port
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔗 Webhook endpoint: http://localhost:${PORT}/webhook`);
+});
+
+// Set webhook if deploying to Render
+if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    const webhookUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`;
+    console.log(`🔗 Setting webhook to: ${webhookUrl}`);
+    
+    const webhookData = JSON.stringify({
+        url: webhookUrl
+    });
+    
+    const webhookOptions = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': webhookData.length
+        }
+    };
+    
+    const webhookReq = https.request(`${botUrl}/setWebhook`, webhookOptions, (res) => {
+        let responseData = '';
+        res.on('data', (chunk) => {
+            responseData += chunk;
+        });
+        res.on('end', () => {
+            console.log('🔗 Webhook response:', responseData);
+        });
+    });
+    
+    webhookReq.write(webhookData);
+    webhookReq.end();
+} else {
+    // Use polling for local development
+    console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
+    console.log('📱 Bot is now listening for commands...');
+    console.log('🔍 Search for: @aronov_dishwasher_bot');
+    
+    // Start cleanup timer (every minute)
+    setInterval(cleanupExpiredRequests, 60000);
+    
+    // Start polling for updates
+    getUpdates();
+}
+
+// Keep-alive mechanism (every 5 minutes)
+if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    setInterval(keepAlive, 5 * 60 * 1000); // 5 minutes
+}
 
 // Start cleanup timer (every minute)
 setInterval(cleanupExpiredRequests, 60000);
-
-// Start polling for updates
-getUpdates();

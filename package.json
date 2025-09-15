@@ -4,7 +4,11 @@
   "description": "A Telegram bot for managing family dishwasher queue",
   "main": "simple-telegram-bot.js",
   "scripts": {
-    "start": "node simple-telegram-bot.js"
+    "start": "node simple-telegram-bot.js",
+    "dev": "node simple-telegram-bot.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {},
   "license": "MIT"

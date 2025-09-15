@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: dishwasher-bot
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: RENDER_EXTERNAL_HOSTNAME
+        fromService:
+          type: web
+          name: dishwasher-bot
+          property: host
