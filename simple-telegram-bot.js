@@ -415,25 +415,21 @@ function handleCommand(chatId, userId, userName, text) {
         }
         
     } else if (command === '/help' || command === 'help') {
-        const helpMessage = `🤖 **Dishwasher Bot Commands:**\n\n` +
-            `📋 **Queue Commands:**\n` +
-            `• \`/status\` - Show current queue\n` +
-            `• \`/done\` - Complete your turn\n\n` +
-            `🔄 **Swap Features:**\n` +
-            `• **Swap** - Request to swap with another user (requires approval)\n` +
-            `• **Force Swap** - Admin can force swap any two users (no approval needed)\n\n` +
-            `⚡ **Punishment System:**\n` +
-            `• **Request Punishment** - Report another user (notifies admins)\n` +
-            `• **Apply Punishment** - Admin can punish directly (3 EXTRA turns)\n` +
-            `• **Simple & Direct** (no strike counting needed!)\n\n` +
-            `👥 **User Management:**\n` +
-            `• \`/admins\` - Show current admins\n` +
-            `• \`/users\` - Show authorized users\n` +
-            `• \`/addadmin <user>\` - Add admin\n` +
-            `• \`/removeadmin <user>\` - Remove admin\n` +
-            `• \`/authorize <user>\` - Authorize user\n\n` +
-            `🎯 **Fixed Queue:** Eden → Adele → Emma → (repeating)\n\n` +
-            `💡 **Tip:** Use the buttons for easier mobile interaction!`;
+        const helpMessage = `🤖 **בוט מדיח הכלים של המשפחה (Family Dishwasher Bot):**\n\n` +
+            `📋 **פקודות התור (Queue Commands):**\n` +
+            `• \`/status\` - הצגת התור הנוכחי (Show current queue)\n` +
+            `• \`/done\` - השלמת התור שלך (Complete your turn)\n\n` +
+            `🔄 **החלפת תורות (Swap Turns):**\n` +
+            `• **החלפה (Swap)** - בקשה להחלפה עם משתמש אחר\n` +
+            `• **תהליך:** בחר משתמש → המשתמש מקבל הודעה → צריך לאשר או לדחות\n` +
+            `• **אישור:** שני הצדדים צריכים להסכים להחלפה\n` +
+            `• **ביטול:** אתה יכול לבטל את הבקשה שלך בכל עת (כפתור "Cancel Request")\n\n` +
+            `⚡ **דיווח על משתמש (Report User):**\n` +
+            `• **בקשת ענישה (Request Punishment)** - דיווח על משתמש אחר\n` +
+            `• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n` +
+            `• **אישור:** מנהל צריך לאשר את הענישה (3 תורות נוספים)\n\n` +
+            `🎯 **תור קבוע (Fixed Queue):** עדן (Eden) → עדלה (Adele) → אמה (Emma) → (חוזר)\n\n` +
+            `💡 **טיפ (Tip):** השתמש בכפתורים לניווט קל יותר! (Use buttons for easier mobile interaction!)`;
         
         sendMessage(chatId, helpMessage);
         
@@ -552,7 +548,7 @@ function handleCommand(chatId, userId, userName, text) {
         punishmentRequest.reason = reason;
         
         // Notify all admins
-        const adminMessage = `⚡ **Punishment Request**\n\n👤 **From:** ${userName}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${reason}\n\n⏰ **Request expires in 10 minutes**`;
+        const adminMessage = `⚡ **Punishment Request**\n\n👤 **From:** ${userName}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${reason}`;
         
         const buttons = [
             [
@@ -918,7 +914,7 @@ function handleCallback(chatId, userId, userName, data) {
             ];
             
             sendMessageWithButtons(targetUserId, 
-                `🔄 **Swap Request**\n\n👤 **From:** ${userName} (${currentUserQueueName})\n🎯 **Wants to swap with:** ${targetUser}\n\n⏰ **Request expires in 5 minutes**`, 
+                `🔄 **Swap Request**\n\n👤 **From:** ${userName} (${currentUserQueueName})\n🎯 **Wants to swap with:** ${targetUser}`, 
                 buttons
             );
         }
@@ -1480,36 +1476,7 @@ function getUpdates(offset = 0) {
     });
 }
 
-// Cleanup expired requests every minute
-function cleanupExpiredRequests() {
-    const now = Date.now();
-    const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
-    const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
-    
-    // Cleanup expired swap requests
-    for (const [requestId, request] of pendingSwaps.entries()) {
-        if (now - request.timestamp > fiveMinutes) {
-            // Notify the requester that the request expired
-            sendMessage(request.fromUserId, `⏰ **Swap request expired!**\n\n🎯 Your swap request with ${request.toUser} has expired after 5 minutes.`);
-            
-            // Remove expired request
-            pendingSwaps.delete(requestId);
-            console.log(`🧹 Cleaned up expired swap request ${requestId}`);
-        }
-    }
-    
-    // Cleanup expired punishment requests
-    for (const [requestId, request] of pendingPunishments.entries()) {
-        if (now - request.timestamp > tenMinutes) {
-            // Notify the requester that the request expired
-            sendMessage(request.fromUserId, `⏰ **Punishment request expired!**\n\n🎯 Your punishment request for ${request.targetUser} has expired after 10 minutes.`);
-            
-            // Remove expired request
-            pendingPunishments.delete(requestId);
-            console.log(`🧹 Cleaned up expired punishment request ${requestId}`);
-        }
-    }
-}
+// Note: Time limitations removed - requests stay until manually canceled
 
 // Webhook support for Render deployment
 const http = require('http');
@@ -1689,9 +1656,6 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     console.log('📱 Bot is now listening for commands...');
     console.log('🔍 Search for: @aronov_dishwasher_bot');
     
-    // Start cleanup timer (every minute)
-    setInterval(cleanupExpiredRequests, 60000);
-    
     // Start polling for updates
     getUpdates();
 }
@@ -1701,5 +1665,4 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     setInterval(keepAlive, 5 * 60 * 1000); // 5 minutes
 }
 
-// Start cleanup timer (every minute)
-setInterval(cleanupExpiredRequests, 60000);
+// Note: Cleanup timer removed - no time limitations on requests
