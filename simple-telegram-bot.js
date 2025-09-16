@@ -203,7 +203,12 @@ const translations = {
         // Button texts
         'approve': '✅ Approve',
         'reject': '❌ Reject',
-        'current_turn_button': '🎯 {user} (Current Turn)'
+        'current_turn_button': '🎯 {user} (Current Turn)',
+        
+        // Usage messages
+        'usage_addadmin': '❌ **שימוש:** `/addadmin <שם משתמש>`\n\nדוגמה: `/addadmin Dani`',
+        'usage_removeadmin': '❌ **שימוש:** `/removeadmin <שם משתמש>`\n\nדוגמה: `/removeadmin Dani`',
+        'usage_authorize': '❌ **שימוש:** `/authorize <שם משתמש>`\n\nדוגמה: `/authorize Eden`'
     },
     he: {
         // Menu titles
@@ -355,7 +360,12 @@ const translations = {
         // Button texts
         'approve': '✅ אשר',
         'reject': '❌ דחה',
-        'current_turn_button': '🎯 {user} (התור הנוכחי)'
+        'current_turn_button': '🎯 {user} (התור הנוכחי)',
+        
+        // Usage messages
+        'usage_addadmin': '❌ **Usage:** `/addadmin <username>`\n\nExample: `/addadmin Dani`',
+        'usage_removeadmin': '❌ **Usage:** `/removeadmin <username>`\n\nExample: `/removeadmin Dani`',
+        'usage_authorize': '❌ **Usage:** `/authorize <username>`\n\nExample: `/authorize Eden`'
     }
 };
 
@@ -835,7 +845,7 @@ function handleCommand(chatId, userId, userName, text) {
         const userToAdd = command.replace('/addadmin ', '').trim();
         
         if (!userToAdd) {
-            sendMessage(chatId, '❌ **Usage:** `/addadmin <username>`\n\nExample: `/addadmin Dani`');
+            sendMessage(chatId, t(userId, 'usage_addadmin'));
             return;
         }
         
@@ -853,13 +863,13 @@ function handleCommand(chatId, userId, userName, text) {
         
         // If there are existing admins, check if current user is an admin
         if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
-            sendMessage(chatId, `❌ **Admin access required!**\n\n👤 ${userName} is not an admin.\n\n💡 **Ask an existing admin to add you:**\n\`/addadmin ${userName}\``);
+            sendMessage(chatId, t(userId, 'not_authorized_queue_commands', {user: userName}));
             return;
         }
         
         // Prevent self-promotion for existing admins
         if (userToAdd.toLowerCase() === userName.toLowerCase() || userToAdd === userId.toString()) {
-            sendMessage(chatId, `❌ **Cannot add yourself as admin!**\n\n🛡️ **Security protection:** Only other admins can promote you.\n\n💡 **Ask another admin to add you:**\n\`/addadmin ${userName}\``);
+            sendMessage(chatId, t(userId, 'cannot_add_yourself_admin', {user: userName}));
             return;
         }
         
@@ -874,7 +884,7 @@ function handleCommand(chatId, userId, userName, text) {
     } else if (command.startsWith('/removeadmin ')) {
         // Check if user is already an admin
         if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
-            sendMessage(chatId, `❌ **Admin access required!**\n\n👤 ${userName} is not an admin.`);
+            sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: userName}));
             return;
         }
         
@@ -894,7 +904,7 @@ function handleCommand(chatId, userId, userName, text) {
                 sendMessage(chatId, `❌ **User not found!**\n\n👤 ${userToRemove} is not an admin.\n\n💡 **Use \`/admins\` to see current admins.**`);
             }
         } else {
-            sendMessage(chatId, '❌ **Usage:** `/removeadmin <username>`\n\nExample: `/removeadmin Dani`');
+            sendMessage(chatId, t(userId, 'usage_removeadmin'));
         }
         
     } else if (command.startsWith('punishment_reason_')) {
@@ -995,7 +1005,7 @@ function handleCommand(chatId, userId, userName, text) {
                 }
             }
         } else {
-            sendMessage(chatId, '❌ **Usage:** `/authorize <username>`\n\nExample: `/authorize Eden`');
+            sendMessage(chatId, t(userId, 'usage_authorize'));
         }
         
     } else {
