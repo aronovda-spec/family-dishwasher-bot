@@ -102,6 +102,7 @@ const translations = {
         'alerted_user': '👤 **Alerted:**',
         'sent_to_all': '📢 **Sent to:** All authorized users and admins',
         'swap_request_sent': '✅ **Swap request sent to admins!**',
+        'punishment_request_sent': '✅ **Punishment request sent to admins!**',
         'target_user': '🎯 **Target:**',
         'reason': '📝 **Reason:**',
         'waiting_approval': '⏰ **Waiting for admin approval...**',
@@ -206,6 +207,7 @@ const translations = {
         'alerted_user': '👤 **הותרע:**',
         'sent_to_all': '📢 **נשלח אל:** כל המשתמשים והמנהלים',
         'swap_request_sent': '✅ **בקשת החלפה נשלחה למנהלים!**',
+        'punishment_request_sent': '✅ **בקשת עונש נשלחה למנהלים!**',
         'target_user': '🎯 **יעד:**',
         'reason': '📝 **סיבה:**',
         'waiting_approval': '⏰ **ממתין לאישור מנהל...**',
@@ -839,7 +841,7 @@ function handleCommand(chatId, userId, userName, text) {
             }
         });
         
-        sendMessage(chatId, `✅ **Punishment request sent to admins!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${reason}\n⏰ **Waiting for admin approval...**`);
+        sendMessage(chatId, `${t(userId, 'punishment_request_sent')}\n\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'waiting_approval')}`);
         
     } else if (command.startsWith('admin_punishment_reason_')) {
         // Handle admin punishment reason input
