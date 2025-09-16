@@ -37,6 +37,9 @@ const instanceId = process.env.RENDER_INSTANCE_ID || `local-${Date.now()}`;
 const lastUserAction = new Map(); // Map: userId -> {action, timestamp}
 const ACTION_COOLDOWN = 1000; // 1 second cooldown between same actions
 
+// Language preference storage
+const userLanguage = new Map(); // Map: userId -> 'en' or 'he'
+
 // Royal emoji mapping for elegant display
 const royalEmojis = {
     // Admins (by order of addition)
@@ -47,6 +50,65 @@ const royalEmojis = {
     'Adele Aronov': '⭐', // Princess 2  
     'Emma Aronov': '✨'  // Princess 3
 };
+
+// Translation dictionaries
+const translations = {
+    en: {
+        // Menu titles
+        'admin_menu': 'Admin Menu - Full Access',
+        'user_menu': 'User Menu - Queue Access',
+        'guest_menu': 'Guest Menu - Limited Access',
+        
+        // Button texts
+        'status': '📊 Status',
+        'done': '✅ Done',
+        'help': '❓ Help',
+        'request_access': '🔐 Request Access',
+        'users': '👥 Users',
+        'admins': '🔑 Admins',
+        'authorize': '🎫 Authorize',
+        'add_admin': '👑 Add Admin',
+        'force_swap': '⚡ Force Swap',
+        'apply_punishment': '⚖️ Apply Punishment',
+        'dishwasher_alert': '🚨 Dishwasher Alert!',
+        'swap': '🔄 Swap',
+        'request_punishment': '⚖️ Request Punishment',
+        'language_switch': '🇮🇱 עברית'
+    },
+    he: {
+        // Menu titles
+        'admin_menu': 'תפריט מנהל - גישה מלאה',
+        'user_menu': 'תפריט משתמש - גישה לתור',
+        'guest_menu': 'תפריט אורח - גישה מוגבלת',
+        
+        // Button texts
+        'status': '📊 מצב',
+        'done': '✅ סיים',
+        'help': '❓ עזרה',
+        'request_access': '🔐 בקש גישה',
+        'users': '👥 משתמשים',
+        'admins': '🔑 מנהלים',
+        'authorize': '🎫 הרשה',
+        'add_admin': '👑 הוסף מנהל',
+        'force_swap': '⚡ החלף בכוח',
+        'apply_punishment': '⚖️ הפעל עונש',
+        'dishwasher_alert': '🚨 התראת כלים!',
+        'swap': '🔄 החלף',
+        'request_punishment': '⚖️ בקש עונש',
+        'language_switch': '🇺🇸 English'
+    }
+};
+
+// Get user's language preference
+function getUserLanguage(userId) {
+    return userLanguage.get(userId) || 'en'; // Default to English
+}
+
+// Get translated text
+function t(userId, key) {
+    const lang = getUserLanguage(userId);
+    return translations[lang][key] || translations.en[key] || key;
+}
 
 // Function to add royal emoji to user names
 function addRoyalEmoji(userName) {
@@ -164,55 +226,61 @@ function handleCommand(chatId, userId, userName, text) {
         let buttons = [];
         
         if (isAdmin) {
-            text += `Admin Menu - Full Access`;
+            text += t(userId, 'admin_menu');
             buttons = [
                 [
-                    { text: "📊 Status", callback_data: "status" },
-                    { text: "✅ Done", callback_data: "done" }
+                    { text: t(userId, 'status'), callback_data: "status" },
+                    { text: t(userId, 'done'), callback_data: "done" }
                 ],
                 [
-                    { text: "👥 Users", callback_data: "users" },
-                    { text: "🔑 Admins", callback_data: "admins" }
+                    { text: t(userId, 'users'), callback_data: "users" },
+                    { text: t(userId, 'admins'), callback_data: "admins" }
                 ],
                 [
-                    { text: "🎫 Authorize", callback_data: "authorize_menu" },
-                    { text: "👑 Add Admin", callback_data: "addadmin_menu" }
+                    { text: t(userId, 'authorize'), callback_data: "authorize_menu" },
+                    { text: t(userId, 'add_admin'), callback_data: "addadmin_menu" }
                 ],
                 [
-                    { text: "⚡ Force Swap", callback_data: "force_swap_menu" },
-                    { text: "⚖️ Apply Punishment", callback_data: "apply_punishment_menu" }
+                    { text: t(userId, 'force_swap'), callback_data: "force_swap_menu" },
+                    { text: t(userId, 'apply_punishment'), callback_data: "apply_punishment_menu" }
                 ],
                 [
-                    { text: "🚨 Dishwasher Alert!", callback_data: "dishwasher_alert" }
+                    { text: t(userId, 'dishwasher_alert'), callback_data: "dishwasher_alert" }
+                ],
+                [
+                    { text: t(userId, 'language_switch'), callback_data: "language_switch" }
                 ]
             ];
         } else if (isAuthorized) {
-            text += `User Menu - Queue Access`;
+            text += t(userId, 'user_menu');
             buttons = [
                 [
-                    { text: "📊 Status", callback_data: "status" },
-                    { text: "✅ Done", callback_data: "done" }
+                    { text: t(userId, 'status'), callback_data: "status" },
+                    { text: t(userId, 'done'), callback_data: "done" }
                 ],
                 [
-                    { text: "🔄 Swap", callback_data: "swap_menu" },
-                    { text: "⚖️ Request Punishment", callback_data: "request_punishment_menu" }
+                    { text: t(userId, 'swap'), callback_data: "swap_menu" },
+                    { text: t(userId, 'request_punishment'), callback_data: "request_punishment_menu" }
                 ],
                 [
-                    { text: "❓ Help", callback_data: "help" }
+                    { text: t(userId, 'help'), callback_data: "help" }
+                ],
+                [
+                    { text: t(userId, 'language_switch'), callback_data: "language_switch" }
                 ]
             ];
         } else {
-            text += `Guest Menu - Limited Access`;
+            text += t(userId, 'guest_menu');
             buttons = [
                 [
-                    { text: "📊 Status", callback_data: "status" },
-                    { text: "❓ Help", callback_data: "help" }
+                    { text: t(userId, 'status'), callback_data: "status" },
+                    { text: t(userId, 'help'), callback_data: "help" }
                 ],
                 [
-                    { text: "🔐 Request Access", callback_data: "request_access" }
+                    { text: t(userId, 'request_access'), callback_data: "request_access" }
                 ],
                 [
-                    { text: "🧪 טסט", callback_data: "hebrew_test" }
+                    { text: t(userId, 'language_switch'), callback_data: "language_switch" }
                 ]
             ];
         }
@@ -877,15 +945,16 @@ function handleCallback(chatId, userId, userName, data) {
             }
         }
         
-    } else if (data === 'hebrew_test') {
-        const hebrewMessage = `🧪 **בדיקה בעברית** 🧪\n\n` +
-            `שלום ${userName}! 👋\n\n` +
-            `זהו כפתור בדיקה בעברית.\n` +
-            `הבוט תומך בטקסט דו-כיווני! 🎯\n\n` +
-            `**Hebrew Test Successful!** ✅\n` +
-            `Mixed Hebrew and English text works perfectly! 🌟`;
+    } else if (data === 'language_switch') {
+        const currentLang = getUserLanguage(userId);
+        const newLang = currentLang === 'en' ? 'he' : 'en';
+        userLanguage.set(userId, newLang);
         
-        sendMessage(chatId, hebrewMessage);
+        const switchMessage = newLang === 'he' ? 
+            `🇮🇱 **שפה שונתה לעברית!** ✅\n\nהבוט יציג כעת הכל בעברית.\nשלח /start כדי לראות את התפריט החדש! 🎯` :
+            `🇺🇸 **Language switched to English!** ✅\n\nThe bot will now display everything in English.\nSend /start to see the new menu! 🎯`;
+        
+        sendMessage(chatId, switchMessage);
         
     } else if (data === 'swap_menu') {
         const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
