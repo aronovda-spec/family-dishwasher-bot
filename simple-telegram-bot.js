@@ -227,7 +227,20 @@ const translations = {
         'swap_request_not_for_you': '❌ **This swap request is not for you!**',
         'swap_request_not_yours': '❌ **This swap request is not yours!**',
         'not_authorized_punishment': '❌ **Not authorized!** You need to be authorized to request punishments.',
-        'no_users_available_report': '❌ **No users available to report!**'
+        'no_users_available_report': '❌ **No users available to report!**',
+        
+        // Swap request messages
+        'swap_request_title': 'Swap Request',
+        'new_swap_request': 'New Swap Request',
+        'from_user': 'From',
+        'wants_to_swap_with': 'Wants to swap with',
+        'time': 'Time',
+        'request_id': 'Request ID',
+        'swap_request_rejected_title': 'Swap Request Rejected',
+        'rejected_by': 'Rejected by',
+        
+        // Punishment request messages
+        'punishment_request_title': 'Punishment Request'
     },
     he: {
         // Menu titles
@@ -403,7 +416,20 @@ const translations = {
         'swap_request_not_for_you': '❌ **בקשת החלפה זו לא מיועדת לך!**',
         'swap_request_not_yours': '❌ **בקשת החלפה זו לא שלך!**',
         'not_authorized_punishment': '❌ **לא מורשה!** אתה צריך להיות מורשה כדי לבקש עונשים.',
-        'no_users_available_report': '❌ **אין משתמשים זמינים לדיווח!**'
+        'no_users_available_report': '❌ **אין משתמשים זמינים לדיווח!**',
+        
+        // Swap request messages
+        'swap_request_title': 'בקשת החלפה',
+        'new_swap_request': 'בקשת החלפה חדשה',
+        'from_user': 'מאת',
+        'wants_to_swap_with': 'רוצה להחליף עם',
+        'time': 'זמן',
+        'request_id': 'מזהה בקשה',
+        'swap_request_rejected_title': 'בקשת החלפה נדחתה',
+        'rejected_by': 'נדחתה על ידי',
+        
+        // Punishment request messages
+        'punishment_request_title': 'בקשת עונש'
     }
 };
 
@@ -1332,7 +1358,7 @@ function handleCallback(chatId, userId, userName, data) {
             ]);
             
             sendMessageWithButtons(targetUserId, 
-                `🔄 **Swap Request**\n\n👤 **From:** ${userName} (${currentUserQueueName})\n🎯 **Wants to swap with:** ${targetUser}`, 
+                `🔄 **${t(targetUserId, 'swap_request_title')}**\n\n👤 **${t(targetUserId, 'from_user')}:** ${userName} (${currentUserQueueName})\n🎯 **${t(targetUserId, 'wants_to_swap_with')}:** ${targetUser}`, 
                 buttons
             );
         }
@@ -1341,7 +1367,7 @@ function handleCallback(chatId, userId, userName, data) {
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId && adminChatId !== targetUserId) { // Don't notify the requester or target user
                 // Create notification in admin's language
-                const adminNotification = `🔄 **New Swap Request**\n\n👤 **From:** ${userName} (${currentUserQueueName})\n🎯 **Wants to swap with:** ${targetUser}\n📅 **Time:** ${new Date().toLocaleString()}\n\n💡 **Request ID:** ${requestId}`;
+                const adminNotification = `🔄 **${t(adminChatId, 'new_swap_request')}**\n\n👤 **${t(adminChatId, 'from_user')}:** ${userName} (${currentUserQueueName})\n🎯 **${t(adminChatId, 'wants_to_swap_with')}:** ${targetUser}\n📅 **${t(adminChatId, 'time')}:** ${new Date().toLocaleString()}\n\n💡 **${t(adminChatId, 'request_id')}:** ${requestId}`;
                 console.log(`🔔 Sending admin swap notification to chat ID: ${adminChatId}`);
                 sendMessage(adminChatId, adminNotification);
             }
@@ -1400,7 +1426,7 @@ function handleCallback(chatId, userId, userName, data) {
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId && adminChatId !== swapRequest.fromUserId) { // Don't notify the rejector or requester
                 // Create rejection notification in admin's language
-                const adminNotification = `❌ **Swap Request Rejected**\n\n👤 **From:** ${swapRequest.fromUser}\n👤 **Rejected by:** ${userName}\n📅 **Time:** ${new Date().toLocaleString()}`;
+                const adminNotification = `❌ **${t(adminChatId, 'swap_request_rejected_title')}**\n\n👤 **${t(adminChatId, 'from_user')}:** ${swapRequest.fromUser}\n👤 **${t(adminChatId, 'rejected_by')}:** ${userName}\n📅 **${t(adminChatId, 'time')}:** ${new Date().toLocaleString()}`;
                 console.log(`🔔 Sending admin swap rejection notification to chat ID: ${adminChatId}`);
                 sendMessage(adminChatId, adminNotification);
             }
@@ -1623,11 +1649,11 @@ function handleCallback(chatId, userId, userName, data) {
         });
         
         // Notify all admins with approval/rejection buttons in their language
-        const adminMessage = `Punishment Request\n\nFrom: ${userName}\nTarget: ${targetUser}\nReason: ${reason}`;
-        
-        // Send to all admins with localized buttons
+        // Send to all admins with localized message and buttons
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId) { // Don't notify the requester
+                // Create message in admin's language
+                const adminMessage = `${t(adminChatId, 'punishment_request_title')}\n\n${t(adminChatId, 'from_user')}: ${userName}\n${t(adminChatId, 'target_user')}: ${targetUser}\n${t(adminChatId, 'reason')}: ${reason}`;
                 const buttons = createLocalizedButtons(adminChatId, [
                     [
                         { translationKey: 'approve', callback_data: `punishment_approve_${requestId}` },
