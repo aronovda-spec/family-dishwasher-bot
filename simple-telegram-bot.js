@@ -206,10 +206,16 @@ const translations = {
         'current_turn_button': '🎯 {user} (Current Turn)',
         
         // Usage messages
-        'usage_addadmin': '❌ **שימוש:** `/addadmin <שם משתמש>`\n\nדוגמה: `/addadmin Dani`',
-        'usage_removeadmin': '❌ **שימוש:** `/removeadmin <שם משתמש>`\n\nדוגמה: `/removeadmin Dani`',
-        'usage_authorize': '❌ **שימוש:** `/authorize <שם משתמש>`\n\nדוגמה: `/authorize Eden`',
-        'unknown_command': '❌ פקודה לא מוכרת. הקלד /help כדי לראות פקודות זמינות.'
+        'usage_addadmin': '❌ **Usage:** `/addadmin <username>`\n\nExample: `/addadmin Dani`',
+        'usage_removeadmin': '❌ **Usage:** `/removeadmin <username>`\n\nExample: `/removeadmin Dani`',
+        'usage_authorize': '❌ **Usage:** `/authorize <username>`\n\nExample: `/authorize Eden`',
+        'unknown_command': '❌ Unknown command. Type /help to see available commands.',
+        
+        // Queue update messages
+        'queue_update': 'Queue Update',
+        'swapped_positions': 'swapped positions',
+        'new_queue_order': 'New queue order',
+        'current_turn_status': 'CURRENT TURN'
     },
     he: {
         // Menu titles
@@ -364,10 +370,16 @@ const translations = {
         'current_turn_button': '🎯 {user} (התור הנוכחי)',
         
         // Usage messages
-        'usage_addadmin': '❌ **Usage:** `/addadmin <username>`\n\nExample: `/addadmin Dani`',
-        'usage_removeadmin': '❌ **Usage:** `/removeadmin <username>`\n\nExample: `/removeadmin Dani`',
-        'usage_authorize': '❌ **Usage:** `/authorize <username>`\n\nExample: `/authorize Eden`',
-        'unknown_command': '❌ Unknown command. Type /help to see available commands.'
+        'usage_addadmin': '❌ **שימוש:** `/addadmin <שם משתמש>`\n\nדוגמה: `/addadmin Dani`',
+        'usage_removeadmin': '❌ **שימוש:** `/removeadmin <שם משתמש>`\n\nדוגמה: `/removeadmin Dani`',
+        'usage_authorize': '❌ **שימוש:** `/authorize <שם משתמש>`\n\nדוגמה: `/authorize Eden`',
+        'unknown_command': '❌ פקודה לא מוכרת. הקלד /help כדי לראות פקודות זמינות.',
+        
+        // Queue update messages
+        'queue_update': 'עדכון התור',
+        'swapped_positions': 'החליפו מקומות',
+        'new_queue_order': 'סדר התור החדש',
+        'current_turn_status': 'התור הנוכחי'
     }
 };
 
@@ -717,14 +729,22 @@ function handleCommand(chatId, userId, userName, text) {
             // Send confirmation to admin
             sendMessage(chatId, adminDoneMessage);
             
-            // Notify all authorized users and admins
+            // Notify all authorized users and admins in their language
             [...authorizedUsers, ...admins].forEach(user => {
                 // Try to find chat ID for this user
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 
                 if (userChatId && userChatId !== chatId) {
+                    // Create message in recipient's language
+                    const userDoneMessage = `${t(userChatId, 'admin_intervention')}\n\n` +
+                        `${t(userChatId, 'admin_completed_duty', {admin: userName})}\n` +
+                        `${t(userChatId, 'helped_user', {user: currentUser})}\n` +
+                        `${t(userChatId, 'next_turn', {user: nextUser})}` +
+                        (punishmentTurnsRemaining > 0 ? `\n${t(userChatId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '') +
+                        `\n\n${t(userChatId, 'admin_can_apply_punishment', {user: currentUser})}`;
+                    
                     console.log(`🔔 Sending admin DONE notification to ${user} (${userChatId})`);
-                    sendMessage(userChatId, adminDoneMessage);
+                    sendMessage(userChatId, userDoneMessage);
                 } else {
                     console.log(`🔔 No chat ID found for ${user}`);
                 }
@@ -792,14 +812,20 @@ function handleCommand(chatId, userId, userName, text) {
                 `${t(userId, 'next_turn', {user: nextUser})}` +
                 (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
             
-            // Notify all authorized users and admins
+            // Notify all authorized users and admins in their language
             [...authorizedUsers, ...admins].forEach(user => {
                 // Try to find chat ID for this user
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 
                 if (userChatId && userChatId !== chatId) {
+                    // Create message in recipient's language
+                    const userDoneMessage = `${t(userChatId, 'turn_completed')}\n\n` +
+                        `${t(userChatId, 'completed_by', {user: currentUser})}\n` +
+                        `${t(userChatId, 'next_turn', {user: nextUser})}` +
+                        (punishmentTurnsRemaining > 0 ? `\n${t(userChatId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
+                    
                     console.log(`🔔 Sending user DONE notification to ${user} (${userChatId})`);
-                    sendMessage(userChatId, doneMessage);
+                    sendMessage(userChatId, userDoneMessage);
                 } else {
                     console.log(`🔔 No chat ID found for ${user}`);
                 }
@@ -1062,19 +1088,22 @@ function executeSwap(swapRequest, requestId, status) {
             currentTurn = fromIndex;
         }
         
-        // Notify both users
-        const message = `✅ **Swap Approved!**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **New queue order:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ' (CURRENT TURN)' : ''}`).join('\n')}`;
+        // Notify both users in their language
+        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(fromUserId, 'new_queue_order')}:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`).join('\n')}`;
+        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(toUserId, 'new_queue_order')}:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ` (${t(toUserId, 'current_turn_status')})` : ''}`).join('\n')}`;
         
-        sendMessage(fromUserId, message);
-        sendMessage(toUserId, message);
+        sendMessage(fromUserId, fromUserMessage);
+        sendMessage(toUserId, toUserMessage);
         
-        // Notify all other authorized users and admins using userChatIds
+        // Notify all other authorized users and admins using userChatIds in their language
         [...authorizedUsers, ...admins].forEach(user => {
             if (user !== fromUser && user !== toUser) {
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 if (userChatId) {
+                    // Create swap notification in recipient's language
+                    const swapNotification = `🔄 **${t(userChatId, 'queue_update')}:** ${fromUser} ↔ ${toUser} ${t(userChatId, 'swapped_positions')}!`;
                     console.log(`🔔 Sending swap approval notification to ${user} (${userChatId})`);
-                    sendMessage(userChatId, `🔄 **Queue Update:** ${fromUser} ↔ ${toUser} swapped positions!`);
+                    sendMessage(userChatId, swapNotification);
                 } else {
                     console.log(`🔔 No chat ID found for ${user}`);
                 }
