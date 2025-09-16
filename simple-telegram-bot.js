@@ -133,7 +133,21 @@ const translations = {
         'error_queue_position': '❌ **Error:** Could not find your queue position.',
         'punishment_request_expired': '❌ **Punishment request not found or expired!**',
         'not_your_punishment': '❌ **This punishment request is not yours!**',
-        'not_your_swap': '❌ **This swap request is not for you!**'
+        'not_your_swap': '❌ **This swap request is not for you!**',
+        
+        // Done command messages
+        'admin_intervention': '✅ **ADMIN INTERVENTION!**',
+        'admin_completed_duty': '👨‍💼 **Admin:** {admin} completed dishwasher duty',
+        'helped_user': '👤 **Helped user:** {user}',
+        'next_turn': '🔄 **Next turn:** {user}',
+        'punishment_turns_remaining': '⚡ **Punishment turns remaining:** {count}',
+        'admin_can_apply_punishment': '💡 **Admin can manually apply punishment to {user} if needed**',
+        'turn_completed': '✅ **TURN COMPLETED!**',
+        'completed_by': '👤 **Completed by:** {user}',
+        
+        // Punishment selection messages
+        'apply_punishment_select_reason': 'Apply Punishment - Select reason for {user}:',
+        'request_punishment_select_reason': 'Request Punishment - Select reason for {user}:'
     },
     he: {
         // Menu titles
@@ -215,7 +229,21 @@ const translations = {
         'error_queue_position': '❌ **שגיאה:** לא ניתן למצוא את מיקומך בתור.',
         'punishment_request_expired': '❌ **בקשת עונש לא נמצאה או פגה תוקפה!**',
         'not_your_punishment': '❌ **בקשת עונש זו לא שלך!**',
-        'not_your_swap': '❌ **בקשת החלפה זו לא מיועדת לך!**'
+        'not_your_swap': '❌ **בקשת החלפה זו לא מיועדת לך!**',
+        
+        // Done command messages
+        'admin_intervention': '✅ **התערבות מנהל!**',
+        'admin_completed_duty': '👨‍💼 **מנהל:** {admin} השלים את חובת הכלים',
+        'helped_user': '👤 **עזר למשתמש:** {user}',
+        'next_turn': '🔄 **התור הבא:** {user}',
+        'punishment_turns_remaining': '⚡ **תורות עונש נותרו:** {count}',
+        'admin_can_apply_punishment': '💡 **מנהל יכול להפעיל עונש על {user} במידת הצורך**',
+        'turn_completed': '✅ **התור הושלם!**',
+        'completed_by': '👤 **הושלם על ידי:** {user}',
+        
+        // Punishment selection messages
+        'apply_punishment_select_reason': 'הפעל עונש - בחר סיבה עבור {user}:',
+        'request_punishment_select_reason': 'בקש עונש - בחר סיבה עבור {user}:'
     }
 };
 
@@ -225,9 +253,16 @@ function getUserLanguage(userId) {
 }
 
 // Get translated text
-function t(userId, key) {
+function t(userId, key, replacements = {}) {
     const lang = getUserLanguage(userId);
-    return translations[lang][key] || translations.en[key] || key;
+    let text = translations[lang][key] || translations.en[key] || key;
+    
+    // Replace placeholders like {user}, {admin}, {count}
+    for (const [placeholder, value] of Object.entries(replacements)) {
+        text = text.replace(new RegExp(`{${placeholder}}`, 'g'), value);
+    }
+    
+    return text;
 }
 
 // Function to add royal emoji to user names
@@ -538,12 +573,12 @@ function handleCommand(chatId, userId, userName, text) {
             
             const nextUser = queue[currentTurn];
             
-            const adminDoneMessage = `✅ **ADMIN INTERVENTION!**\n\n` +
-                `👨‍💼 **Admin:** ${userName} completed dishwasher duty\n` +
-                `👤 **Helped user:** ${currentUser}\n` +
-                `🔄 **Next turn:** ${nextUser}` +
-                (punishmentTurnsRemaining > 0 ? `\n⚡ **Punishment turns remaining:** ${punishmentTurnsRemaining - 1}` : '') +
-                `\n\n💡 **Admin can manually apply punishment to ${currentUser} if needed**`;
+            const adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
+                `${t(userId, 'admin_completed_duty', {admin: userName})}\n` +
+                `${t(userId, 'helped_user', {user: currentUser})}\n` +
+                `${t(userId, 'next_turn', {user: nextUser})}` +
+                (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '') +
+                `\n\n${t(userId, 'admin_can_apply_punishment', {user: currentUser})}`;
             
             // Send confirmation to admin
             sendMessage(chatId, adminDoneMessage);
@@ -618,10 +653,10 @@ function handleCommand(chatId, userId, userName, text) {
             
             const nextUser = queue[currentTurn];
             
-            const doneMessage = `✅ **TURN COMPLETED!**\n\n` +
-                `👤 **Completed by:** ${currentUser}\n` +
-                `🔄 **Next turn:** ${nextUser}` +
-                (punishmentTurnsRemaining > 0 ? `\n⚡ **Punishment turns remaining:** ${punishmentTurnsRemaining - 1}` : '');
+            const doneMessage = `${t(userId, 'turn_completed')}\n\n` +
+                `${t(userId, 'completed_by', {user: currentUser})}\n` +
+                `${t(userId, 'next_turn', {user: nextUser})}` +
+                (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
             
             // Notify all authorized users and admins
             [...authorizedUsers, ...admins].forEach(user => {
@@ -1417,7 +1452,7 @@ function handleCallback(chatId, userId, userName, data) {
             ]
         ];
         
-        sendMessageWithButtons(chatId, `Request Punishment - Select reason for ${targetUser}:`, reasonButtons);
+        sendMessageWithButtons(chatId, t(userId, 'request_punishment_select_reason', {user: targetUser}), reasonButtons);
         
     } else if (data.startsWith('punishment_reason_')) {
         const parts = data.replace('punishment_reason_', '').split('_');
@@ -1577,7 +1612,7 @@ function handleCallback(chatId, userId, userName, data) {
             ]
         ];
         
-        sendMessageWithButtons(chatId, `Apply Punishment - Select reason for ${targetUser}:`, buttons);
+        sendMessageWithButtons(chatId, t(userId, 'apply_punishment_select_reason', {user: targetUser}), buttons);
         
     } else if (data.startsWith('admin_punishment_reason_')) {
         const parts = data.replace('admin_punishment_reason_', '').split('_');
