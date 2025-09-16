@@ -113,7 +113,27 @@ const translations = {
         'next_up': '🎯 Next up:',
         'completed_turn': 'completed their turn!',
         'punishment_remaining': '⚖️ Punishment:',
-        'extra_turns_remaining': 'extra turn(s) remaining.'
+        'extra_turns_remaining': 'extra turn(s) remaining.',
+        
+        // More popup messages
+        'force_swap_completed': '✅ **Force swap completed!**',
+        'swap_users': '🔄 **{user1} ↔ {user2}**',
+        'punishment_approved': '✅ **Punishment Approved!**',
+        'approved_by': '👨‍💼 **Approved by:**',
+        'extra_turns_applied': '⚡ **3 extra turns applied immediately!**',
+        'admin_direct_punishment': '⚡ **Admin Direct Punishment Applied!**',
+        'extra_turns_added': '⚡ **3 extra turns added immediately!**',
+        'swap_request_approved': '✅ **Swap request approved!**',
+        'swap_request_rejected': '❌ **Swap request rejected!**',
+        'swap_request_canceled': '❌ **Swap request canceled!**',
+        'keep_current_turn': '🔄 **You keep your current turn.**',
+        'declined_swap': 'declined your swap request.',
+        'canceled_swap_with': 'You canceled your swap request with',
+        'error_users_not_found': '❌ **Error:** Could not find users in queue.',
+        'error_queue_position': '❌ **Error:** Could not find your queue position.',
+        'punishment_request_expired': '❌ **Punishment request not found or expired!**',
+        'not_your_punishment': '❌ **This punishment request is not yours!**',
+        'not_your_swap': '❌ **This swap request is not for you!**'
     },
     he: {
         // Menu titles
@@ -175,7 +195,27 @@ const translations = {
         'next_up': '🎯 הבא בתור:',
         'completed_turn': 'סיים את התור!',
         'punishment_remaining': '⚖️ עונש:',
-        'extra_turns_remaining': 'תורות נוספים נותרו.'
+        'extra_turns_remaining': 'תורות נוספים נותרו.',
+        
+        // More popup messages
+        'force_swap_completed': '✅ **החלפה בכוח הושלמה!**',
+        'swap_users': '🔄 **{user1} ↔ {user2}**',
+        'punishment_approved': '✅ **עונש אושר!**',
+        'approved_by': '👨‍💼 **אושר על ידי:**',
+        'extra_turns_applied': '⚡ **3 תורות נוספים הופעלו מיד!**',
+        'admin_direct_punishment': '⚡ **עונש ישיר של מנהל הופעל!**',
+        'extra_turns_added': '⚡ **3 תורות נוספים נוספו מיד!**',
+        'swap_request_approved': '✅ **בקשת החלפה אושרה!**',
+        'swap_request_rejected': '❌ **בקשת החלפה נדחתה!**',
+        'swap_request_canceled': '❌ **בקשת החלפה בוטלה!**',
+        'keep_current_turn': '🔄 **אתה שומר על התור הנוכחי שלך.**',
+        'declined_swap': 'דחה את בקשת החלפה שלך.',
+        'canceled_swap_with': 'ביטלת את בקשת החלפה שלך עם',
+        'error_users_not_found': '❌ **שגיאה:** לא ניתן למצוא משתמשים בתור.',
+        'error_queue_position': '❌ **שגיאה:** לא ניתן למצוא את מיקומך בתור.',
+        'punishment_request_expired': '❌ **בקשת עונש לא נמצאה או פגה תוקפה!**',
+        'not_your_punishment': '❌ **בקשת עונש זו לא שלך!**',
+        'not_your_swap': '❌ **בקשת החלפה זו לא מיועדת לך!**'
     }
 };
 
@@ -718,12 +758,12 @@ function handleCommand(chatId, userId, userName, text) {
         
         const punishmentRequest = pendingPunishments.get(requestId);
         if (!punishmentRequest) {
-            sendMessage(chatId, '❌ **Punishment request not found or expired!**');
+            sendMessage(chatId, t(userId, 'punishment_request_expired'));
             return;
         }
         
         if (punishmentRequest.fromUserId !== userId) {
-            sendMessage(chatId, '❌ **This punishment request is not yours!**');
+            sendMessage(chatId, t(userId, 'not_your_punishment'));
             return;
         }
         
@@ -758,19 +798,19 @@ function handleCommand(chatId, userId, userName, text) {
         
         const punishmentRequest = pendingPunishments.get(requestId);
         if (!punishmentRequest) {
-            sendMessage(chatId, '❌ **Punishment request not found or expired!**');
+            sendMessage(chatId, t(userId, 'punishment_request_expired'));
             return;
         }
         
         if (punishmentRequest.fromUserId !== userId) {
-            sendMessage(chatId, '❌ **This punishment request is not yours!**');
+            sendMessage(chatId, t(userId, 'not_your_punishment'));
             return;
         }
         
         // Apply punishment directly (admin doesn't need approval)
         applyPunishment(punishmentRequest.targetUser, reason, userName);
         
-        sendMessage(chatId, `✅ **Punishment Applied!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}`);
+        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${userName}`);
         
         // Remove request
         pendingPunishments.delete(requestId);
@@ -1060,7 +1100,7 @@ function handleCallback(chatId, userId, userName, data) {
         const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
         
         if (!currentUserQueueName) {
-            sendMessage(chatId, '❌ **Error:** Could not find your queue position.');
+            sendMessage(chatId, t(userId, 'error_queue_position'));
             return;
         }
         
@@ -1335,9 +1375,9 @@ function handleCallback(chatId, userId, userName, data) {
                 }
             });
             
-            sendMessage(chatId, `✅ **Force swap completed!**\n\n🔄 **${firstUser} ↔ ${secondUser}**`);
+            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${firstUser} ↔ ${secondUser}**`);
         } else {
-            sendMessage(chatId, '❌ **Error:** Could not find users in queue.');
+            sendMessage(chatId, t(userId, 'error_users_not_found'));
         }
         
     } else if (data === 'request_punishment_menu') {
@@ -1420,7 +1460,7 @@ function handleCallback(chatId, userId, userName, data) {
         const punishmentRequest = pendingPunishments.get(requestId);
         
         if (!punishmentRequest) {
-            sendMessage(chatId, '❌ **Punishment request not found or expired!**');
+            sendMessage(chatId, t(userId, 'punishment_request_expired'));
             return;
         }
         
@@ -1468,7 +1508,7 @@ function handleCallback(chatId, userId, userName, data) {
         const punishmentRequest = pendingPunishments.get(requestId);
         
         if (!punishmentRequest) {
-            sendMessage(chatId, '❌ **Punishment request not found or expired!**');
+            sendMessage(chatId, t(userId, 'punishment_request_expired'));
             return;
         }
         
@@ -1546,10 +1586,10 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Apply punishment directly with selected reason
         applyPunishment(targetUser, reason, userName);
-        sendMessage(chatId, `✅ **Punishment Applied!**\n\n👤 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}\n\n⚡ **3 extra turns added immediately!**`);
+        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${userName}\n\n${t(userId, 'extra_turns_added')}`);
         
         // Notify all authorized users and admins about the admin direct punishment
-        const notificationMessage = `⚡ **Admin Direct Punishment Applied!**\n\n👤 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${userName}\n\n⚡ **3 extra turns added immediately!**`;
+        const notificationMessage = `${t(userId, 'admin_direct_punishment')}\n\n${t(userId, 'target_user')} ${targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${userName}\n\n${t(userId, 'extra_turns_added')}`;
         
         // Notify all authorized users
         [...authorizedUsers].forEach(user => {
