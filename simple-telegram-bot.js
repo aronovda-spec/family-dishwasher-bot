@@ -37,6 +37,37 @@ const instanceId = process.env.RENDER_INSTANCE_ID || `local-${Date.now()}`;
 const lastUserAction = new Map(); // Map: userId -> {action, timestamp}
 const ACTION_COOLDOWN = 1000; // 1 second cooldown between same actions
 
+// Royal emoji mapping for elegant display
+const royalEmojis = {
+    // Admins (by order of addition)
+    'admin_1': '👑', // King - First admin
+    'admin_2': '💎', // Queen - Second admin
+    // Queue members
+    'Eden Aronov': '🔱', // Princess 1
+    'Adele Aronov': '⭐', // Princess 2  
+    'Emma Aronov': '✨'  // Princess 3
+};
+
+// Function to add royal emoji to user names
+function addRoyalEmoji(userName) {
+    // Check if it's a queue member first
+    if (royalEmojis[userName]) {
+        return `${royalEmojis[userName]} ${userName}`;
+    }
+    
+    // Check if it's an admin (by order)
+    const adminArray = Array.from(admins);
+    if (adminArray.length > 0 && (adminArray[0] === userName || adminArray[0] === userName.toLowerCase())) {
+        return `${royalEmojis.admin_1} ${userName}`; // King
+    }
+    if (adminArray.length > 1 && (adminArray[1] === userName || adminArray[1] === userName.toLowerCase())) {
+        return `${royalEmojis.admin_2} ${userName}`; // Queen
+    }
+    
+    // Return plain name if no royal emoji found
+    return userName;
+}
+
 // Send message to Telegram
 function sendMessage(chatId, text) {
     const url = `${botUrl}/sendMessage`;
@@ -242,6 +273,7 @@ function handleCommand(chatId, userId, userName, text) {
         for (let i = 0; i < 3; i++) {
             const turnIndex = (currentTurn + i) % queue.length;
             const name = queue[turnIndex];
+            const royalName = addRoyalEmoji(name); // Add royal emoji
             const isCurrentTurn = i === 0;
             const turnIcon = isCurrentTurn ? '🔄' : '⏳';
             const turnText = isCurrentTurn ? ' - **CURRENT TURN**' : '';
@@ -250,7 +282,7 @@ function handleCommand(chatId, userId, userName, text) {
             const authorizedUser = queueUserMapping.get(name);
             const authText = authorizedUser ? ` (${authorizedUser})` : ' (Not authorized)';
             
-            statusMessage += `${turnIcon} ${i + 1}. ${name}${turnText}${authText}\n`;
+            statusMessage += `${turnIcon} ${i + 1}. ${royalName}${turnText}${authText}\n`;
         }
         
         statusMessage += `\n👥 **Authorized Users:** ${authorizedUsers.size}/3`;
@@ -853,7 +885,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Show all users except the current user (can't swap with yourself)
         const uniqueUsers = [...new Set(queue)];
         const availableUsers = uniqueUsers.filter(name => name !== currentUserQueueName);
-        const buttons = availableUsers.map(name => [{ text: name, callback_data: `swap_request_${name}` }]);
+        const buttons = availableUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `swap_request_${name}` }]);
         
         sendMessageWithButtons(chatId, 
             `Request Swap - Your position: ${currentUserQueueName} - Select user to swap with:`, 
@@ -1039,12 +1071,13 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Only show current turn user for Force Swap (avoid misleading)
         const currentUser = queue[currentTurn];
-        const buttons = [[{ text: `🎯 ${currentUser} (Current Turn)`, callback_data: `force_swap_select_${currentUser}` }]];
+        const royalCurrentUser = addRoyalEmoji(currentUser);
+        const buttons = [[{ text: `🎯 ${royalCurrentUser} (Current Turn)`, callback_data: `force_swap_select_${currentUser}` }]];
         
         console.log(`🔍 Force Swap - Current turn user: ${currentUser}`);
         
         sendMessageWithButtons(chatId, 
-            `⚡ **Force Swap** - Current turn: **${currentUser}**\n\nSwap current turn with another user:`, 
+            `⚡ **Force Swap** - Current turn: **${royalCurrentUser}**\n\nSwap current turn with another user:`, 
             buttons
         );
         
@@ -1055,10 +1088,11 @@ function handleCallback(chatId, userId, userName, data) {
         const uniqueUsers = [...new Set(queue)];
         const remainingUsers = uniqueUsers.filter(name => name !== firstUser);
         
-        const buttons = remainingUsers.map(name => [{ text: name, callback_data: `force_swap_execute_${firstUser}_${name}` }]);
+        const buttons = remainingUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `force_swap_execute_${firstUser}_${name}` }]);
+        const royalFirstUser = addRoyalEmoji(firstUser);
         
         sendMessageWithButtons(chatId, 
-            `⚡ **Force Swap** - Step 2\n\n🎯 **Current turn:** ${firstUser}\n🔄 **Swap with:** Select user below`, 
+            `⚡ **Force Swap** - Step 2\n\n🎯 **Current turn:** ${royalFirstUser}\n🔄 **Swap with:** Select user below`, 
             buttons
         );
         
@@ -1158,7 +1192,7 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const buttons = availableUsers.map(name => [{ text: name, callback_data: `punishment_target_${name}` }]);
+        const buttons = availableUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `punishment_target_${name}` }]);
         
         sendMessageWithButtons(chatId, 
             `Request Punishment - Select user to report:`, 
@@ -1318,7 +1352,7 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Get unique users from the queue to avoid duplicate buttons
         const uniqueUsers = [...new Set(queue)];
-        const buttons = uniqueUsers.map(name => [{ text: name, callback_data: `admin_punish_${name}` }]);
+        const buttons = uniqueUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `admin_punish_${name}` }]);
         
         sendMessageWithButtons(chatId, 
             `Apply Punishment - Select user to punish:`, 
