@@ -156,7 +156,11 @@ const translations = {
         'requested_by': '👤 **Requested by:** {user}',
         'rejected_by': '👨‍💼 **Rejected by:** {user}',
         'declined_punishment_request': '👨‍💼 {admin} declined your punishment request for {target}.',
-        'you_declined_punishment': '👤 You declined {requester}\'s punishment request.'
+        'you_declined_punishment': '👤 You declined {requester}\'s punishment request.',
+        
+        // Additional punishment messages
+        'punishment_request_submitted': 'Punishment Request Submitted!',
+        'admins_notified': 'Admins have been notified!'
     },
     he: {
         // Menu titles
@@ -261,7 +265,11 @@ const translations = {
         'requested_by': '👤 **התבקש על ידי:** {user}',
         'rejected_by': '👨‍💼 **נדחה על ידי:** {user}',
         'declined_punishment_request': '👨‍💼 {admin} דחה את בקשת העונש שלך עבור {target}.',
-        'you_declined_punishment': '👤 דחית את בקשת העונש של {requester}.'
+        'you_declined_punishment': '👤 דחית את בקשת העונש של {requester}.',
+        
+        // Additional punishment messages
+        'punishment_request_submitted': 'בקשת עונש הוגשה!',
+        'admins_notified': 'המנהלים הותרעו!'
     }
 };
 
@@ -1506,7 +1514,7 @@ function handleCallback(chatId, userId, userName, data) {
             }
         }
         
-        sendMessage(chatId, `Punishment Request Submitted!\n\nTarget: ${targetUser}\nReason: ${reason}\nRequested by: ${userName}\n\nAdmins have been notified!`);
+        sendMessage(chatId, `${t(userId, 'punishment_request_submitted')}\n\n${t(userId, 'target_user')} ${targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'requested_by', {user: userName})}\n\n${t(userId, 'admins_notified')}`);
         
     } else if (data.startsWith('punishment_approve_')) {
         const requestId = parseInt(data.replace('punishment_approve_', ''));
