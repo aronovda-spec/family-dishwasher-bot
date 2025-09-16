@@ -1671,15 +1671,15 @@ console.log('🔍 Search for: @aronov_dishwasher_bot');
 getUpdates();
 }
 
-// Keep-alive mechanism (every 10 minutes) - Render free tier sleeps after 15 minutes of inactivity
+// Keep-alive mechanism (every 5 minutes) - Render free tier sleeps after 15 minutes of inactivity
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
-    console.log('🔄 Starting keep-alive mechanism (every 10 minutes)');
+    console.log('🔄 Starting aggressive keep-alive mechanism (every 5 minutes)');
     
     // Initial keep-alive after 30 seconds to ensure server is ready
     setTimeout(keepAlive, 30 * 1000);
     
-    // Then every 10 minutes
-    setInterval(keepAlive, 10 * 60 * 1000); // 10 minutes
+    // Then every 5 minutes (more aggressive)
+    setInterval(keepAlive, 5 * 60 * 1000); // 5 minutes
 }
 
 // Note: Cleanup timer removed - no time limitations on requests
