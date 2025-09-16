@@ -389,6 +389,16 @@ function t(userId, key, replacements = {}) {
     return text;
 }
 
+// Helper function to create buttons with recipient's language
+function createLocalizedButtons(recipientUserId, buttonConfigs) {
+    return buttonConfigs.map(row => 
+        row.map(button => ({
+            text: button.translationKey ? t(recipientUserId, button.translationKey) : button.text,
+            callback_data: button.callback_data
+        }))
+    );
+}
+
 // Function to add royal emoji to user names
 function addRoyalEmoji(userName) {
     // Check if it's a queue member first
@@ -1300,12 +1310,12 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Notify the target user
         if (targetUserId) {
-            const buttons = [
+            const buttons = createLocalizedButtons(targetUserId, [
                 [
-                { text: t(userId, 'approve'), callback_data: `swap_approve_${requestId}` },
-                { text: t(userId, 'reject'), callback_data: `swap_reject_${requestId}` }
+                { translationKey: 'approve', callback_data: `swap_approve_${requestId}` },
+                { translationKey: 'reject', callback_data: `swap_reject_${requestId}` }
                 ]
-            ];
+            ]);
             
             sendMessageWithButtons(targetUserId, 
                 `🔄 **Swap Request**\n\n👤 **From:** ${userName} (${currentUserQueueName})\n🎯 **Wants to swap with:** ${targetUser}`, 
