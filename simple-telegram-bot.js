@@ -1484,15 +1484,21 @@ const url = require('url');
 
 // Keep-alive mechanism to prevent Render from sleeping
 function keepAlive() {
-    const keepAliveUrl = process.env.KEEP_ALIVE_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost'}`;
-    
     if (process.env.RENDER_EXTERNAL_HOSTNAME) {
-        console.log('🔄 Sending keep-alive ping...');
+        const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`;
+        console.log('🔄 Sending keep-alive ping to:', keepAliveUrl);
+        
         https.get(keepAliveUrl, (res) => {
-            console.log('✅ Keep-alive ping successful');
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+                console.log('✅ Keep-alive ping successful:', data);
+            });
         }).on('error', (err) => {
             console.log('❌ Keep-alive ping failed:', err.message);
         });
+    } else {
+        console.log('🏠 Keep-alive skipped - running locally');
     }
 }
 
@@ -1613,13 +1619,14 @@ const server = http.createServer((req, res) => {
     res.end('Not Found');
 });
 
-// Start server only if deploying to Render
+// Start server for Render deployment or if PORT is explicitly set
+const PORT = process.env.PORT || 3000;
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
-    const PORT = process.env.PORT || 3000;
+    // Always start server on Render
     server.listen(PORT, () => {
         console.log(`🚀 Server running on port ${PORT}`);
-        console.log(`🌐 Health check: http://localhost:${PORT}/health`);
-        console.log(`🔗 Webhook endpoint: http://localhost:${PORT}/webhook`);
+        console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
+        console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
     });
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
@@ -1664,9 +1671,15 @@ console.log('🔍 Search for: @aronov_dishwasher_bot');
 getUpdates();
 }
 
-// Keep-alive mechanism (every 5 minutes)
+// Keep-alive mechanism (every 10 minutes) - Render free tier sleeps after 15 minutes of inactivity
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
-    setInterval(keepAlive, 5 * 60 * 1000); // 5 minutes
+    console.log('🔄 Starting keep-alive mechanism (every 10 minutes)');
+    
+    // Initial keep-alive after 30 seconds to ensure server is ready
+    setTimeout(keepAlive, 30 * 1000);
+    
+    // Then every 10 minutes
+    setInterval(keepAlive, 10 * 60 * 1000); // 10 minutes
 }
 
 // Note: Cleanup timer removed - no time limitations on requests
