@@ -160,7 +160,8 @@ const translations = {
         
         // Additional punishment messages
         'punishment_request_submitted': 'Punishment Request Submitted!',
-        'admins_notified': 'Admins have been notified!'
+        'admins_notified': 'Admins have been notified!',
+        'request_punishment_select_user': 'Request Punishment - Select user to report:'
     },
     he: {
         // Menu titles
@@ -269,7 +270,8 @@ const translations = {
         
         // Additional punishment messages
         'punishment_request_submitted': 'בקשת עונש הוגשה!',
-        'admins_notified': 'המנהלים הותרעו!'
+        'admins_notified': 'המנהלים הותרעו!',
+        'request_punishment_select_user': 'בקש עונש - בחר משתמש לדיווח:'
     }
 };
 
@@ -1459,7 +1461,7 @@ function handleCallback(chatId, userId, userName, data) {
         const buttons = availableUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `punishment_target_${name}` }]);
         
         sendMessageWithButtons(chatId, 
-            `Request Punishment - Select user to report:`, 
+            t(userId, 'request_punishment_select_user'), 
             buttons
         );
         
