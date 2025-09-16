@@ -208,7 +208,8 @@ const translations = {
         // Usage messages
         'usage_addadmin': '❌ **שימוש:** `/addadmin <שם משתמש>`\n\nדוגמה: `/addadmin Dani`',
         'usage_removeadmin': '❌ **שימוש:** `/removeadmin <שם משתמש>`\n\nדוגמה: `/removeadmin Dani`',
-        'usage_authorize': '❌ **שימוש:** `/authorize <שם משתמש>`\n\nדוגמה: `/authorize Eden`'
+        'usage_authorize': '❌ **שימוש:** `/authorize <שם משתמש>`\n\nדוגמה: `/authorize Eden`',
+        'unknown_command': '❌ פקודה לא מוכרת. הקלד /help כדי לראות פקודות זמינות.'
     },
     he: {
         // Menu titles
@@ -365,7 +366,8 @@ const translations = {
         // Usage messages
         'usage_addadmin': '❌ **Usage:** `/addadmin <username>`\n\nExample: `/addadmin Dani`',
         'usage_removeadmin': '❌ **Usage:** `/removeadmin <username>`\n\nExample: `/removeadmin Dani`',
-        'usage_authorize': '❌ **Usage:** `/authorize <username>`\n\nExample: `/authorize Eden`'
+        'usage_authorize': '❌ **Usage:** `/authorize <username>`\n\nExample: `/authorize Eden`',
+        'unknown_command': '❌ Unknown command. Type /help to see available commands.'
     }
 };
 
@@ -1009,7 +1011,7 @@ function handleCommand(chatId, userId, userName, text) {
         }
         
     } else {
-        sendMessage(chatId, '❌ Unknown command. Type /help to see available commands.');
+        sendMessage(chatId, t(userId, 'unknown_command'));
     }
 }
 
@@ -1119,7 +1121,7 @@ function handleCallback(chatId, userId, userName, data) {
     console.log(`🔘 Button pressed: "${data}" by ${userName}`);
     
     if (data === 'test') {
-        sendMessage(chatId, `🧪 **Test Button Works!**\n\n✅ Inline buttons are working correctly!\n\n👤 **Pressed by:** ${userName}\n🆔 **User ID:** ${userId}\n🔘 **Button data:** ${data}`);
+        sendMessage(chatId, t(userId, 'test_button_works', {user: userName, userId: userId, data: data}));
     } else if (data === 'status') {
         handleCommand(chatId, userId, userName, 'status');
     } else if (data === 'done') {
@@ -1367,8 +1369,8 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
         // Notify the requester
-        sendMessage(swapRequest.fromUserId, `❌ **Swap request rejected!**\n\n👤 ${userName} declined your swap request.`);
-        sendMessage(chatId, `❌ **Swap request rejected!**\n\n👤 You declined ${swapRequest.fromUser}'s swap request.`);
+        sendMessage(swapRequest.fromUserId, t(swapRequest.fromUserId, 'swap_request_rejected_simple', {user: userName}));
+        sendMessage(chatId, t(userId, 'you_declined_swap_request', {user: swapRequest.fromUser}));
         
         // Notify all admins about the rejection
         const adminNotification = `❌ **Swap Request Rejected**\n\n👤 **From:** ${swapRequest.fromUser}\n👤 **Rejected by:** ${userName}\n📅 **Time:** ${new Date().toLocaleString()}`;
