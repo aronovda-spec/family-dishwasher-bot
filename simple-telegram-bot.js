@@ -210,6 +210,9 @@ function handleCommand(chatId, userId, userName, text) {
                 ],
                 [
                     { text: "🔐 Request Access", callback_data: "request_access" }
+                ],
+                [
+                    { text: "🧪 טסט", callback_data: "hebrew_test" }
                 ]
             ];
         }
@@ -873,6 +876,17 @@ function handleCallback(chatId, userId, userName, data) {
                 sendMessage(adminChatId, adminNotification);
             }
         }
+        
+    } else if (data === 'hebrew_test') {
+        const hebrewMessage = `🧪 **בדיקה בעברית** 🧪\n\n` +
+            `שלום ${userName}! 👋\n\n` +
+            `זהו כפתור בדיקה בעברית.\n` +
+            `הבוט תומך בטקסט דו-כיווני! 🎯\n\n` +
+            `**Hebrew Test Successful!** ✅\n` +
+            `Mixed Hebrew and English text works perfectly! 🌟`;
+        
+        sendMessage(chatId, hebrewMessage);
+        
     } else if (data === 'swap_menu') {
         const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         if (!isAuthorized) {
