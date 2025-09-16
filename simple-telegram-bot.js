@@ -73,7 +73,23 @@ const translations = {
         'dishwasher_alert': '🚨 Dishwasher Alert!',
         'swap': '🔄 Swap',
         'request_punishment': '⚖️ Request Punishment',
-        'language_switch': '🇮🇱 עברית'
+        'language_switch': '🇮🇱 עברית',
+        
+        // Punishment reasons
+        'reason_behavior': '😠 Behavior',
+        'reason_household': '🏠 Household Rules',
+        'reason_respect': '🤝 Respect',
+        'reason_other': '📝 Other',
+        
+        // Messages
+        'dishwasher_queue_status': '📋 **Dishwasher Queue Status:**',
+        'current_turn': '- **CURRENT TURN**',
+        'not_authorized_user': '(Not authorized)',
+        'authorized_users': '👥 **Authorized Users:**',
+        'force_swap_current_turn': '⚡ **Force Swap** - Current turn:',
+        'swap_current_turn_with': 'Swap current turn with another user:',
+        'force_swap_step2': '⚡ **Force Swap** - Step 2',
+        'swap_with_select': '🔄 **Swap with:** Select user below'
     },
     he: {
         // Menu titles
@@ -95,7 +111,23 @@ const translations = {
         'dishwasher_alert': '🚨 התראת כלים!',
         'swap': '🔄 החלף',
         'request_punishment': '⚖️ בקש עונש',
-        'language_switch': '🇺🇸 English'
+        'language_switch': '🇺🇸 English',
+        
+        // Punishment reasons
+        'reason_behavior': '😠 התנהגות',
+        'reason_household': '🏠 חוקי הבית',
+        'reason_respect': '🤝 כבוד',
+        'reason_other': '📝 אחר',
+        
+        // Messages
+        'dishwasher_queue_status': '📋 **סטטוס תור הכלים:**',
+        'current_turn': '- **התור הנוכחי**',
+        'not_authorized_user': '(לא מורשה)',
+        'authorized_users': '👥 **משתמשים מורשים:**',
+        'force_swap_current_turn': '⚡ **החלפה בכוח** - התור הנוכחי:',
+        'swap_current_turn_with': 'החלף את התור הנוכחי עם משתמש אחר:',
+        'force_swap_step2': '⚡ **החלפה בכוח** - שלב 2',
+        'swap_with_select': '🔄 **החלף עם:** בחר משתמש למטה'
     }
 };
 
@@ -333,7 +365,7 @@ function handleCommand(chatId, userId, userName, text) {
         req.end();
         
     } else if (command === '/status' || command === 'status') {
-        let statusMessage = `📋 **Dishwasher Queue Status:**\n\n`;
+        let statusMessage = `${t(userId, 'dishwasher_queue_status')}\n\n`;
         
         // Debug: Show current queue state
         console.log(`🔍 DEBUG - Current queue: [${queue.join(', ')}]`);
@@ -347,16 +379,16 @@ function handleCommand(chatId, userId, userName, text) {
             const royalName = addRoyalEmoji(name); // Add royal emoji
             const isCurrentTurn = i === 0;
             const turnIcon = isCurrentTurn ? '🔄' : '⏳';
-            const turnText = isCurrentTurn ? ' - **CURRENT TURN**' : '';
+            const turnText = isCurrentTurn ? ` ${t(userId, 'current_turn')}` : '';
             
             // Check if this queue member is authorized
             const authorizedUser = queueUserMapping.get(name);
-            const authText = authorizedUser ? ` (${authorizedUser})` : ' (Not authorized)';
+            const authText = authorizedUser ? ` (${authorizedUser})` : ` ${t(userId, 'not_authorized_user')}`;
             
             statusMessage += `${turnIcon} ${i + 1}. ${royalName}${turnText}${authText}\n`;
         }
         
-        statusMessage += `\n👥 **Authorized Users:** ${authorizedUsers.size}/3`;
+        statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
         
         // Show punishment information
         const usersWithPunishments = Array.from(punishmentTurns.entries()).filter(([user, turns]) => turns > 0);
@@ -1160,7 +1192,7 @@ function handleCallback(chatId, userId, userName, data) {
         console.log(`🔍 Force Swap - Current turn user: ${currentUser}`);
         
         sendMessageWithButtons(chatId, 
-            `⚡ **Force Swap** - Current turn: **${royalCurrentUser}**\n\nSwap current turn with another user:`, 
+            `${t(userId, 'force_swap_current_turn')} **${royalCurrentUser}**\n\n${t(userId, 'swap_current_turn_with')}`, 
             buttons
         );
         
@@ -1175,7 +1207,7 @@ function handleCallback(chatId, userId, userName, data) {
         const royalFirstUser = addRoyalEmoji(firstUser);
         
         sendMessageWithButtons(chatId, 
-            `⚡ **Force Swap** - Step 2\n\n🎯 **Current turn:** ${royalFirstUser}\n🔄 **Swap with:** Select user below`, 
+            `${t(userId, 'force_swap_step2')}\n\n🎯 **Current turn:** ${royalFirstUser}\n${t(userId, 'swap_with_select')}`, 
             buttons
         );
         
@@ -1288,12 +1320,12 @@ function handleCallback(chatId, userId, userName, data) {
         // Show reason selection buttons
         const reasonButtons = [
             [
-                { text: "😠 Behavior", callback_data: `punishment_reason_${targetUser}_Behavior` },
-                { text: "🏠 Household Rules", callback_data: `punishment_reason_${targetUser}_Household Rules` }
+                { text: t(userId, 'reason_behavior'), callback_data: `punishment_reason_${targetUser}_Behavior` },
+                { text: t(userId, 'reason_household'), callback_data: `punishment_reason_${targetUser}_Household Rules` }
             ],
             [
-                { text: "🤝 Respect", callback_data: `punishment_reason_${targetUser}_Respect` },
-                { text: "📝 Other", callback_data: `punishment_reason_${targetUser}_Other` }
+                { text: t(userId, 'reason_respect'), callback_data: `punishment_reason_${targetUser}_Respect` },
+                { text: t(userId, 'reason_other'), callback_data: `punishment_reason_${targetUser}_Other` }
             ]
         ];
         
@@ -1448,12 +1480,12 @@ function handleCallback(chatId, userId, userName, data) {
         // Show reason selection for admin punishment
         const buttons = [
             [
-                { text: "😠 Behavior", callback_data: `admin_punishment_reason_${targetUser}_Behavior` },
-                { text: "🏠 Household Rules", callback_data: `admin_punishment_reason_${targetUser}_Household Rules` }
+                { text: t(userId, 'reason_behavior'), callback_data: `admin_punishment_reason_${targetUser}_Behavior` },
+                { text: t(userId, 'reason_household'), callback_data: `admin_punishment_reason_${targetUser}_Household Rules` }
             ],
             [
-                { text: "🤝 Respect", callback_data: `admin_punishment_reason_${targetUser}_Respect` },
-                { text: "📝 Other", callback_data: `admin_punishment_reason_${targetUser}_Other` }
+                { text: t(userId, 'reason_respect'), callback_data: `admin_punishment_reason_${targetUser}_Respect` },
+                { text: t(userId, 'reason_other'), callback_data: `admin_punishment_reason_${targetUser}_Other` }
             ]
         ];
         
