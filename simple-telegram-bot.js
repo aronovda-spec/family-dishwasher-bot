@@ -847,7 +847,7 @@ function handleCommand(chatId, userId, userName, text) {
             
             // Note: We don't add chatId here because we don't know the new admin's chat ID yet
             // The new admin's chat ID will be stored when they send /start or interact with the bot
-            sendMessage(chatId, `✅ **First Admin Added!**\n\n👨‍💼 ${userToAdd} is now the first admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** ${userToAdd} needs to send /start to the bot to receive notifications.`);
+            sendMessage(chatId, t(userId, 'first_admin_added', {user: userToAdd}));
             return;
         }
         
@@ -869,7 +869,7 @@ function handleCommand(chatId, userId, userName, text) {
         
         // Note: We don't add chatId here because we don't know the new admin's chat ID yet
         // The new admin's chat ID will be stored when they send /start or interact with the bot
-        sendMessage(chatId, `✅ **Admin Added!**\n\n👨‍💼 ${userToAdd} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** ${userToAdd} needs to send /start to the bot to receive notifications.`);
+        sendMessage(chatId, t(userId, 'admin_added', {user: userToAdd}));
         
     } else if (command.startsWith('/removeadmin ')) {
         // Check if user is already an admin
@@ -922,8 +922,8 @@ function handleCommand(chatId, userId, userName, text) {
         
         const buttons = [
             [
-                { text: "✅ Approve", callback_data: `punishment_approve_${requestId}` },
-                { text: "❌ Reject", callback_data: `punishment_reject_${requestId}` }
+                { text: t(userId, 'approve'), callback_data: `punishment_approve_${requestId}` },
+                { text: t(userId, 'reject'), callback_data: `punishment_reject_${requestId}` }
             ]
         ];
         
@@ -1290,8 +1290,8 @@ function handleCallback(chatId, userId, userName, data) {
         if (targetUserId) {
             const buttons = [
                 [
-                    { text: "✅ Approve", callback_data: `swap_approve_${requestId}` },
-                    { text: "❌ Reject", callback_data: `swap_reject_${requestId}` }
+                { text: t(userId, 'approve'), callback_data: `swap_approve_${requestId}` },
+                { text: t(userId, 'reject'), callback_data: `swap_reject_${requestId}` }
                 ]
             ];
             
@@ -1427,7 +1427,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Only show current turn user for Force Swap (avoid misleading)
         const currentUser = queue[currentTurn];
         const royalCurrentUser = addRoyalEmoji(currentUser);
-        const buttons = [[{ text: `🎯 ${royalCurrentUser} (Current Turn)`, callback_data: `force_swap_select_${currentUser}` }]];
+        const buttons = [[{ text: t(userId, 'current_turn_button', {user: royalCurrentUser}), callback_data: `force_swap_select_${currentUser}` }]];
         
         console.log(`🔍 Force Swap - Current turn user: ${currentUser}`);
         
@@ -1592,8 +1592,8 @@ function handleCallback(chatId, userId, userName, data) {
         
         const buttons = [
             [
-                { text: "✅ Approve", callback_data: `punishment_approve_${requestId}` },
-                { text: "❌ Reject", callback_data: `punishment_reject_${requestId}` }
+                { text: t(userId, 'approve'), callback_data: `punishment_approve_${requestId}` },
+                { text: t(userId, 'reject'), callback_data: `punishment_reject_${requestId}` }
             ]
         ];
         
