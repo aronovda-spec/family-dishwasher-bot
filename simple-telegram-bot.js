@@ -168,7 +168,14 @@ const translations = {
         
         // Authorization messages
         'not_authorized_queue_commands': '❌ **Not authorized!**\n\n👤 {user} is not authorized to use queue commands.\n\n💡 **Ask an admin to authorize you:**\n`/authorize {user}`',
-        'not_authorized_swap_features': '❌ **Not authorized!** You need to be authorized to use swap features.'
+        'not_authorized_swap_features': '❌ **Not authorized!** You need to be authorized to use swap features.',
+        
+        // Additional swap messages
+        'swap_request_sent_detailed': 'Swap request sent! Requested swap with: {user} - Waiting for approval - You can cancel your request if needed',
+        'cancel_request': '❌ Cancel Request',
+        'swap_request_canceled_notification': '❌ **Swap request canceled!**\n\n👤 {user} canceled their swap request with you.',
+        'swap_request_canceled_confirmation': '❌ **Swap request canceled!**\n\n👤 You canceled your swap request with {user}.\n\n🔄 **You keep your current turn.**',
+        'swap_request_canceled_admin': '❌ **Swap Request Canceled**\n\n👤 **From:** {from}\n👤 **Canceled by:** {canceledBy}\n👤 **Target was:** {target}\n📅 **Time:** {time}'
     },
     he: {
         // Menu titles
@@ -285,7 +292,14 @@ const translations = {
         
         // Authorization messages
         'not_authorized_queue_commands': '❌ **לא מורשה!**\n\n👤 {user} לא מורשה להשתמש בפקודות התור.\n\n💡 **בקש ממנהל להרשות אותך:**\n`/authorize {user}`',
-        'not_authorized_swap_features': '❌ **לא מורשה!** אתה צריך להיות מורשה כדי להשתמש בתכונות החלפה.'
+        'not_authorized_swap_features': '❌ **לא מורשה!** אתה צריך להיות מורשה כדי להשתמש בתכונות החלפה.',
+        
+        // Additional swap messages
+        'swap_request_sent_detailed': 'בקשת החלפה נשלחה! ביקשת החלפה עם: {user} - ממתין לאישור - אתה יכול לבטל את הבקשה שלך במידת הצורך',
+        'cancel_request': '❌ בטל בקשה',
+        'swap_request_canceled_notification': '❌ **בקשת החלפה בוטלה!**\n\n👤 {user} ביטל את בקשת החלפה שלו איתך.',
+        'swap_request_canceled_confirmation': '❌ **בקשת החלפה בוטלה!**\n\n👤 ביטלת את בקשת החלפה שלך עם {user}.\n\n🔄 **אתה שומר על התור הנוכחי שלך.**',
+        'swap_request_canceled_admin': '❌ **בקשת החלפה בוטלה**\n\n👤 **מאת:** {from}\n👤 **בוטל על ידי:** {canceledBy}\n👤 **היעד היה:** {target}\n📅 **זמן:** {time}'
     }
 };
 
@@ -1244,12 +1258,12 @@ function handleCallback(chatId, userId, userName, data) {
         // Send confirmation to the requester with cancel option
         const cancelButtons = [
             [
-                { text: "❌ Cancel Request", callback_data: `swap_cancel_${requestId}` }
+                { text: t(userId, 'cancel_request'), callback_data: `swap_cancel_${requestId}` }
             ]
         ];
         
         sendMessageWithButtons(chatId, 
-            `Swap request sent! Requested swap with: ${targetUser} - Waiting for approval - You can cancel your request if needed`, 
+            t(userId, 'swap_request_sent_detailed', {user: targetUser}), 
             cancelButtons
         );
         
@@ -1320,14 +1334,19 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Notify the target user that the request was canceled
         if (swapRequest.toUserId) {
-            sendMessage(swapRequest.toUserId, `❌ **Swap request canceled!**\n\n👤 ${userName} canceled their swap request with you.`);
+            sendMessage(swapRequest.toUserId, t(swapRequest.toUserId, 'swap_request_canceled_notification', {user: userName}));
         }
         
         // Notify the requester
-        sendMessage(chatId, `❌ **Swap request canceled!**\n\n👤 You canceled your swap request with ${swapRequest.toUser}.\n\n🔄 **You keep your current turn.**`);
+        sendMessage(chatId, t(userId, 'swap_request_canceled_confirmation', {user: swapRequest.toUser}));
         
         // Notify all admins about the cancellation
-        const adminNotification = `❌ **Swap Request Canceled**\n\n👤 **From:** ${swapRequest.fromUser}\n👤 **Canceled by:** ${userName}\n👤 **Target was:** ${swapRequest.toUser}\n📅 **Time:** ${new Date().toLocaleString()}`;
+        const adminNotification = t(userId, 'swap_request_canceled_admin', {
+            from: swapRequest.fromUser,
+            canceledBy: userName,
+            target: swapRequest.toUser,
+            time: new Date().toLocaleString()
+        });
         
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId && adminChatId !== swapRequest.toUserId) { // Don't notify the canceler or target user
