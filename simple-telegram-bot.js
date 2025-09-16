@@ -50,7 +50,7 @@ function sendMessage(chatId, text) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Content-Length': data.length
+            'Content-Length': Buffer.byteLength(data)
         }
     };
     
@@ -81,7 +81,7 @@ function sendMessageWithButtons(chatId, text, buttons) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Content-Length': data.length
+            'Content-Length': Buffer.byteLength(data)
         }
     };
     
@@ -136,49 +136,49 @@ function handleCommand(chatId, userId, userName, text) {
             text += `Admin Menu - Full Access`;
             buttons = [
                 [
-                    { text: "Status", callback_data: "status" },
-                    { text: "Done", callback_data: "done" }
+                    { text: "📊 Status", callback_data: "status" },
+                    { text: "✅ Done", callback_data: "done" }
                 ],
                 [
-                    { text: "Users", callback_data: "users" },
-                    { text: "Admins", callback_data: "admins" }
+                    { text: "👥 Users", callback_data: "users" },
+                    { text: "🔑 Admins", callback_data: "admins" }
                 ],
                 [
-                    { text: "Authorize", callback_data: "authorize_menu" },
-                    { text: "Add Admin", callback_data: "addadmin_menu" }
+                    { text: "🎫 Authorize", callback_data: "authorize_menu" },
+                    { text: "👑 Add Admin", callback_data: "addadmin_menu" }
                 ],
                 [
-                    { text: "Force Swap", callback_data: "force_swap_menu" },
-                    { text: "Apply Punishment", callback_data: "apply_punishment_menu" }
+                    { text: "⚡ Force Swap", callback_data: "force_swap_menu" },
+                    { text: "⚖️ Apply Punishment", callback_data: "apply_punishment_menu" }
                 ],
                 [
-                    { text: "Dishwasher Alert!", callback_data: "dishwasher_alert" }
+                    { text: "🚨 Dishwasher Alert!", callback_data: "dishwasher_alert" }
                 ]
             ];
         } else if (isAuthorized) {
             text += `User Menu - Queue Access`;
             buttons = [
                 [
-                    { text: "Status", callback_data: "status" },
-                    { text: "Done", callback_data: "done" }
+                    { text: "📊 Status", callback_data: "status" },
+                    { text: "✅ Done", callback_data: "done" }
                 ],
                 [
-                    { text: "Swap", callback_data: "swap_menu" },
-                    { text: "Request Punishment", callback_data: "request_punishment_menu" }
+                    { text: "🔄 Swap", callback_data: "swap_menu" },
+                    { text: "⚖️ Request Punishment", callback_data: "request_punishment_menu" }
                 ],
                 [
-                    { text: "Help", callback_data: "help" }
+                    { text: "❓ Help", callback_data: "help" }
                 ]
             ];
         } else {
             text += `Guest Menu - Limited Access`;
             buttons = [
                 [
-                    { text: "Status", callback_data: "status" },
-                    { text: "Help", callback_data: "help" }
+                    { text: "📊 Status", callback_data: "status" },
+                    { text: "❓ Help", callback_data: "help" }
                 ],
                 [
-                    { text: "Request Access", callback_data: "request_access" }
+                    { text: "🔐 Request Access", callback_data: "request_access" }
                 ]
             ];
         }
@@ -198,7 +198,7 @@ function handleCommand(chatId, userId, userName, text) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': data.length
+                'Content-Length': Buffer.byteLength(data)
             }
         };
         
@@ -932,7 +932,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Send confirmation to the requester with cancel option
         const cancelButtons = [
             [
-                { text: "Cancel Request", callback_data: `swap_cancel_${requestId}` }
+                { text: "❌ Cancel Request", callback_data: `swap_cancel_${requestId}` }
             ]
         ];
         
@@ -1167,12 +1167,12 @@ function handleCallback(chatId, userId, userName, data) {
         // Show reason selection buttons
         const reasonButtons = [
             [
-                { text: "Behavior", callback_data: `punishment_reason_${targetUser}_Behavior` },
-                { text: "Household Rules", callback_data: `punishment_reason_${targetUser}_Household Rules` }
+                { text: "😠 Behavior", callback_data: `punishment_reason_${targetUser}_Behavior` },
+                { text: "🏠 Household Rules", callback_data: `punishment_reason_${targetUser}_Household Rules` }
             ],
             [
-                { text: "Respect", callback_data: `punishment_reason_${targetUser}_Respect` },
-                { text: "Other", callback_data: `punishment_reason_${targetUser}_Other` }
+                { text: "🤝 Respect", callback_data: `punishment_reason_${targetUser}_Respect` },
+                { text: "📝 Other", callback_data: `punishment_reason_${targetUser}_Other` }
             ]
         ];
         
@@ -1199,8 +1199,8 @@ function handleCallback(chatId, userId, userName, data) {
         
         const buttons = [
             [
-                { text: "Approve", callback_data: `punishment_approve_${requestId}` },
-                { text: "Reject", callback_data: `punishment_reject_${requestId}` }
+                { text: "✅ Approve", callback_data: `punishment_approve_${requestId}` },
+                { text: "❌ Reject", callback_data: `punishment_reject_${requestId}` }
             ]
         ];
         
@@ -1327,12 +1327,12 @@ function handleCallback(chatId, userId, userName, data) {
         // Show reason selection for admin punishment
         const buttons = [
             [
-                { text: "Behavior", callback_data: `admin_punishment_reason_${targetUser}_Behavior` },
-                { text: "Household Rules", callback_data: `admin_punishment_reason_${targetUser}_Household Rules` }
+                { text: "😠 Behavior", callback_data: `admin_punishment_reason_${targetUser}_Behavior` },
+                { text: "🏠 Household Rules", callback_data: `admin_punishment_reason_${targetUser}_Household Rules` }
             ],
             [
-                { text: "Respect", callback_data: `admin_punishment_reason_${targetUser}_Respect` },
-                { text: "Other", callback_data: `admin_punishment_reason_${targetUser}_Other` }
+                { text: "🤝 Respect", callback_data: `admin_punishment_reason_${targetUser}_Respect` },
+                { text: "📝 Other", callback_data: `admin_punishment_reason_${targetUser}_Other` }
             ]
         ];
         
@@ -1561,7 +1561,7 @@ const server = http.createServer((req, res) => {
                     const data = update.callback_query.data;
                     
                     // Button click deduplication: prevent rapid multiple clicks on same button
-                    const now = Date.now();
+    const now = Date.now();
                     const lastAction = lastUserAction.get(userId);
                     
                     if (lastAction && lastAction.action === data && (now - lastAction.timestamp) < ACTION_COOLDOWN) {
@@ -1613,13 +1613,17 @@ const server = http.createServer((req, res) => {
     res.end('Not Found');
 });
 
-// Start server on Render port
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌐 Health check: http://localhost:${PORT}/health`);
-    console.log(`🔗 Webhook endpoint: http://localhost:${PORT}/webhook`);
-});
+// Start server only if deploying to Render
+if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+        console.log(`🔗 Webhook endpoint: http://localhost:${PORT}/webhook`);
+    });
+} else {
+    console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
+}
 
 // Set webhook if deploying to Render
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
@@ -1652,12 +1656,12 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     webhookReq.end();
 } else {
     // Use polling for local development
-    console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
-    console.log('📱 Bot is now listening for commands...');
-    console.log('🔍 Search for: @aronov_dishwasher_bot');
-    
-    // Start polling for updates
-    getUpdates();
+console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
+console.log('📱 Bot is now listening for commands...');
+console.log('🔍 Search for: @aronov_dishwasher_bot');
+
+// Start polling for updates
+getUpdates();
 }
 
 // Keep-alive mechanism (every 5 minutes)
