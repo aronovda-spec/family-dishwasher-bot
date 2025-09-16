@@ -89,7 +89,31 @@ const translations = {
         'force_swap_current_turn': '⚡ **Force Swap** - Current turn:',
         'swap_current_turn_with': 'Swap current turn with another user:',
         'force_swap_step2': '⚡ **Force Swap** - Step 2',
-        'swap_with_select': '🔄 **Swap with:** Select user below'
+        'swap_with_select': '🔄 **Swap with:** Select user below',
+        
+        // Common messages
+        'not_authorized': '❌ **Not authorized!**',
+        'admin_access_required': '❌ **Admin access required!**',
+        'not_your_turn': '❌ **Not your turn!**',
+        'current_turn_user': '🔄 **Current turn:**',
+        'your_queue_position': '👤 **Your queue position:**',
+        'please_wait_turn': '⏳ Please wait for your turn.',
+        'dishwasher_alert_sent': '✅ **Dishwasher Alert Sent!**',
+        'alerted_user': '👤 **Alerted:**',
+        'sent_to_all': '📢 **Sent to:** All authorized users and admins',
+        'swap_request_sent': '✅ **Swap request sent to admins!**',
+        'target_user': '🎯 **Target:**',
+        'reason': '📝 **Reason:**',
+        'waiting_approval': '⏰ **Waiting for admin approval...**',
+        'punishment_applied': '✅ **Punishment Applied!**',
+        'applied_by': '👨‍💼 **Applied by:**',
+        'user_authorized': '✅ **User Authorized!**',
+        'total_authorized': '📊 **Total authorized users:**',
+        'swap_completed': '✅ **Swap completed!**',
+        'next_up': '🎯 Next up:',
+        'completed_turn': 'completed their turn!',
+        'punishment_remaining': '⚖️ Punishment:',
+        'extra_turns_remaining': 'extra turn(s) remaining.'
     },
     he: {
         // Menu titles
@@ -127,7 +151,31 @@ const translations = {
         'force_swap_current_turn': '⚡ **החלפה בכוח** - התור הנוכחי:',
         'swap_current_turn_with': 'החלף את התור הנוכחי עם משתמש אחר:',
         'force_swap_step2': '⚡ **החלפה בכוח** - שלב 2',
-        'swap_with_select': '🔄 **החלף עם:** בחר משתמש למטה'
+        'swap_with_select': '🔄 **החלף עם:** בחר משתמש למטה',
+        
+        // Common messages
+        'not_authorized': '❌ **לא מורשה!**',
+        'admin_access_required': '❌ **נדרשת גישת מנהל!**',
+        'not_your_turn': '❌ **לא התור שלך!**',
+        'current_turn_user': '🔄 **התור הנוכחי:**',
+        'your_queue_position': '👤 **המיקום שלך בתור:**',
+        'please_wait_turn': '⏳ אנא המתן לתורך.',
+        'dishwasher_alert_sent': '✅ **התראת כלים נשלחה!**',
+        'alerted_user': '👤 **הותרע:**',
+        'sent_to_all': '📢 **נשלח אל:** כל המשתמשים והמנהלים',
+        'swap_request_sent': '✅ **בקשת החלפה נשלחה למנהלים!**',
+        'target_user': '🎯 **יעד:**',
+        'reason': '📝 **סיבה:**',
+        'waiting_approval': '⏰ **ממתין לאישור מנהל...**',
+        'punishment_applied': '✅ **עונש הופעל!**',
+        'applied_by': '👨‍💼 **הופעל על ידי:**',
+        'user_authorized': '✅ **משתמש הורשה!**',
+        'total_authorized': '📊 **סך משתמשים מורשים:**',
+        'swap_completed': '✅ **החלפה הושלמה!**',
+        'next_up': '🎯 הבא בתור:',
+        'completed_turn': 'סיים את התור!',
+        'punishment_remaining': '⚖️ עונש:',
+        'extra_turns_remaining': 'תורות נוספים נותרו.'
     }
 };
 
@@ -485,7 +533,7 @@ function handleCommand(chatId, userId, userName, text) {
             
             // Check if it's actually their turn
             if (userQueueName !== currentUser) {
-                sendMessage(chatId, `❌ **Not your turn!**\n\n🔄 **Current turn:** ${currentUser}\n👤 **Your queue position:** ${userQueueName}\n\n⏳ Please wait for your turn.`);
+                sendMessage(chatId, `${t(userId, 'not_your_turn')}\n\n${t(userId, 'current_turn_user')} ${currentUser}\n${t(userId, 'your_queue_position')} ${userQueueName}\n\n${t(userId, 'please_wait_turn')}`);
                 return;
             }
             
@@ -754,7 +802,7 @@ function handleCommand(chatId, userId, userName, text) {
                     
                     // Store chat ID for notifications (we'll need to get this from the user when they interact)
                     // For now, we'll store it when they send /start
-                    sendMessage(chatId, `✅ **User Authorized!**\n\n👥 ${userToAuth} → ${queueMember}\n\n📊 **Total authorized users:** ${authorizedUsers.size}/3`);
+                    sendMessage(chatId, `${t(userId, 'user_authorized')}\n\n👥 ${userToAuth} → ${queueMember}\n\n${t(userId, 'total_authorized')} ${authorizedUsers.size}/3`);
                 } else {
                     sendMessage(chatId, `❌ **User not in queue!**\n\n👥 **Available queue members:**\n• Eden Aronov\n• Adele Aronov\n• Emma Aronov\n\n💡 **Usage:** \`/authorize Eden\` or \`/authorize Eden Aronov\``);
                 }
@@ -926,7 +974,7 @@ function handleCallback(chatId, userId, userName, data) {
         });
         
         // Send confirmation to admin
-        sendMessage(chatId, `✅ **Dishwasher Alert Sent!**\n\n👤 **Alerted:** ${currentUser}\n📢 **Sent to:** All authorized users and admins`);
+        sendMessage(chatId, `${t(userId, 'dishwasher_alert_sent')}\n\n${t(userId, 'alerted_user')} ${currentUser}\n${t(userId, 'sent_to_all')}`);
         
     } else if (data === 'authorize_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
