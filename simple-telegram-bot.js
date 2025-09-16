@@ -1035,26 +1035,30 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
         console.log(`🔍 Queue contents:`, queue);
-        // Get unique users from the queue to avoid duplicate buttons
-        const uniqueUsers = [...new Set(queue)];
-        const buttons = uniqueUsers.map(name => [{ text: name, callback_data: `force_swap_select_${name}` }]);
-        console.log(`🔍 Generated buttons:`, buttons);
+        console.log(`🔍 Current turn:`, currentTurn);
         
-        console.log(`🔍 About to send Force Swap buttons with text: "⚡ **Force Swap** - Select first user:"`);
-        // Test with simple text first
+        // Only show current turn user for Force Swap (avoid misleading)
+        const currentUser = queue[currentTurn];
+        const buttons = [[{ text: `🎯 ${currentUser} (Current Turn)`, callback_data: `force_swap_select_${currentUser}` }]];
+        
+        console.log(`🔍 Force Swap - Current turn user: ${currentUser}`);
+        
         sendMessageWithButtons(chatId, 
-            `Force Swap - Select first user:`, 
+            `⚡ **Force Swap** - Current turn: **${currentUser}**\n\nSwap current turn with another user:`, 
             buttons
         );
         
     } else if (data.startsWith('force_swap_select_')) {
         const firstUser = data.replace('force_swap_select_', '');
-        const remainingUsers = queue.filter(name => name !== firstUser);
+        
+        // Get unique users excluding the current turn user
+        const uniqueUsers = [...new Set(queue)];
+        const remainingUsers = uniqueUsers.filter(name => name !== firstUser);
         
         const buttons = remainingUsers.map(name => [{ text: name, callback_data: `force_swap_execute_${firstUser}_${name}` }]);
         
         sendMessageWithButtons(chatId, 
-            `Force Swap - First user: ${firstUser} - Select second user:`, 
+            `⚡ **Force Swap** - Step 2\n\n🎯 **Current turn:** ${firstUser}\n🔄 **Swap with:** Select user below`, 
             buttons
         );
         
