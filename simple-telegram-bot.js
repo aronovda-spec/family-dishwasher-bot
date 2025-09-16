@@ -164,7 +164,11 @@ const translations = {
         'request_punishment_select_user': 'Request Punishment - Select user to report:',
         
         // Swap messages
-        'request_swap_your_position': 'Request Swap - Your position: {position} - Select user to swap with:'
+        'request_swap_your_position': 'Request Swap - Your position: {position} - Select user to swap with:',
+        
+        // Authorization messages
+        'not_authorized_queue_commands': '❌ **Not authorized!**\n\n👤 {user} is not authorized to use queue commands.\n\n💡 **Ask an admin to authorize you:**\n`/authorize {user}`',
+        'not_authorized_swap_features': '❌ **Not authorized!** You need to be authorized to use swap features.'
     },
     he: {
         // Menu titles
@@ -277,7 +281,11 @@ const translations = {
         'request_punishment_select_user': 'בקש עונש - בחר משתמש לדיווח:',
         
         // Swap messages
-        'request_swap_your_position': 'בקש החלפה - המיקום שלך: {position} - בחר משתמש להחלפה:'
+        'request_swap_your_position': 'בקש החלפה - המיקום שלך: {position} - בחר משתמש להחלפה:',
+        
+        // Authorization messages
+        'not_authorized_queue_commands': '❌ **לא מורשה!**\n\n👤 {user} לא מורשה להשתמש בפקודות התור.\n\n💡 **בקש ממנהל להרשות אותך:**\n`/authorize {user}`',
+        'not_authorized_swap_features': '❌ **לא מורשה!** אתה צריך להיות מורשה כדי להשתמש בתכונות החלפה.'
     }
 };
 
@@ -633,7 +641,7 @@ function handleCommand(chatId, userId, userName, text) {
         } else {
             // Regular user "Done" - Check if user is authorized
             if (!authorizedUsers.has(userName) && !authorizedUsers.has(userName.toLowerCase())) {
-                sendMessage(chatId, `❌ **Not authorized!**\n\n👤 ${userName} is not authorized to use queue commands.\n\n💡 **Ask an admin to authorize you:**\n\`/authorize ${userName}\``);
+                sendMessage(chatId, t(userId, 'not_authorized_queue_commands', {user: userName}));
                 return;
             }
             
@@ -1148,7 +1156,7 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'swap_menu') {
         const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         if (!isAuthorized) {
-            sendMessage(chatId, '❌ **Not authorized!** You need to be authorized to use swap features.');
+            sendMessage(chatId, t(userId, 'not_authorized_swap_features'));
             return;
         }
         
