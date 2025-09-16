@@ -147,7 +147,15 @@ const translations = {
         
         // Punishment selection messages
         'apply_punishment_select_reason': 'Apply Punishment - Select reason for {user}:',
-        'request_punishment_select_reason': 'Request Punishment - Select reason for {user}:'
+        'request_punishment_select_reason': 'Request Punishment - Select reason for {user}:',
+        
+        // Punishment approval/rejection messages
+        'punishment_request_approved': '✅ **Punishment Request Approved!**',
+        'punishment_request_rejected': '❌ **Punishment Request Rejected!**',
+        'requested_by': '👤 **Requested by:** {user}',
+        'rejected_by': '👨‍💼 **Rejected by:** {user}',
+        'declined_punishment_request': '👨‍💼 {admin} declined your punishment request for {target}.',
+        'you_declined_punishment': '👤 You declined {requester}\'s punishment request.'
     },
     he: {
         // Menu titles
@@ -243,7 +251,15 @@ const translations = {
         
         // Punishment selection messages
         'apply_punishment_select_reason': 'הפעל עונש - בחר סיבה עבור {user}:',
-        'request_punishment_select_reason': 'בקש עונש - בחר סיבה עבור {user}:'
+        'request_punishment_select_reason': 'בקש עונש - בחר סיבה עבור {user}:',
+        
+        // Punishment approval/rejection messages
+        'punishment_request_approved': '✅ **בקשת עונש אושרה!**',
+        'punishment_request_rejected': '❌ **בקשת עונש נדחתה!**',
+        'requested_by': '👤 **התבקש על ידי:** {user}',
+        'rejected_by': '👨‍💼 **נדחה על ידי:** {user}',
+        'declined_punishment_request': '👨‍💼 {admin} דחה את בקשת העונש שלך עבור {target}.',
+        'you_declined_punishment': '👤 דחית את בקשת העונש של {requester}.'
     }
 };
 
@@ -1510,13 +1526,14 @@ function handleCallback(chatId, userId, userName, data) {
         applyPunishment(punishmentRequest.targetUser, punishmentRequest.reason, userName);
         
         // Send confirmation to admin who approved
-        sendMessage(chatId, `✅ **Punishment Approved!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}\n\n⚡ **3 extra turns applied immediately!**`);
+        sendMessage(chatId, `${t(userId, 'punishment_approved')}\n\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${punishmentRequest.reason}\n${t(userId, 'approved_by')} ${userName}\n\n${t(userId, 'extra_turns_applied')}`);
         
         // Notify requester
-        sendMessage(punishmentRequest.fromUserId, `✅ **Punishment Approved!**\n\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}`);
+        sendMessage(punishmentRequest.fromUserId, `${t(punishmentRequest.fromUserId, 'punishment_approved')}\n\n${t(punishmentRequest.fromUserId, 'target_user')} ${punishmentRequest.targetUser}\n${t(punishmentRequest.fromUserId, 'reason')} ${punishmentRequest.reason}\n${t(punishmentRequest.fromUserId, 'approved_by')} ${userName}`);
         
         // Notify all other authorized users and admins about the approval
-        const approvalMessage = `✅ **Punishment Request Approved!**\n\n👤 **Requested by:** ${punishmentRequest.fromUser}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Approved by:** ${userName}\n\n⚡ **3 extra turns applied immediately!**`;
+        // Note: For notifications to other users, we need to get their language preference
+        const approvalMessage = `${t(userId, 'punishment_request_approved')}\n\n${t(userId, 'requested_by', {user: punishmentRequest.fromUser})}\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${punishmentRequest.reason}\n${t(userId, 'approved_by')} ${userName}\n\n${t(userId, 'extra_turns_applied')}`;
         
         // Notify all authorized users
         [...authorizedUsers].forEach(user => {
@@ -1555,11 +1572,11 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
         // Notify requester
-        sendMessage(punishmentRequest.fromUserId, `❌ **Punishment Request Rejected!**\n\n👨‍💼 ${userName} declined your punishment request for ${punishmentRequest.targetUser}.`);
-        sendMessage(chatId, `❌ **Punishment request rejected!**\n\n👤 You declined ${punishmentRequest.fromUser}'s punishment request.`);
+        sendMessage(punishmentRequest.fromUserId, `${t(punishmentRequest.fromUserId, 'punishment_request_rejected')}\n\n${t(punishmentRequest.fromUserId, 'declined_punishment_request', {admin: userName, target: punishmentRequest.targetUser})}`);
+        sendMessage(chatId, `${t(userId, 'punishment_request_rejected')}\n\n${t(userId, 'you_declined_punishment', {requester: punishmentRequest.fromUser})}`);
         
         // Notify all other authorized users and admins about the rejection
-        const rejectionMessage = `❌ **Punishment Request Rejected!**\n\n👤 **Requested by:** ${punishmentRequest.fromUser}\n🎯 **Target:** ${punishmentRequest.targetUser}\n📝 **Reason:** ${punishmentRequest.reason}\n👨‍💼 **Rejected by:** ${userName}`;
+        const rejectionMessage = `${t(userId, 'punishment_request_rejected')}\n\n${t(userId, 'requested_by', {user: punishmentRequest.fromUser})}\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${punishmentRequest.reason}\n${t(userId, 'rejected_by', {user: userName})}`;
         
         // Notify all authorized users
         [...authorizedUsers].forEach(user => {
