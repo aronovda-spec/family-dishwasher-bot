@@ -215,7 +215,19 @@ const translations = {
         'queue_update': 'Queue Update',
         'swapped_positions': 'swapped positions',
         'new_queue_order': 'New queue order',
-        'current_turn_status': 'CURRENT TURN'
+        'current_turn_status': 'CURRENT TURN',
+        'admin_force_swap_executed': 'Admin Force Swap Executed!',
+        'apply_punishment_select_user': 'Apply Punishment - Select user to punish:',
+        
+        // Error messages
+        'max_authorized_users': '❌ **Maximum 3 authorized users reached!**\n\nRemove a user first before adding another.',
+        'no_one_in_queue': '❌ **No one is currently in the queue!**',
+        'not_your_turn_swap': '❌ **Not your turn!** You can only request swaps during your turn.',
+        'swap_request_not_found': '❌ **Swap request not found or expired!**',
+        'swap_request_not_for_you': '❌ **This swap request is not for you!**',
+        'swap_request_not_yours': '❌ **This swap request is not yours!**',
+        'not_authorized_punishment': '❌ **Not authorized!** You need to be authorized to request punishments.',
+        'no_users_available_report': '❌ **No users available to report!**'
     },
     he: {
         // Menu titles
@@ -379,7 +391,19 @@ const translations = {
         'queue_update': 'עדכון התור',
         'swapped_positions': 'החליפו מקומות',
         'new_queue_order': 'סדר התור החדש',
-        'current_turn_status': 'התור הנוכחי'
+        'current_turn_status': 'התור הנוכחי',
+        'admin_force_swap_executed': 'מנהל ביצע החלפה בכוח!',
+        'apply_punishment_select_user': 'הפעל עונש - בחר משתמש לעונש:',
+        
+        // Error messages
+        'max_authorized_users': '❌ **הגעת למקסימום 3 משתמשים מורשים!**\n\nהסר משתמש קודם לפני הוספת אחר.',
+        'no_one_in_queue': '❌ **אף אחד לא נמצא כרגע בתור!**',
+        'not_your_turn_swap': '❌ **לא התור שלך!** אתה יכול לבקש החלפות רק במהלך התור שלך.',
+        'swap_request_not_found': '❌ **בקשת החלפה לא נמצאה או פגה תוקפה!**',
+        'swap_request_not_for_you': '❌ **בקשת החלפה זו לא מיועדת לך!**',
+        'swap_request_not_yours': '❌ **בקשת החלפה זו לא שלך!**',
+        'not_authorized_punishment': '❌ **לא מורשה!** אתה צריך להיות מורשה כדי לבקש עונשים.',
+        'no_users_available_report': '❌ **אין משתמשים זמינים לדיווח!**'
     }
 };
 
@@ -930,16 +954,16 @@ function handleCommand(chatId, userId, userName, text) {
         if (userToRemove) {
             // Prevent self-removal (security protection)
             if (userToRemove.toLowerCase() === userName.toLowerCase() || userToRemove === userId.toString()) {
-                sendMessage(chatId, `❌ **Cannot remove yourself as admin!**\n\n🛡️ **Security protection:** Only other admins can remove you.\n\n💡 **Ask another admin to remove you:**\n\`/removeadmin ${userName}\``);
+                sendMessage(chatId, t(userId, 'cannot_remove_yourself_admin', {user: userName}));
                 return;
             }
             
             // Check if user exists in admins
             if (admins.has(userToRemove)) {
                 admins.delete(userToRemove);
-                sendMessage(chatId, `✅ **Admin Removed!**\n\n👤 ${userToRemove} is no longer an admin.\n\n🔒 **Admin privileges revoked.**`);
+                sendMessage(chatId, t(userId, 'admin_removed', {user: userToRemove}));
             } else {
-                sendMessage(chatId, `❌ **User not found!**\n\n👤 ${userToRemove} is not an admin.\n\n💡 **Use \`/admins\` to see current admins.**`);
+                sendMessage(chatId, t(userId, 'user_not_found_admin', {user: userToRemove}));
             }
         } else {
             sendMessage(chatId, t(userId, 'usage_removeadmin'));
@@ -973,14 +997,14 @@ function handleCommand(chatId, userId, userName, text) {
     } else if (command.startsWith('/authorize ')) {
         // Check if user is an admin
         if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
-            sendMessage(chatId, `❌ **Admin access required!**\n\n👤 ${userName} is not an admin.\n\n💡 **Only admins can authorize users.**`);
+            sendMessage(chatId, t(userId, 'admin_access_required_authorize', {user: userName}));
             return;
         }
         
         const userToAuth = command.replace('/authorize ', '').trim();
         if (userToAuth) {
             if (authorizedUsers.size >= 3) {
-                sendMessage(chatId, '❌ **Maximum 3 authorized users reached!**\n\nRemove a user first before adding another.');
+                sendMessage(chatId, t(userId, 'max_authorized_users'));
             } else {
                 // Check if user is one of the queue members
                 const queueMember = queue.find(name => 
@@ -999,7 +1023,7 @@ function handleCommand(chatId, userId, userName, text) {
                     // For now, we'll store it when they send /start
                     sendMessage(chatId, `${t(userId, 'user_authorized')}\n\n👥 ${userToAuth} → ${queueMember}\n\n${t(userId, 'total_authorized')} ${authorizedUsers.size}/3`);
                 } else {
-                    sendMessage(chatId, `❌ **User not in queue!**\n\n👥 **Available queue members:**\n• Eden Aronov\n• Adele Aronov\n• Emma Aronov\n\n💡 **Usage:** \`/authorize Eden\` or \`/authorize Eden Aronov\``);
+                    sendMessage(chatId, t(userId, 'user_not_in_queue'));
                 }
             }
         } else {
@@ -1140,14 +1164,14 @@ function handleCallback(chatId, userId, userName, data) {
         
         if (!isAdmin) {
             console.log(`🔍 DEBUG - Access denied for ${userName}`);
-            sendMessage(chatId, '❌ **Admin access required!**');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
         // Get current turn user
         const currentUser = queue[currentTurn];
         if (!currentUser) {
-            sendMessage(chatId, '❌ **No one is currently in the queue!**');
+            sendMessage(chatId, t(userId, 'no_one_in_queue'));
             return;
         }
         
@@ -1186,7 +1210,7 @@ function handleCallback(chatId, userId, userName, data) {
                 `💡 **Usage:** Type \`/authorize Eden\` to authorize Eden`;
             sendMessage(chatId, message);
         } else {
-            sendMessage(chatId, '❌ **Admin access required!**');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
         }
     } else if (data === 'addadmin_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
@@ -1196,7 +1220,7 @@ function handleCallback(chatId, userId, userName, data) {
                 `**Example:** \`/addadmin Marianna\``;
             sendMessage(chatId, message);
         } else {
-            sendMessage(chatId, '❌ **Admin access required!**');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
         }
     } else if (data === 'request_access') {
         const message = `🔐 **Request Access**\n\n` +
@@ -1266,14 +1290,14 @@ function handleCallback(chatId, userId, userName, data) {
         // Check if it's the current user's turn
         const currentUserIndex = queue.indexOf(currentUserQueueName);
         if (currentTurn !== currentUserIndex) {
-            sendMessage(chatId, '❌ **Not your turn!** You can only request swaps during your turn.');
+            sendMessage(chatId, t(userId, 'not_your_turn_swap'));
             return;
         }
         
         // Check if user already has a pending swap request
         for (const [requestId, request] of pendingSwaps.entries()) {
             if (request.fromUserId === userId) {
-                sendMessage(chatId, `❌ **You already have a pending swap request!**\n\n🎯 **Current request:** ${request.fromUser} ↔ ${request.toUser}\n⏰ **Request ID:** ${requestId}\n\n💡 **You can cancel your current request before creating a new one.**`);
+                sendMessage(chatId, t(userId, 'pending_swap_exists', {fromUser: request.fromUser, toUser: request.toUser, requestId: requestId}));
                 return;
             }
         }
@@ -1281,7 +1305,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Check if target user already has a pending swap request
         for (const [requestId, request] of pendingSwaps.entries()) {
             if (request.toUserId === targetUserId || request.fromUserId === targetUserId) {
-                sendMessage(chatId, `❌ **${targetUser} already has a pending swap request!**\n\n🎯 **Current request:** ${request.fromUser} ↔ ${request.toUser}\n⏰ **Request ID:** ${requestId}\n\n💡 **Please wait for this request to be resolved before creating a new one.**`);
+                sendMessage(chatId, t(userId, 'target_has_pending_swap', {targetUser: targetUser, fromUser: request.fromUser, toUser: request.toUser, requestId: requestId}));
                 return;
             }
         }
@@ -1340,13 +1364,13 @@ function handleCallback(chatId, userId, userName, data) {
         const swapRequest = pendingSwaps.get(requestId);
         
         if (!swapRequest) {
-            sendMessage(chatId, '❌ **Swap request not found or expired!**');
+            sendMessage(chatId, t(userId, 'swap_request_not_found'));
             return;
         }
         
         // Check if this is the correct user approving
         if (swapRequest.toUserId !== userId) {
-            sendMessage(chatId, '❌ **This swap request is not for you!**');
+            sendMessage(chatId, t(userId, 'swap_request_not_for_you'));
             return;
         }
         
@@ -1358,13 +1382,13 @@ function handleCallback(chatId, userId, userName, data) {
         const swapRequest = pendingSwaps.get(requestId);
         
         if (!swapRequest) {
-            sendMessage(chatId, '❌ **Swap request not found or expired!**');
+            sendMessage(chatId, t(userId, 'swap_request_not_found'));
             return;
         }
         
         // Check if this is the correct user rejecting
         if (swapRequest.toUserId !== userId) {
-            sendMessage(chatId, '❌ **This swap request is not for you!**');
+            sendMessage(chatId, t(userId, 'swap_request_not_for_you'));
             return;
         }
         
@@ -1390,13 +1414,13 @@ function handleCallback(chatId, userId, userName, data) {
         const swapRequest = pendingSwaps.get(requestId);
         
         if (!swapRequest) {
-            sendMessage(chatId, '❌ **Swap request not found or expired!**');
+            sendMessage(chatId, t(userId, 'swap_request_not_found'));
             return;
         }
         
         // Check if this is the correct user canceling
         if (swapRequest.fromUserId !== userId) {
-            sendMessage(chatId, '❌ **This swap request is not yours!**');
+            sendMessage(chatId, t(userId, 'swap_request_not_yours'));
             return;
         }
         
@@ -1429,7 +1453,7 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'force_swap_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         if (!isAdmin) {
-            sendMessage(chatId, '❌ **Admin access required!**');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
@@ -1525,13 +1549,12 @@ function handleCallback(chatId, userId, userName, data) {
             
             console.log(`🔍 DEBUG - Temporary swap stored: ${firstUser}↔${secondUser} (will revert after current turn)`);
             
-            // Notify all users
-            const message = `⚡ **Admin Force Swap Executed!**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n📋 **New queue order:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ' (CURRENT TURN)' : ''}`).join('\n')}`;
-            
-            // Send to all authorized users and admins using userChatIds
+            // Notify all users in their language
             [...authorizedUsers, ...admins].forEach(user => {
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 if (userChatId && userChatId !== chatId) { // Don't notify the admin who performed the swap
+                    // Create message in recipient's language
+                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n📋 **${t(userChatId, 'new_queue_order')}:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ` (${t(userChatId, 'current_turn_status')})` : ''}`).join('\n')}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
                 } else {
@@ -1547,7 +1570,7 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'request_punishment_menu') {
         const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
         if (!isAuthorized) {
-            sendMessage(chatId, '❌ **Not authorized!** You need to be authorized to request punishments.');
+            sendMessage(chatId, t(userId, 'not_authorized_punishment'));
             return;
         }
         
@@ -1555,7 +1578,7 @@ function handleCallback(chatId, userId, userName, data) {
         const availableUsers = queue.filter(name => name !== currentUserQueueName);
         
         if (availableUsers.length === 0) {
-            sendMessage(chatId, '❌ **No users available to report!**');
+            sendMessage(chatId, t(userId, 'no_users_available_report'));
             return;
         }
         
@@ -1630,7 +1653,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Check if this is an admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         if (!isAdmin) {
-            sendMessage(chatId, '❌ **Admin access required!**');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
@@ -1681,7 +1704,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Check if this is an admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         if (!isAdmin) {
-            sendMessage(chatId, '❌ **Admin access required!**');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
@@ -1718,7 +1741,7 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'apply_punishment_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         if (!isAdmin) {
-            sendMessage(chatId, '❌ **Admin access required!**');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
@@ -1727,7 +1750,7 @@ function handleCallback(chatId, userId, userName, data) {
         const buttons = uniqueUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `admin_punish_${name}` }]);
         
         sendMessageWithButtons(chatId, 
-            `Apply Punishment - Select user to punish:`, 
+            t(userId, 'apply_punishment_select_user'), 
             buttons
         );
         
