@@ -161,7 +161,10 @@ const translations = {
         // Additional punishment messages
         'punishment_request_submitted': 'Punishment Request Submitted!',
         'admins_notified': 'Admins have been notified!',
-        'request_punishment_select_user': 'Request Punishment - Select user to report:'
+        'request_punishment_select_user': 'Request Punishment - Select user to report:',
+        
+        // Swap messages
+        'request_swap_your_position': 'Request Swap - Your position: {position} - Select user to swap with:'
     },
     he: {
         // Menu titles
@@ -271,7 +274,10 @@ const translations = {
         // Additional punishment messages
         'punishment_request_submitted': 'בקשת עונש הוגשה!',
         'admins_notified': 'המנהלים הותרעו!',
-        'request_punishment_select_user': 'בקש עונש - בחר משתמש לדיווח:'
+        'request_punishment_select_user': 'בקש עונש - בחר משתמש לדיווח:',
+        
+        // Swap messages
+        'request_swap_your_position': 'בקש החלפה - המיקום שלך: {position} - בחר משתמש להחלפה:'
     }
 };
 
@@ -1154,7 +1160,7 @@ function handleCallback(chatId, userId, userName, data) {
         const buttons = availableUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `swap_request_${name}` }]);
         
         sendMessageWithButtons(chatId, 
-            `Request Swap - Your position: ${currentUserQueueName} - Select user to swap with:`, 
+            t(userId, 'request_swap_your_position', {position: currentUserQueueName}), 
             buttons
         );
         
