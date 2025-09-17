@@ -266,7 +266,8 @@ const translations = {
         'got_it': '✅ Got it!',
         'like': '👍 Like',
         'sent_to': 'Sent to',
-        'cancel': '❌ Cancel'
+        'cancel': '❌ Cancel',
+        'from_admin': 'From Admin'
     },
     he: {
         // Menu titles
@@ -476,7 +477,8 @@ const translations = {
         'got_it': '✅ הבנתי!',
         'like': '👍 אהבתי',
         'sent_to': 'נשלח אל',
-        'cancel': '❌ בטל'
+        'cancel': '❌ בטל',
+        'from_admin': 'מהמנהל'
     }
 };
 
@@ -611,7 +613,6 @@ function handleCommand(chatId, userId, userName, text) {
     
     if (userState === 'typing_announcement') {
         // Admin is typing announcement
-        console.log(`🔍 DEBUG - Processing announcement text: "${text}" from user ${userId} (${userName})`);
         const announcementText = text;
         
         pendingAnnouncements.set(userId, {
@@ -620,7 +621,6 @@ function handleCommand(chatId, userId, userName, text) {
             timestamp: Date.now()
         });
         
-        console.log(`🔍 DEBUG - Showing announcement preview to user ${userId}`);
         // Show preview with confirmation buttons (same format as message)
         const previewMessage = `${t(userId, 'announcement_preview')}:\n\n` +
                               `📢 **${t(userId, 'announcement')}**\n\n` +
@@ -1283,7 +1283,6 @@ function executeSwap(swapRequest, requestId, status) {
 // Handle callback queries (button presses)
 function handleCallback(chatId, userId, userName, data) {
     console.log(`🔘 Button pressed: "${data}" by ${userName}`);
-    console.log(`🔍 DEBUG - Current user state for ${userId}: ${userStates.get(userId) || 'none'}`);
     
     if (data === 'test') {
         sendMessage(chatId, t(userId, 'test_button_works', {user: userName, userId: userId, data: data}));
@@ -1391,16 +1390,13 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
     } else if (data === 'create_announcement') {
-        console.log(`🔍 DEBUG - CREATE_ANNOUNCEMENT callback reached! User: ${userName} (${userId})`);
         // Admin creates announcement
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
-        console.log(`🔍 DEBUG - Admin check: ${isAdmin} (admins: ${Array.from(admins)})`);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
-        console.log(`🔍 DEBUG - Setting announcement state for user ${userId} (${userName})`);
         sendMessage(chatId, t(userId, 'type_announcement_message'));
         userStates.set(userId, 'typing_announcement');
         
