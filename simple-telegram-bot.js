@@ -1283,6 +1283,7 @@ function executeSwap(swapRequest, requestId, status) {
 // Handle callback queries (button presses)
 function handleCallback(chatId, userId, userName, data) {
     console.log(`🔘 Button pressed: "${data}" by ${userName}`);
+    console.log(`🔍 DEBUG - Current user state for ${userId}: ${userStates.get(userId) || 'none'}`);
     
     if (data === 'test') {
         sendMessage(chatId, t(userId, 'test_button_works', {user: userName, userId: userId, data: data}));
@@ -1390,8 +1391,10 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
     } else if (data === 'create_announcement') {
+        console.log(`🔍 DEBUG - CREATE_ANNOUNCEMENT callback reached! User: ${userName} (${userId})`);
         // Admin creates announcement
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        console.log(`🔍 DEBUG - Admin check: ${isAdmin} (admins: ${Array.from(admins)})`);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
