@@ -267,7 +267,7 @@ function trackMonthlyAction(type, userName, adminName = null, count = 1) {
 }
 
 // Generate monthly report
-function generateMonthlyReport(monthKey, userId) {
+function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
     const monthData = monthlyStats.get(monthKey);
     if (!monthData) {
         return t(userId, 'no_data_available');
@@ -281,7 +281,14 @@ function generateMonthlyReport(monthKey, userId) {
     const userLang = getUserLanguage(userId);
     const monthName = monthNames[userLang][parseInt(month) - 1];
     
-    let report = `${t(userId, 'monthly_report_title', {month: monthName, year})}\n\n`;
+    let report = '';
+    
+    // Add auto-report header if this is an automatic report
+    if (isAutoReport) {
+        report += `${t(userId, 'auto_monthly_report_header', {month: monthName, year})}`;
+    }
+    
+    report += `${t(userId, 'monthly_report_title', {month: monthName, year})}\n\n`;
     
     // User statistics
     report += `${t(userId, 'user_statistics')}\n`;
@@ -313,6 +320,34 @@ function generateMonthlyReport(monthKey, userId) {
     report += `- ${t(userId, 'queue_reorders', {count: monthData.totals.queueReorders})}`;
     
     return report;
+}
+
+// Broadcast monthly report to all authorized users and admins
+function broadcastMonthlyReport(monthKey = null, isAutoReport = false) {
+    const currentMonthKey = monthKey || getCurrentMonthKey();
+    console.log(`📊 Broadcasting monthly report for ${currentMonthKey}${isAutoReport ? ' (automatic)' : ' (manual)'}`);
+    
+    let recipientCount = 0;
+    
+    // Send to all authorized users
+    authorizedUsers.forEach(userName => {
+        const chatId = userChatIds.get(userName.toLowerCase());
+        if (chatId) {
+            const report = generateMonthlyReport(currentMonthKey, chatId, isAutoReport);
+            sendMessage(chatId, report);
+            recipientCount++;
+        }
+    });
+    
+    // Send to all admins
+    adminChatIds.forEach(chatId => {
+        const report = generateMonthlyReport(currentMonthKey, chatId, isAutoReport);
+        sendMessage(chatId, report);
+        recipientCount++;
+    });
+    
+    console.log(`📊 Monthly report sent to ${recipientCount} recipients`);
+    return recipientCount;
 }
 
 // Swap request tracking
@@ -605,7 +640,10 @@ const translations = {
         
         // Monthly Reports
         'monthly_report': '📊 Monthly Report',
+        'share_monthly_report': '📤 Share Monthly Report',
         'monthly_report_title': '📊 Monthly Report - {month} {year}',
+        'monthly_report_shared': '✅ **Monthly Report Shared!**\n\n📤 Report sent to all authorized users and admins.\n\n👥 **Recipients:** {count} users',
+        'auto_monthly_report_header': '🗓️ **AUTOMATIC MONTHLY REPORT**\n\n📅 End of {month} {year}\n\n',
         'user_statistics': 'USER STATISTICS:',
         'admin_statistics': 'ADMIN STATISTICS:',
         'completions_count': 'Completions: {count}',
@@ -877,7 +915,10 @@ const translations = {
         
         // Monthly Reports
         'monthly_report': '📊 דוח חודשי',
+        'share_monthly_report': '📤 שתף דוח חודשי',
         'monthly_report_title': '📊 דוח חודשי - {month} {year}',
+        'monthly_report_shared': '✅ **דוח חודשי נשלח!**\n\n📤 הדוח נשלח לכל המשתמשים המורשים והמנהלים.\n\n👥 **נמענים:** {count} משתמשים',
+        'auto_monthly_report_header': '🗓️ **דוח חודשי אוטומטי**\n\n📅 סוף {month} {year}\n\n',
         'user_statistics': 'סטטיסטיקות משתמשים:',
         'admin_statistics': 'סטטיסטיקות מנהלים:',
         'completions_count': 'השלמות: {count}',
@@ -1119,7 +1160,8 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'send_message'), callback_data: "send_user_message" }
                 ],
                 [
-                    { text: t(userId, 'monthly_report'), callback_data: "monthly_report_show" }
+                    { text: t(userId, 'monthly_report'), callback_data: "monthly_report_show" },
+                    { text: t(userId, 'share_monthly_report'), callback_data: "share_monthly_report" }
                 ],
                 [
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
@@ -1925,6 +1967,18 @@ function handleCallback(chatId, userId, userName, data) {
         const currentMonthKey = getCurrentMonthKey();
         const report = generateMonthlyReport(currentMonthKey, userId);
         sendMessage(chatId, report);
+        
+    } else if (data === 'share_monthly_report') {
+        // Share monthly report with all users
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const currentMonthKey = getCurrentMonthKey();
+        const recipientCount = broadcastMonthlyReport(currentMonthKey, false);
+        sendMessage(chatId, t(userId, 'monthly_report_shared', {count: recipientCount}));
         
     } else if (data === 'queue_management_menu') {
         // Queue Management submenu
@@ -3107,5 +3161,24 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     // Then every 5 minutes (more aggressive)
     setInterval(keepAlive, 5 * 60 * 1000); // 5 minutes
 }
+
+// Automatic monthly report system
+function checkAndSendMonthlyReport() {
+    const now = new Date();
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const isLastDayOfMonth = now.getDate() === lastDayOfMonth;
+    const isEndOfDay = now.getHours() === 23 && now.getMinutes() >= 55; // Between 23:55-23:59
+    
+    console.log(`📅 Monthly report check: ${now.toISOString()} - Last day: ${isLastDayOfMonth}, End of day: ${isEndOfDay}`);
+    
+    if (isLastDayOfMonth && isEndOfDay) {
+        console.log('📊 Sending automatic monthly report...');
+        const currentMonthKey = getCurrentMonthKey();
+        broadcastMonthlyReport(currentMonthKey, true);
+    }
+}
+
+// Check for monthly reports every hour
+setInterval(checkAndSendMonthlyReport, 60 * 60 * 1000); // 1 hour
 
 // Note: Cleanup timer removed - no time limitations on requests
