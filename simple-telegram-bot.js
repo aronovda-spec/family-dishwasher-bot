@@ -265,7 +265,8 @@ const translations = {
         // Common messaging elements
         'got_it': '✅ Got it!',
         'like': '👍 Like',
-        'sent_to': 'Sent to'
+        'sent_to': 'Sent to',
+        'cancel': '❌ Cancel'
     },
     he: {
         // Menu titles
@@ -474,7 +475,8 @@ const translations = {
         // Common messaging elements
         'got_it': '✅ הבנתי!',
         'like': '👍 אהבתי',
-        'sent_to': 'נשלח אל'
+        'sent_to': 'נשלח אל',
+        'cancel': '❌ בטל'
     }
 };
 
@@ -617,7 +619,7 @@ function handleCommand(chatId, userId, userName, text) {
             timestamp: Date.now()
         });
         
-        // Show preview with confirmation buttons
+        // Show preview with confirmation buttons (same format as message)
         const previewMessage = `${t(userId, 'announcement_preview')}:\n\n` +
                               `📢 **${t(userId, 'announcement')}**\n\n` +
                               `${announcementText}\n\n` +
