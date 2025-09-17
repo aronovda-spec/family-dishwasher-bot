@@ -453,7 +453,11 @@ const translations = {
         'suspended_until': 'Suspended until: {date}',
         'current_queue_order': 'Current Queue Order:',
         'punishment_debt_preserved': 'Punishment debt preserved: {count} turns',
-        'reactivated_with_punishment': '{user} reactivated with {count} punishment turns'
+        'reactivated_with_punishment': '{user} reactivated with {count} punishment turns',
+        'remove_user': '❌ Remove User',
+        'select_user_to_remove': 'Select user to remove permanently:',
+        'user_removed': '❌ {user} removed from queue permanently',
+        'permanently_removed': 'Permanently removed'
     },
     he: {
         // Menu titles
@@ -703,7 +707,11 @@ const translations = {
         'suspended_until': 'מושעה עד: {date}',
         'current_queue_order': 'סדר התור הנוכחי:',
         'punishment_debt_preserved': 'חוב עונש נשמר: {count} תורות',
-        'reactivated_with_punishment': '{user} הופעל מחדש עם {count} תורות עונש'
+        'reactivated_with_punishment': '{user} הופעל מחדש עם {count} תורות עונש',
+        'remove_user': '❌ הסר משתמש',
+        'select_user_to_remove': 'בחר משתמש להסרה קבועה:',
+        'user_removed': '❌ {user} הוסר מהתור לצמיתות',
+        'permanently_removed': 'הוסר לצמיתות'
     }
 };
 
@@ -1062,7 +1070,17 @@ function handleCommand(chatId, userId, userName, text) {
             statusMessage += `\n\n✈️ **${t(userId, 'suspended_users_list')}**`;
             suspendedUsersList.forEach(([user, data]) => {
                 const date = data.suspendedUntil.toLocaleDateString();
-                statusMessage += `\n• ${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}`;
+                
+                // Check if this is a permanent removal (100+ year suspension)
+                const now = new Date();
+                const yearsUntilExpiry = (data.suspendedUntil - now) / (1000 * 60 * 60 * 24 * 365);
+                const isPermanent = yearsUntilExpiry > 50; // If more than 50 years, consider it permanent
+                
+                if (isPermanent) {
+                    statusMessage += `\n• ${addRoyalEmoji(user)}: ${t(userId, 'permanently_removed')}`;
+                } else {
+                    statusMessage += `\n• ${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}`;
+                }
             });
         }
         
@@ -1732,6 +1750,9 @@ function handleCallback(chatId, userId, userName, data) {
                 { text: t(userId, 'reactivate_user'), callback_data: "reactivate_user_menu" }
             ],
             [
+                { text: t(userId, 'remove_user'), callback_data: "remove_user_menu" }
+            ],
+            [
                 { text: t(userId, 'reset_queue'), callback_data: "reset_queue_confirm" }
             ]
         ];
@@ -1859,7 +1880,17 @@ function handleCallback(chatId, userId, userName, data) {
             suspended.forEach(([user, data]) => {
                 const date = data.suspendedUntil.toLocaleDateString();
                 const debtText = data.punishmentDebt > 0 ? ` (${data.punishmentDebt} punishment turns)` : '';
-                statsMessage += `${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}${debtText}\n`;
+                
+                // Check if this is a permanent removal (100+ year suspension)
+                const now = new Date();
+                const yearsUntilExpiry = (data.suspendedUntil - now) / (1000 * 60 * 60 * 24 * 365);
+                const isPermanent = yearsUntilExpiry > 50; // If more than 50 years, consider it permanent
+                
+                if (isPermanent) {
+                    statsMessage += `${addRoyalEmoji(user)}: ${t(userId, 'permanently_removed')}${debtText}\n`;
+                } else {
+                    statsMessage += `${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}${debtText}\n`;
+                }
             });
         }
         
@@ -1923,6 +1954,25 @@ function handleCallback(chatId, userId, userName, data) {
             sendMessage(chatId, t(userId, 'user_reactivated', {user: addRoyalEmoji(selectedUser)}));
         } else {
             sendMessage(chatId, `❌ Failed to reactivate ${addRoyalEmoji(selectedUser)}`);
+        }
+        
+    } else if (data === 'remove_user_menu') {
+        // Select user to remove permanently (only show users currently in queue)
+        if (queue.length === 0) {
+            sendMessage(chatId, 'No users in queue to remove.');
+            return;
+        }
+        const buttons = queue.map(user => [{ text: addRoyalEmoji(user), callback_data: `remove_${user}` }]);
+        sendMessageWithButtons(chatId, t(userId, 'select_user_to_remove'), buttons);
+        
+    } else if (data.startsWith('remove_')) {
+        // Execute permanent removal (100-year suspension)
+        const selectedUser = data.replace('remove_', '');
+        const success = suspendUser(selectedUser, 36500, t(userId, 'permanently_removed')); // 100 years
+        if (success) {
+            sendMessage(chatId, t(userId, 'user_removed', {user: addRoyalEmoji(selectedUser)}));
+        } else {
+            sendMessage(chatId, `❌ Failed to remove ${addRoyalEmoji(selectedUser)}`);
         }
         
     } else if (data === 'reset_queue_confirm') {
