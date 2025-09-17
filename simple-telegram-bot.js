@@ -1160,10 +1160,6 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'send_message'), callback_data: "send_user_message" }
                 ],
                 [
-                    { text: t(userId, 'monthly_report'), callback_data: "monthly_report_show" },
-                    { text: t(userId, 'share_monthly_report'), callback_data: "share_monthly_report" }
-                ],
-                [
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
                 [
@@ -1939,6 +1935,10 @@ function handleCallback(chatId, userId, userName, data) {
         const maintenanceButtons = [
             [
                 { text: t(userId, 'queue_management'), callback_data: "queue_management_menu" }
+            ],
+            [
+                { text: t(userId, 'monthly_report'), callback_data: "monthly_report_show" },
+                { text: t(userId, 'share_monthly_report'), callback_data: "share_monthly_report" }
             ],
             [
                 { text: t(userId, 'users'), callback_data: "users" }
