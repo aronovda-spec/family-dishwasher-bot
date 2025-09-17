@@ -7,7 +7,7 @@ const botUrl = `https://api.telegram.org/bot${token}`;
 
 // Simple queue management
 let currentTurn = 0;
-const queue = ['Eden Aronov', 'Adele Aronov', 'Emma Aronov'];
+const queue = ['Eden', 'Adele', 'Emma'];
 
 // User management
 const admins = new Set(); // Set of admin user IDs
