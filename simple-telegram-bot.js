@@ -1756,7 +1756,7 @@ function handleCallback(chatId, userId, userName, data) {
         sendMessageWithButtons(chatId, t(userId, 'select_new_position', {user: addRoyalEmoji(selectedUser)}), positionButtons);
         
     } else if (data.startsWith('reorder_position_')) {
-        // Execute reorder (handle all user occurrences including punishment turns)
+        // Execute reorder (rebuild queue in desired order)
         const parts = data.replace('reorder_position_', '').split('_');
         const selectedUser = parts[0];
         const newPosition = parseInt(parts[1]) - 1; // Convert to 0-based index
@@ -1765,32 +1765,69 @@ function handleCallback(chatId, userId, userName, data) {
         const userPositions = getAllUserPositions(selectedUser);
         
         if (userPositions.length > 0) {
-            // Remove all occurrences of user (from end to preserve indices)
+            // Store current queue state
+            const originalQueue = [...queue];
+            const originalCurrentTurn = currentTurn;
+            
+            // Extract the user and their punishment turns
             const removedUsers = [];
             for (let i = userPositions.length - 1; i >= 0; i--) {
                 removedUsers.unshift(queue.splice(userPositions[i], 1)[0]);
             }
             
-            // Adjust newPosition if we removed users before it
-            const removedBeforeNewPosition = userPositions.filter(pos => pos < newPosition).length;
-            const adjustedPosition = newPosition - removedBeforeNewPosition;
+            // Get the base queue (unique users only)
+            const baseQueue = ['Eden', 'Adele', 'Emma'];
+            const otherUsers = baseQueue.filter(user => user !== selectedUser);
             
-            // Insert all user occurrences at new position
-            for (let i = 0; i < removedUsers.length; i++) {
-                queue.splice(adjustedPosition + i, 0, removedUsers[i]);
+            // Build new base order
+            const newBaseOrder = [];
+            for (let i = 0; i < baseQueue.length; i++) {
+                if (i === newPosition) {
+                    newBaseOrder.push(selectedUser);
+                }
+                if (otherUsers.length > 0) {
+                    const nextUser = otherUsers.shift();
+                    if (nextUser !== selectedUser) {
+                        newBaseOrder.push(nextUser);
+                    }
+                }
             }
             
-            // Adjust currentTurn if needed
-            if (currentTurn >= userPositions[0]) {
-                // If current turn was at or after the first occurrence of moved user
-                currentTurn = currentTurn - userPositions.length + removedUsers.length;
-                if (currentTurn < 0) currentTurn = 0;
-            }
-            if (currentTurn >= queue.length && queue.length > 0) {
-                currentTurn = 0;
+            // If position is at the end and not yet added
+            if (newPosition >= newBaseOrder.length && !newBaseOrder.includes(selectedUser)) {
+                newBaseOrder.push(selectedUser);
             }
             
-            const punishmentNote = removedUsers.length > 1 ? ` (including ${removedUsers.length - 1} punishment turns)` : '';
+            // Rebuild queue with punishment turns
+            queue.length = 0; // Clear queue
+            
+            // Add base users
+            newBaseOrder.forEach(user => {
+                queue.push(user);
+            });
+            
+            // Add punishment turns back for the moved user
+            const punishmentCount = removedUsers.length - 1; // -1 for the normal turn
+            for (let i = 0; i < punishmentCount; i++) {
+                queue.push(selectedUser);
+            }
+            
+            // Add punishment turns for other users (if any)
+            baseQueue.forEach(user => {
+                if (user !== selectedUser) {
+                    const userPunishments = punishmentTurns.get(user) || 0;
+                    for (let i = 0; i < userPunishments; i++) {
+                        queue.push(user);
+                    }
+                }
+            });
+            
+            // Adjust currentTurn to point to the same logical position
+            const currentUserInOriginal = originalQueue[originalCurrentTurn];
+            const newCurrentIndex = queue.indexOf(currentUserInOriginal);
+            currentTurn = newCurrentIndex !== -1 ? newCurrentIndex : 0;
+            
+            const punishmentNote = punishmentCount > 0 ? ` (including ${punishmentCount} punishment turns)` : '';
             const reorderMessage = `${t(userId, 'queue_reordered')}${punishmentNote}\n\n${t(userId, 'new_queue_order_is')}\n${queue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n')}`;
             sendMessage(chatId, reorderMessage);
         } else {
