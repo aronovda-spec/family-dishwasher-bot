@@ -611,6 +611,7 @@ function handleCommand(chatId, userId, userName, text) {
     
     if (userState === 'typing_announcement') {
         // Admin is typing announcement
+        console.log(`🔍 DEBUG - Processing announcement text: "${text}" from user ${userId} (${userName})`);
         const announcementText = text;
         
         pendingAnnouncements.set(userId, {
@@ -619,6 +620,7 @@ function handleCommand(chatId, userId, userName, text) {
             timestamp: Date.now()
         });
         
+        console.log(`🔍 DEBUG - Showing announcement preview to user ${userId}`);
         // Show preview with confirmation buttons (same format as message)
         const previewMessage = `${t(userId, 'announcement_preview')}:\n\n` +
                               `📢 **${t(userId, 'announcement')}**\n\n` +
@@ -1395,6 +1397,7 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
+        console.log(`🔍 DEBUG - Setting announcement state for user ${userId} (${userName})`);
         sendMessage(chatId, t(userId, 'type_announcement_message'));
         userStates.set(userId, 'typing_announcement');
         
