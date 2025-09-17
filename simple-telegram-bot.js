@@ -17,6 +17,11 @@ const userChatIds = new Map(); // Map: userName -> chatId for notifications
 
 // Link Telegram users to queue names
 const userQueueMapping = new Map(); // Map: Telegram user ID -> Queue name
+
+// Messaging system state management
+const userStates = new Map(); // userId -> current state
+const pendingAnnouncements = new Map(); // userId -> announcement data
+const pendingMessages = new Map(); // userId -> message data
 const queueUserMapping = new Map(); // Map: Queue name -> Telegram user ID
 
 // Swap request tracking
@@ -240,7 +245,27 @@ const translations = {
         'rejected_by': 'Rejected by',
         
         // Punishment request messages
-        'punishment_request_title': 'Punishment Request'
+        'punishment_request_title': 'Punishment Request',
+        
+        // Announcement system (Admin only)
+        'create_announcement': 'Create Announcement',
+        'type_announcement_message': 'Type your announcement message:',
+        'announcement_preview': 'Preview',
+        'announcement': 'Announcement',
+        'send_to_all': '📢 Send to All',
+        'announcement_sent': 'Announcement sent successfully!',
+        
+        // Message system (Admin + Users)
+        'send_message': 'Send Message',
+        'type_your_message': 'Type your message:',
+        'message_preview': 'Preview',
+        'message_from': 'Message from',
+        'message_sent': 'Message sent successfully!',
+        
+        // Common messaging elements
+        'got_it': '✅ Got it!',
+        'like': '👍 Like',
+        'sent_to': 'Sent to'
     },
     he: {
         // Menu titles
@@ -429,7 +454,27 @@ const translations = {
         'rejected_by': 'נדחתה על ידי',
         
         // Punishment request messages
-        'punishment_request_title': 'בקשת עונש'
+        'punishment_request_title': 'בקשת עונש',
+        
+        // Announcement system (Admin only)
+        'create_announcement': 'צור הודעה רשמית',
+        'type_announcement_message': 'הקלד את ההודעה הרשמית שלך:',
+        'announcement_preview': 'תצוגה מקדימה',
+        'announcement': 'הודעה רשמית',
+        'send_to_all': '📢 שלח לכולם',
+        'announcement_sent': 'ההודעה הרשמית נשלחה בהצלחה!',
+        
+        // Message system (Admin + Users)
+        'send_message': 'שלח הודעה',
+        'type_your_message': 'הקלד את ההודעה שלך:',
+        'message_preview': 'תצוגה מקדימה',
+        'message_from': 'הודעה מאת',
+        'message_sent': 'ההודעה נשלחה בהצלחה!',
+        
+        // Common messaging elements
+        'got_it': '✅ הבנתי!',
+        'like': '👍 אהבתי',
+        'sent_to': 'נשלח אל'
     }
 };
 
@@ -559,6 +604,65 @@ function handleCommand(chatId, userId, userName, text) {
     
     console.log(`🔍 Processing: "${command}" from ${userName}`);
     
+    // Handle messaging states first (before command processing)
+    const userState = userStates.get(userId);
+    
+    if (userState === 'typing_announcement') {
+        // Admin is typing announcement
+        const announcementText = text;
+        
+        pendingAnnouncements.set(userId, {
+            text: announcementText,
+            fromAdmin: userName,
+            timestamp: Date.now()
+        });
+        
+        // Show preview with confirmation buttons
+        const previewMessage = `${t(userId, 'announcement_preview')}:\n\n` +
+                              `📢 **${t(userId, 'announcement')}**\n\n` +
+                              `${announcementText}\n\n` +
+                              `👨‍💼 **${t(userId, 'from_admin')}:** ${userName}\n` +
+                              `🕐 **${t(userId, 'time')}:** ${new Date().toLocaleString()}`;
+        
+        const buttons = [
+            [
+                { text: t(userId, 'send_to_all'), callback_data: 'confirm_send_announcement' },
+                { text: t(userId, 'cancel'), callback_data: 'cancel_announcement' }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, previewMessage, buttons);
+        userStates.delete(userId);
+        return;
+        
+    } else if (userState === 'typing_message') {
+        // User is typing message
+        const messageText = text;
+        
+        pendingMessages.set(userId, {
+            text: messageText,
+            fromUser: userName,
+            timestamp: Date.now()
+        });
+        
+        // Show preview with confirmation buttons
+        const previewMessage = `${t(userId, 'message_preview')}:\n\n` +
+                              `💬 **${t(userId, 'message_from')} ${userName}**\n\n` +
+                              `${messageText}\n\n` +
+                              `🕐 **${t(userId, 'time')}:** ${new Date().toLocaleString()}`;
+        
+        const buttons = [
+            [
+                { text: t(userId, 'send_to_all'), callback_data: 'confirm_send_message' },
+                { text: t(userId, 'cancel'), callback_data: 'cancel_message' }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, previewMessage, buttons);
+        userStates.delete(userId);
+        return;
+    }
+    
     if (command === '/start') {
         // Store chat ID for this user (for notifications)
         userChatIds.set(userName, chatId);
@@ -599,6 +703,10 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'dishwasher_alert'), callback_data: "dishwasher_alert" }
                 ],
                 [
+                    { text: t(userId, 'create_announcement'), callback_data: "create_announcement" },
+                    { text: t(userId, 'send_message'), callback_data: "send_user_message" }
+                ],
+                [
                     { text: t(userId, 'language_switch'), callback_data: "language_switch" }
                 ]
             ];
@@ -615,6 +723,9 @@ function handleCommand(chatId, userId, userName, text) {
                 ],
                 [
                     { text: t(userId, 'help'), callback_data: "help" }
+                ],
+                [
+                    { text: t(userId, 'send_message'), callback_data: "send_user_message" }
                 ],
                 [
                     { text: t(userId, 'language_switch'), callback_data: "language_switch" }
@@ -1273,6 +1384,62 @@ function handleCallback(chatId, userId, userName, data) {
                 sendMessage(adminChatId, adminNotification);
             }
         }
+        
+    } else if (data === 'create_announcement') {
+        // Admin creates announcement
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        sendMessage(chatId, t(userId, 'type_announcement_message'));
+        userStates.set(userId, 'typing_announcement');
+        
+    } else if (data === 'send_user_message') {
+        // User or admin sends message
+        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase()) || 
+                           admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        if (!isAuthorized) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        sendMessage(chatId, t(userId, 'type_your_message'));
+        userStates.set(userId, 'typing_message');
+        
+    } else if (data === 'confirm_send_announcement') {
+        // Admin confirms sending announcement
+        const announcement = pendingAnnouncements.get(userId);
+        if (announcement) {
+            broadcastAnnouncement(announcement.text, announcement.fromAdmin);
+            sendMessage(chatId, `${t(userId, 'announcement_sent')}\n\n${t(userId, 'sent_to')} ${[...authorizedUsers, ...admins].length - 1} ${t(userId, 'users')}`);
+            pendingAnnouncements.delete(userId);
+        }
+        
+    } else if (data === 'confirm_send_message') {
+        // User/admin confirms sending message
+        const message = pendingMessages.get(userId);
+        if (message) {
+            broadcastMessage(message.text, message.fromUser, false);
+            sendMessage(chatId, `${t(userId, 'message_sent')}\n\n${t(userId, 'sent_to')} ${[...authorizedUsers, ...admins].length - 1} ${t(userId, 'users')}`);
+            pendingMessages.delete(userId);
+        }
+        
+    } else if (data === 'cancel_announcement' || data === 'cancel_message') {
+        // Cancel announcement or message
+        pendingAnnouncements.delete(userId);
+        pendingMessages.delete(userId);
+        userStates.delete(userId);
+        sendMessage(chatId, t(userId, 'cancel'));
+        
+    } else if (data === 'acknowledge_announcement') {
+        // User acknowledges announcement (simple response)
+        sendMessage(chatId, '✅');
+        
+    } else if (data === 'like_message') {
+        // User likes message (simple response)
+        sendMessage(chatId, '👍');
         
     } else if (data === 'language_switch') {
         const currentLang = getUserLanguage(userId);
@@ -2082,6 +2249,58 @@ const server = http.createServer((req, res) => {
 });
 
 // Start server for Render deployment or if PORT is explicitly set
+// Broadcast functions for announcements and messages
+function broadcastAnnouncement(announcementText, fromAdmin) {
+    const timestamp = new Date().toLocaleString();
+    
+    // Send to all authorized users and admins
+    [...authorizedUsers, ...admins].forEach(user => {
+        const userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+        
+        if (userChatId) {
+            // Create announcement in recipient's language (interface only)
+            const announcement = `📢 **${t(userChatId, 'announcement')}**\n\n` +
+                               `${announcementText}\n\n` +  // Content unchanged
+                               `👨‍💼 **${t(userChatId, 'from_admin')}:** ${fromAdmin}\n` +
+                               `🕐 **${t(userChatId, 'time')}:** ${timestamp}`;
+            
+            // Add acknowledgment button
+            const buttons = [
+                [{ text: t(userChatId, 'got_it'), callback_data: 'acknowledge_announcement' }]
+            ];
+            
+            sendMessageWithButtons(userChatId, announcement, buttons);
+        }
+    });
+}
+
+function broadcastMessage(messageText, fromUser, isAnnouncement = false) {
+    const timestamp = new Date().toLocaleString();
+    
+    // Send to all authorized users and admins (except sender)
+    [...authorizedUsers, ...admins].forEach(user => {
+        if (user === fromUser || user.toLowerCase() === fromUser.toLowerCase()) {
+            return; // Don't send to sender
+        }
+        
+        const userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+        
+        if (userChatId) {
+            // Create message in recipient's language (interface only)
+            const message = `💬 **${t(userChatId, 'message_from')} ${fromUser}**\n\n` +
+                           `${messageText}\n\n` +  // Content unchanged
+                           `🕐 **${t(userChatId, 'time')}:** ${timestamp}`;
+            
+            // Add like button
+            const buttons = [
+                [{ text: t(userChatId, 'like'), callback_data: 'like_message' }]
+            ];
+            
+            sendMessageWithButtons(userChatId, message, buttons);
+        }
+    });
+}
+
 const PORT = process.env.PORT || 3000;
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     // Always start server on Render
