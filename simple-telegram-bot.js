@@ -29,6 +29,34 @@ const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason:
 const queueStatistics = new Map(); // userName -> { totalCompletions: number, monthlyCompletions: number, lastCompleted: Date }
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
+// Monthly report tracking
+const monthlyStats = new Map(); // month-year -> { users: {}, admins: {}, totals: {} }
+
+// Helper function to get current month key
+function getCurrentMonthKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Helper function to initialize user stats for current month
+function initializeMonthlyStats(monthKey) {
+    if (!monthlyStats.has(monthKey)) {
+        monthlyStats.set(monthKey, {
+            users: {
+                'Eden': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, punishmentRequests: 0 },
+                'Adele': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, punishmentRequests: 0 },
+                'Emma': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, punishmentRequests: 0 }
+            },
+            admins: {},
+            totals: {
+                dishesCompleted: 0,
+                adminInterventions: 0,
+                queueReorders: 0
+            }
+        });
+    }
+}
+
 // Helper function to get all positions of a user in queue (including punishment turns)
 function getAllUserPositions(userName) {
     return queue.map((user, index) => user === userName ? index : -1)
@@ -169,6 +197,122 @@ function updateUserStatistics(userName) {
     stats.lastCompleted = new Date();
     
     queueStatistics.set(userName, stats);
+    
+    // Update monthly stats
+    const monthKey = getCurrentMonthKey();
+    initializeMonthlyStats(monthKey);
+    const monthData = monthlyStats.get(monthKey);
+    if (monthData.users[userName]) {
+        monthData.users[userName].completions++;
+    }
+    monthData.totals.dishesCompleted++;
+}
+
+// Helper function to track monthly statistics
+function trackMonthlyAction(type, userName, adminName = null, count = 1) {
+    const monthKey = getCurrentMonthKey();
+    initializeMonthlyStats(monthKey);
+    const monthData = monthlyStats.get(monthKey);
+    
+    switch (type) {
+        case 'punishment_received':
+            if (monthData.users[userName]) {
+                monthData.users[userName].punishments += count;
+            }
+            break;
+        case 'suspension':
+            if (monthData.users[userName]) {
+                monthData.users[userName].daysSuspended += count;
+            }
+            break;
+        case 'swap_requested':
+            if (monthData.users[userName]) {
+                monthData.users[userName].swapsRequested++;
+            }
+            break;
+        case 'punishment_request':
+            if (monthData.users[userName]) {
+                monthData.users[userName].punishmentRequests++;
+            }
+            break;
+        case 'admin_completion':
+            if (!monthData.admins[adminName]) {
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+            }
+            monthData.admins[adminName].completions++;
+            monthData.totals.adminInterventions++;
+            break;
+        case 'admin_punishment':
+            if (!monthData.admins[adminName]) {
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+            }
+            monthData.admins[adminName].punishmentsApplied++;
+            break;
+        case 'admin_force_swap':
+            if (!monthData.admins[adminName]) {
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+            }
+            monthData.admins[adminName].forceSwaps++;
+            break;
+        case 'admin_announcement':
+            if (!monthData.admins[adminName]) {
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+            }
+            monthData.admins[adminName].announcements++;
+            break;
+        case 'queue_reorder':
+            monthData.totals.queueReorders++;
+            break;
+    }
+}
+
+// Generate monthly report
+function generateMonthlyReport(monthKey, userId) {
+    const monthData = monthlyStats.get(monthKey);
+    if (!monthData) {
+        return t(userId, 'no_data_available');
+    }
+    
+    const [year, month] = monthKey.split('-');
+    const monthNames = {
+        'en': ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+        'he': ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
+    };
+    const userLang = getUserLanguage(userId);
+    const monthName = monthNames[userLang][parseInt(month) - 1];
+    
+    let report = `${t(userId, 'monthly_report_title', {month: monthName, year})}\n\n`;
+    
+    // User statistics
+    report += `${t(userId, 'user_statistics')}\n`;
+    Object.entries(monthData.users).forEach(([userName, stats]) => {
+        report += `${addRoyalEmoji(userName)}:\n`;
+        report += `  ✅ ${t(userId, 'completions_count', {count: stats.completions})}\n`;
+        report += `  ⚡ ${t(userId, 'punishments_received', {count: stats.punishments})}\n`;
+        report += `  ✈️ ${t(userId, 'days_suspended', {count: stats.daysSuspended})}\n`;
+        report += `  🔄 ${t(userId, 'swaps_requested', {count: stats.swapsRequested})}\n`;
+        report += `  📝 ${t(userId, 'punishment_requests_made', {count: stats.punishmentRequests})}\n\n`;
+    });
+    
+    // Admin statistics
+    if (Object.keys(monthData.admins).length > 0) {
+        report += `${t(userId, 'admin_statistics')}\n`;
+        Object.entries(monthData.admins).forEach(([adminName, stats]) => {
+            report += `👨‍💼 ${adminName}:\n`;
+            report += `  ✅ ${t(userId, 'completions_helped', {count: stats.completions})}\n`;
+            report += `  ⚡ ${t(userId, 'punishments_applied', {count: stats.punishmentsApplied})}\n`;
+            report += `  🔄 ${t(userId, 'force_swaps_executed', {count: stats.forceSwaps})}\n`;
+            report += `  📢 ${t(userId, 'announcements_sent', {count: stats.announcements})}\n\n`;
+        });
+    }
+    
+    // Totals
+    report += `📈 TOTALS:\n`;
+    report += `- ${t(userId, 'total_dishes_completed', {count: monthData.totals.dishesCompleted})}\n`;
+    report += `- ${t(userId, 'admin_interventions', {count: monthData.totals.adminInterventions})}\n`;
+    report += `- ${t(userId, 'queue_reorders', {count: monthData.totals.queueReorders})}`;
+    
+    return report;
 }
 
 // Swap request tracking
@@ -457,7 +601,25 @@ const translations = {
         'remove_user': '❌ Remove User',
         'select_user_to_remove': 'Select user to remove permanently:',
         'user_removed': '❌ {user} removed from queue permanently',
-        'permanently_removed': 'Permanently removed'
+        'permanently_removed': 'Permanently removed',
+        
+        // Monthly Reports
+        'monthly_report': '📊 Monthly Report',
+        'monthly_report_title': '📊 Monthly Report - {month} {year}',
+        'user_statistics': 'USER STATISTICS:',
+        'admin_statistics': 'ADMIN STATISTICS:',
+        'completions_count': 'Completions: {count}',
+        'punishments_received': 'Punishments received: {count}',
+        'days_suspended': 'Days suspended: {count}',
+        'swaps_requested': 'Swaps requested: {count}',
+        'punishment_requests_made': 'Punishment requests made: {count}',
+        'completions_helped': 'Completions (helped): {count}',
+        'punishments_applied': 'Punishments applied: {count}',
+        'force_swaps_executed': 'Force swaps: {count}',
+        'announcements_sent': 'Announcements: {count}',
+        'total_dishes_completed': 'Total dishes completed: {count}',
+        'admin_interventions': 'Admin interventions: {count}',
+        'queue_reorders': 'Queue reorders: {count}'
     },
     he: {
         // Menu titles
@@ -711,7 +873,25 @@ const translations = {
         'remove_user': '❌ הסר משתמש',
         'select_user_to_remove': 'בחר משתמש להסרה קבועה:',
         'user_removed': '❌ {user} הוסר מהתור לצמיתות',
-        'permanently_removed': 'הוסר לצמיתות'
+        'permanently_removed': 'הוסר לצמיתות',
+        
+        // Monthly Reports
+        'monthly_report': '📊 דוח חודשי',
+        'monthly_report_title': '📊 דוח חודשי - {month} {year}',
+        'user_statistics': 'סטטיסטיקות משתמשים:',
+        'admin_statistics': 'סטטיסטיקות מנהלים:',
+        'completions_count': 'השלמות: {count}',
+        'punishments_received': 'עונשים שהתקבלו: {count}',
+        'days_suspended': 'ימי השעיה: {count}',
+        'swaps_requested': 'החלפות שנתבקשו: {count}',
+        'punishment_requests_made': 'בקשות עונש שנשלחו: {count}',
+        'completions_helped': 'השלמות (עזרה): {count}',
+        'punishments_applied': 'עונשים שהוחלו: {count}',
+        'force_swaps_executed': 'החלפות בכוח: {count}',
+        'announcements_sent': 'הודעות רשמיות: {count}',
+        'total_dishes_completed': 'סה"כ כלים שהושלמו: {count}',
+        'admin_interventions': 'התערבויות מנהל: {count}',
+        'queue_reorders': 'סידורי תור מחדש: {count}'
     }
 };
 
@@ -937,6 +1117,9 @@ function handleCommand(chatId, userId, userName, text) {
                 [
                     { text: t(userId, 'create_announcement'), callback_data: "create_announcement" },
                     { text: t(userId, 'send_message'), callback_data: "send_user_message" }
+                ],
+                [
+                    { text: t(userId, 'monthly_report'), callback_data: "monthly_report_show" }
                 ],
                 [
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
@@ -1730,6 +1913,18 @@ function handleCallback(chatId, userId, userName, data) {
         ];
         
         sendMessageWithButtons(chatId, maintenanceText, maintenanceButtons);
+        
+    } else if (data === 'monthly_report_show') {
+        // Show monthly report
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const currentMonthKey = getCurrentMonthKey();
+        const report = generateMonthlyReport(currentMonthKey, userId);
+        sendMessage(chatId, report);
         
     } else if (data === 'queue_management_menu') {
         // Queue Management submenu
