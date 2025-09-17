@@ -25,42 +25,81 @@ const pendingMessages = new Map(); // userId -> message data
 const queueUserMapping = new Map(); // Map: Queue name -> Telegram user ID
 
 // Queue management system
-const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason: string }
+const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason: string, originalPosition: number }
 const queueStatistics = new Map(); // userName -> { totalCompletions: number, monthlyCompletions: number, lastCompleted: Date }
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
-// Helper function to check if user is currently suspended
-function isUserSuspended(userName) {
-    if (!suspendedUsers.has(userName)) return false;
-    
-    const suspension = suspendedUsers.get(userName);
+// Helper function to check if user is currently suspended (and auto-reactivate if expired)
+function checkAndCleanExpiredSuspensions() {
     const now = new Date();
+    const expiredUsers = [];
     
-    // Check if suspension has expired
-    if (now >= suspension.suspendedUntil) {
-        suspendedUsers.delete(userName); // Auto-remove expired suspensions
+    suspendedUsers.forEach((suspension, userName) => {
+        if (now >= suspension.suspendedUntil) {
+            expiredUsers.push(userName);
+        }
+    });
+    
+    // Auto-reactivate expired users
+    expiredUsers.forEach(userName => {
+        console.log(`⏰ Auto-reactivating ${userName} - suspension expired`);
+        reactivateUser(userName);
+    });
+}
+
+// Helper function to suspend user (remove from queue)
+function suspendUser(userName, days, reason = null) {
+    const userIndex = queue.indexOf(userName);
+    if (userIndex === -1) {
+        console.log(`⚠️ Cannot suspend ${userName} - not in queue`);
         return false;
     }
     
+    // Store suspension data with original position
+    const suspendUntil = new Date();
+    suspendUntil.setDate(suspendUntil.getDate() + days);
+    
+    suspendedUsers.set(userName, {
+        suspendedUntil: suspendUntil,
+        reason: reason || `Suspended for ${days} day${days > 1 ? 's' : ''}`,
+        originalPosition: userIndex
+    });
+    
+    // Remove user from queue
+    queue.splice(userIndex, 1);
+    
+    // Adjust currentTurn if necessary
+    if (currentTurn >= userIndex && currentTurn > 0) {
+        currentTurn--; // Shift back if we removed someone before current turn
+    }
+    if (currentTurn >= queue.length && queue.length > 0) {
+        currentTurn = 0; // Reset to beginning if we're past the end
+    }
+    
+    console.log(`✈️ ${userName} suspended and removed from queue. New queue: [${queue.join(', ')}]`);
     return true;
 }
 
-// Helper function to advance to next non-suspended user
-function advanceToNextActiveUser() {
-    let attempts = 0;
-    const maxAttempts = queue.length; // Prevent infinite loop
+// Helper function to reactivate user (add back to queue)
+function reactivateUser(userName) {
+    if (!suspendedUsers.has(userName)) {
+        console.log(`⚠️ Cannot reactivate ${userName} - not suspended`);
+        return false;
+    }
     
-    do {
-        currentTurn = (currentTurn + 1) % queue.length;
-        attempts++;
-        
-        if (attempts >= maxAttempts) {
-            // All users are suspended - this shouldn't happen in practice
-            console.log('⚠️ WARNING: All users appear to be suspended');
-            break;
-        }
-    } while (isUserSuspended(queue[currentTurn]));
+    const suspension = suspendedUsers.get(userName);
+    suspendedUsers.delete(userName);
     
+    // Add user back to queue at the end (simpler than trying to restore exact position)
+    queue.push(userName);
+    
+    console.log(`✅ ${userName} reactivated and added back to queue. New queue: [${queue.join(', ')}]`);
+    return true;
+}
+
+// Helper function to advance to next user (no need to skip anyone now)
+function advanceToNextUser() {
+    currentTurn = (currentTurn + 1) % queue.length;
     return queue[currentTurn];
 }
 
@@ -733,6 +772,9 @@ function handleCommand(chatId, userId, userName, text) {
     
     console.log(`🔍 Processing: "${command}" from ${userName}`);
     
+    // Check and clean expired suspensions first
+    checkAndCleanExpiredSuspensions();
+    
     // Handle messaging states first (before command processing)
     const userState = userStates.get(userId);
     
@@ -939,10 +981,7 @@ function handleCommand(chatId, userId, userName, text) {
             const authorizedUser = queueUserMapping.get(name);
             const authText = authorizedUser ? ` (${authorizedUser})` : ` ${t(userId, 'not_authorized_user')}`;
             
-            // Check if user is suspended
-            const suspendedText = isUserSuspended(name) ? ' ✈️' : '';
-            
-            statusMessage += `${turnIcon} ${i + 1}. ${royalName}${turnText}${authText}${suspendedText}\n`;
+            statusMessage += `${turnIcon} ${i + 1}. ${royalName}${turnText}${authText}\n`;
         }
         
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
@@ -991,8 +1030,8 @@ function handleCommand(chatId, userId, userName, text) {
                 // For punishment turns, don't advance currentTurn since queue has already shifted
                 // currentTurn stays the same because we removed the current position
             } else {
-                // Only advance currentTurn for normal turns, skipping suspended users
-                advanceToNextActiveUser();
+                // Only advance currentTurn for normal turns
+                advanceToNextUser();
             }
             
             // Update statistics for the user who completed their turn
@@ -1082,8 +1121,8 @@ function handleCommand(chatId, userId, userName, text) {
                 // For punishment turns, don't advance currentTurn since queue has already shifted
                 // currentTurn stays the same because we removed the current position
             } else {
-                // Only advance currentTurn for normal turns, skipping suspended users
-                advanceToNextActiveUser();
+                // Only advance currentTurn for normal turns
+                advanceToNextUser();
             }
             
             // Update statistics for the user who completed their turn
@@ -1595,18 +1634,19 @@ function handleCallback(chatId, userId, userName, data) {
         const maintenanceText = `${t(userId, 'maintenance')} Menu`;
         const maintenanceButtons = [
             [
-                { text: t(userId, 'users'), callback_data: "users" },
+                { text: t(userId, 'users'), callback_data: "users" }
+            ],
+            [
                 { text: t(userId, 'admins'), callback_data: "admins" }
             ],
             [
-                { text: t(userId, 'authorize'), callback_data: "authorize_menu" },
+                { text: t(userId, 'authorize'), callback_data: "authorize_menu" }
+            ],
+            [
                 { text: t(userId, 'add_admin'), callback_data: "addadmin_menu" }
             ],
             [
                 { text: t(userId, 'queue_management'), callback_data: "queue_management_menu" }
-            ],
-            [
-                { text: t(userId, 'back'), callback_data: "start" }
             ]
         ];
         
@@ -1681,12 +1721,11 @@ function handleCallback(chatId, userId, userName, data) {
         // Show queue statistics
         let statsMessage = `${t(userId, 'queue_statistics_title')}\n\n`;
         
-        // Current queue order
+        // Current queue order (active users only)
         statsMessage += `${t(userId, 'current_queue_order')}\n`;
         queue.forEach((user, index) => {
             const emoji = addRoyalEmoji(user);
-            const suspended = suspendedUsers.has(user) ? ' ✈️' : '';
-            statsMessage += `${index + 1}. ${emoji}${suspended}\n`;
+            statsMessage += `${index + 1}. ${emoji}\n`;
         });
         
         // Statistics (placeholder for now - can be enhanced later)
@@ -1709,13 +1748,12 @@ function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, statsMessage);
         
     } else if (data === 'suspend_user_menu') {
-        // Select user to suspend
-        const activeUsers = ['Eden', 'Adele', 'Emma'].filter(user => !suspendedUsers.has(user));
-        if (activeUsers.length === 0) {
-            sendMessage(chatId, 'All users are already suspended.');
+        // Select user to suspend (only show users currently in queue)
+        if (queue.length === 0) {
+            sendMessage(chatId, 'No users in queue to suspend.');
             return;
         }
-        const buttons = activeUsers.map(user => [{ text: addRoyalEmoji(user), callback_data: `suspend_select_${user}` }]);
+        const buttons = queue.map(user => [{ text: addRoyalEmoji(user), callback_data: `suspend_select_${user}` }]);
         sendMessageWithButtons(chatId, t(userId, 'select_user_to_suspend'), buttons);
         
     } else if (data.startsWith('suspend_select_')) {
@@ -1736,21 +1774,18 @@ function handleCallback(chatId, userId, userName, data) {
         const selectedUser = parts[0];
         const days = parseInt(parts[1]);
         
-        const suspendUntil = new Date();
-        suspendUntil.setDate(suspendUntil.getDate() + days);
-        
-        suspendedUsers.set(selectedUser, {
-            suspendedUntil: suspendUntil,
-            reason: `Suspended for ${days} day${days > 1 ? 's' : ''}`
-        });
-        
-        const durationText = days === 1 ? t(userId, 'duration_1_day').replace('1️⃣ ', '') :
-                           days === 3 ? t(userId, 'duration_3_days').replace('3️⃣ ', '') :
-                           days === 7 ? t(userId, 'duration_7_days').replace('7️⃣ ', '') :
-                           days === 14 ? t(userId, 'duration_14_days').replace('🗓️ ', '') :
-                           days === 30 ? t(userId, 'duration_30_days').replace('📅 ', '') : `${days} days`;
-        
-        sendMessage(chatId, t(userId, 'user_suspended', {user: addRoyalEmoji(selectedUser), duration: durationText}));
+        const success = suspendUser(selectedUser, days);
+        if (success) {
+            const durationText = days === 1 ? t(userId, 'duration_1_day').replace('1️⃣ ', '') :
+                               days === 3 ? t(userId, 'duration_3_days').replace('3️⃣ ', '') :
+                               days === 7 ? t(userId, 'duration_7_days').replace('7️⃣ ', '') :
+                               days === 14 ? t(userId, 'duration_14_days').replace('🗓️ ', '') :
+                               days === 30 ? t(userId, 'duration_30_days').replace('📅 ', '') : `${days} days`;
+            
+            sendMessage(chatId, t(userId, 'user_suspended', {user: addRoyalEmoji(selectedUser), duration: durationText}));
+        } else {
+            sendMessage(chatId, `❌ Failed to suspend ${addRoyalEmoji(selectedUser)}`);
+        }
         
     } else if (data === 'reactivate_user_menu') {
         // Select user to reactivate
@@ -1765,8 +1800,12 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data.startsWith('reactivate_')) {
         // Execute reactivation
         const selectedUser = data.replace('reactivate_', '');
-        suspendedUsers.delete(selectedUser);
-        sendMessage(chatId, t(userId, 'user_reactivated', {user: addRoyalEmoji(selectedUser)}));
+        const success = reactivateUser(selectedUser);
+        if (success) {
+            sendMessage(chatId, t(userId, 'user_reactivated', {user: addRoyalEmoji(selectedUser)}));
+        } else {
+            sendMessage(chatId, `❌ Failed to reactivate ${addRoyalEmoji(selectedUser)}`);
+        }
         
     } else if (data === 'reset_queue_confirm') {
         // Confirm queue reset
