@@ -267,7 +267,9 @@ const translations = {
         'like': '👍 Like',
         'sent_to': 'Sent to',
         'cancel': '❌ Cancel',
-        'from_admin': 'From Admin'
+        'from_admin': 'From Admin',
+        'maintenance': '🔧 Maintenance',
+        'back': '⬅️ Back'
     },
     he: {
         // Menu titles
@@ -478,7 +480,9 @@ const translations = {
         'like': '👍 אהבתי',
         'sent_to': 'נשלח אל',
         'cancel': '❌ בטל',
-        'from_admin': 'מהמנהל'
+        'from_admin': 'מהמנהל',
+        'maintenance': '🔧 תחזוקה',
+        'back': '⬅️ חזור'
     }
 };
 
@@ -692,12 +696,7 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'done'), callback_data: "done" }
                 ],
                 [
-                    { text: t(userId, 'users'), callback_data: "users" },
-                    { text: t(userId, 'admins'), callback_data: "admins" }
-                ],
-                [
-                    { text: t(userId, 'authorize'), callback_data: "authorize_menu" },
-                    { text: t(userId, 'add_admin'), callback_data: "addadmin_menu" }
+                    { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
                 [
                     { text: t(userId, 'force_swap'), callback_data: "force_swap_menu" },
@@ -1444,6 +1443,31 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'like_message') {
         // User likes message (simple response)
         sendMessage(chatId, '👍');
+        
+    } else if (data === 'maintenance_menu') {
+        // Admin maintenance menu
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const maintenanceText = `${t(userId, 'maintenance')} Menu`;
+        const maintenanceButtons = [
+            [
+                { text: t(userId, 'users'), callback_data: "users" },
+                { text: t(userId, 'admins'), callback_data: "admins" }
+            ],
+            [
+                { text: t(userId, 'authorize'), callback_data: "authorize_menu" },
+                { text: t(userId, 'add_admin'), callback_data: "addadmin_menu" }
+            ],
+            [
+                { text: t(userId, 'back'), callback_data: "start" }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, maintenanceText, maintenanceButtons);
         
     } else if (data === 'language_switch') {
         const currentLang = getUserLanguage(userId);
