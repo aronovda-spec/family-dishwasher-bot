@@ -29,6 +29,41 @@ const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason:
 const queueStatistics = new Map(); // userName -> { totalCompletions: number, monthlyCompletions: number, lastCompleted: Date }
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
+// Helper function to get all positions of a user in queue (including punishment turns)
+function getAllUserPositions(userName) {
+    return queue.map((user, index) => user === userName ? index : -1)
+              .filter(index => index !== -1);
+}
+
+// Helper function to remove all occurrences of a user from queue
+function removeAllUserOccurrences(userName) {
+    const positions = getAllUserPositions(userName);
+    // Remove from end to beginning to preserve indices
+    for (let i = positions.length - 1; i >= 0; i--) {
+        queue.splice(positions[i], 1);
+    }
+    console.log(`🗑️ Removed all ${positions.length} occurrences of ${userName} from queue`);
+    return positions.length;
+}
+
+// Helper function to adjust currentTurn after queue modifications
+function adjustCurrentTurnAfterRemoval(removedPositions) {
+    if (removedPositions.length === 0) return;
+    
+    // Count how many positions were removed before currentTurn
+    const removedBeforeCurrent = removedPositions.filter(pos => pos < currentTurn).length;
+    
+    // Adjust currentTurn
+    currentTurn -= removedBeforeCurrent;
+    
+    // Ensure currentTurn is within bounds
+    if (currentTurn >= queue.length && queue.length > 0) {
+        currentTurn = 0;
+    } else if (currentTurn < 0) {
+        currentTurn = 0;
+    }
+}
+
 // Helper function to check if user is currently suspended (and auto-reactivate if expired)
 function checkAndCleanExpiredSuspensions() {
     const now = new Date();
@@ -47,40 +82,47 @@ function checkAndCleanExpiredSuspensions() {
     });
 }
 
-// Helper function to suspend user (remove from queue)
+// Helper function to suspend user (remove from queue, preserve punishment debt)
 function suspendUser(userName, days, reason = null) {
-    const userIndex = queue.indexOf(userName);
-    if (userIndex === -1) {
+    const userPositions = getAllUserPositions(userName);
+    if (userPositions.length === 0) {
         console.log(`⚠️ Cannot suspend ${userName} - not in queue`);
         return false;
     }
     
-    // Store suspension data with original position
+    // Calculate punishment debt
+    const normalTurns = 1; // Every user has 1 normal turn
+    const punishmentTurnsInQueue = userPositions.length - normalTurns;
+    const punishmentTurnsInCounter = punishmentTurns.get(userName) || 0;
+    
+    // Total punishment debt is the maximum of what's in queue vs counter
+    const totalPunishmentDebt = Math.max(punishmentTurnsInQueue, punishmentTurnsInCounter);
+    
+    // Store suspension data with punishment debt
     const suspendUntil = new Date();
     suspendUntil.setDate(suspendUntil.getDate() + days);
     
     suspendedUsers.set(userName, {
         suspendedUntil: suspendUntil,
         reason: reason || `Suspended for ${days} day${days > 1 ? 's' : ''}`,
-        originalPosition: userIndex
+        originalPosition: userPositions[0], // Store first position
+        punishmentDebt: totalPunishmentDebt
     });
     
-    // Remove user from queue
-    queue.splice(userIndex, 1);
+    // Remove all occurrences from queue
+    const removedCount = removeAllUserOccurrences(userName);
     
-    // Adjust currentTurn if necessary
-    if (currentTurn >= userIndex && currentTurn > 0) {
-        currentTurn--; // Shift back if we removed someone before current turn
-    }
-    if (currentTurn >= queue.length && queue.length > 0) {
-        currentTurn = 0; // Reset to beginning if we're past the end
-    }
+    // Clear punishment counter (debt is now stored in suspension)
+    punishmentTurns.delete(userName);
     
-    console.log(`✈️ ${userName} suspended and removed from queue. New queue: [${queue.join(', ')}]`);
+    // Adjust currentTurn
+    adjustCurrentTurnAfterRemoval(userPositions);
+    
+    console.log(`✈️ ${userName} suspended with ${totalPunishmentDebt} punishment debt preserved. Removed ${removedCount} turns. New queue: [${queue.join(', ')}]`);
     return true;
 }
 
-// Helper function to reactivate user (add back to queue)
+// Helper function to reactivate user (add back to queue with punishment debt)
 function reactivateUser(userName) {
     if (!suspendedUsers.has(userName)) {
         console.log(`⚠️ Cannot reactivate ${userName} - not suspended`);
@@ -88,12 +130,27 @@ function reactivateUser(userName) {
     }
     
     const suspension = suspendedUsers.get(userName);
-    suspendedUsers.delete(userName);
+    const punishmentDebt = suspension.punishmentDebt || 0;
     
-    // Add user back to queue at the end (simpler than trying to restore exact position)
+    // Add user back to queue (normal turn)
     queue.push(userName);
     
-    console.log(`✅ ${userName} reactivated and added back to queue. New queue: [${queue.join(', ')}]`);
+    // Restore punishment debt if any
+    if (punishmentDebt > 0) {
+        punishmentTurns.set(userName, punishmentDebt);
+        
+        // Add punishment turns to queue
+        for (let i = 0; i < punishmentDebt; i++) {
+            queue.push(userName);
+        }
+        
+        console.log(`✅ ${userName} reactivated with ${punishmentDebt} punishment turns restored. New queue: [${queue.join(', ')}]`);
+    } else {
+        console.log(`✅ ${userName} reactivated with no punishment debt. New queue: [${queue.join(', ')}]`);
+    }
+    
+    // Clear suspension
+    suspendedUsers.delete(userName);
     return true;
 }
 
@@ -394,7 +451,9 @@ const translations = {
         'this_month': 'This Month:',
         'suspended_users_list': 'Suspended Users:',
         'suspended_until': 'Suspended until: {date}',
-        'current_queue_order': 'Current Queue Order:'
+        'current_queue_order': 'Current Queue Order:',
+        'punishment_debt_preserved': 'Punishment debt preserved: {count} turns',
+        'reactivated_with_punishment': '{user} reactivated with {count} punishment turns'
     },
     he: {
         // Menu titles
@@ -642,7 +701,9 @@ const translations = {
         'this_month': 'החודש:',
         'suspended_users_list': 'משתמשים מושעים:',
         'suspended_until': 'מושעה עד: {date}',
-        'current_queue_order': 'סדר התור הנוכחי:'
+        'current_queue_order': 'סדר התור הנוכחי:',
+        'punishment_debt_preserved': 'חוב עונש נשמר: {count} תורות',
+        'reactivated_with_punishment': '{user} הופעל מחדש עם {count} תורות עונש'
     }
 };
 
@@ -859,9 +920,6 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'done'), callback_data: "done" }
                 ],
                 [
-                    { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
-                ],
-                [
                     { text: t(userId, 'force_swap'), callback_data: "force_swap_menu" },
                     { text: t(userId, 'apply_punishment'), callback_data: "apply_punishment_menu" }
                 ],
@@ -871,6 +929,9 @@ function handleCommand(chatId, userId, userName, text) {
                 [
                     { text: t(userId, 'create_announcement'), callback_data: "create_announcement" },
                     { text: t(userId, 'send_message'), callback_data: "send_user_message" }
+                ],
+                [
+                    { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
                 [
                     { text: t(userId, 'language_switch'), callback_data: "language_switch" }
@@ -1634,6 +1695,9 @@ function handleCallback(chatId, userId, userName, data) {
         const maintenanceText = `${t(userId, 'maintenance')} Menu`;
         const maintenanceButtons = [
             [
+                { text: t(userId, 'queue_management'), callback_data: "queue_management_menu" }
+            ],
+            [
                 { text: t(userId, 'users'), callback_data: "users" }
             ],
             [
@@ -1644,9 +1708,6 @@ function handleCallback(chatId, userId, userName, data) {
             ],
             [
                 { text: t(userId, 'add_admin'), callback_data: "addadmin_menu" }
-            ],
-            [
-                { text: t(userId, 'queue_management'), callback_data: "queue_management_menu" }
             ]
         ];
         
@@ -1695,26 +1756,45 @@ function handleCallback(chatId, userId, userName, data) {
         sendMessageWithButtons(chatId, t(userId, 'select_new_position', {user: addRoyalEmoji(selectedUser)}), positionButtons);
         
     } else if (data.startsWith('reorder_position_')) {
-        // Execute reorder
+        // Execute reorder (handle all user occurrences including punishment turns)
         const parts = data.replace('reorder_position_', '').split('_');
         const selectedUser = parts[0];
         const newPosition = parseInt(parts[1]) - 1; // Convert to 0-based index
         
-        // Reorder the queue
-        const currentQueue = [...queue];
-        const userIndex = currentQueue.indexOf(selectedUser);
-        if (userIndex !== -1) {
-            // Remove user from current position
-            currentQueue.splice(userIndex, 1);
-            // Insert user at new position
-            currentQueue.splice(newPosition, 0, selectedUser);
+        // Get all positions of user (including punishment turns)
+        const userPositions = getAllUserPositions(selectedUser);
+        
+        if (userPositions.length > 0) {
+            // Remove all occurrences of user (from end to preserve indices)
+            const removedUsers = [];
+            for (let i = userPositions.length - 1; i >= 0; i--) {
+                removedUsers.unshift(queue.splice(userPositions[i], 1)[0]);
+            }
             
-            // Update the global queue
-            queue.length = 0;
-            queue.push(...currentQueue);
+            // Adjust newPosition if we removed users before it
+            const removedBeforeNewPosition = userPositions.filter(pos => pos < newPosition).length;
+            const adjustedPosition = newPosition - removedBeforeNewPosition;
             
-            const reorderMessage = `${t(userId, 'queue_reordered')}\n\n${t(userId, 'new_queue_order_is')}\n${queue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n')}`;
+            // Insert all user occurrences at new position
+            for (let i = 0; i < removedUsers.length; i++) {
+                queue.splice(adjustedPosition + i, 0, removedUsers[i]);
+            }
+            
+            // Adjust currentTurn if needed
+            if (currentTurn >= userPositions[0]) {
+                // If current turn was at or after the first occurrence of moved user
+                currentTurn = currentTurn - userPositions.length + removedUsers.length;
+                if (currentTurn < 0) currentTurn = 0;
+            }
+            if (currentTurn >= queue.length && queue.length > 0) {
+                currentTurn = 0;
+            }
+            
+            const punishmentNote = removedUsers.length > 1 ? ` (including ${removedUsers.length - 1} punishment turns)` : '';
+            const reorderMessage = `${t(userId, 'queue_reordered')}${punishmentNote}\n\n${t(userId, 'new_queue_order_is')}\n${queue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n')}`;
             sendMessage(chatId, reorderMessage);
+        } else {
+            sendMessage(chatId, `❌ Cannot reorder ${addRoyalEmoji(selectedUser)} - not found in queue`);
         }
         
     } else if (data === 'queue_statistics_show') {
@@ -1735,13 +1815,14 @@ function handleCallback(chatId, userId, userName, data) {
             statsMessage += `${addRoyalEmoji(user)}: ${stats.totalCompletions}\n`;
         });
         
-        // Suspended users
+        // Suspended users with punishment debt
         const suspended = Array.from(suspendedUsers.entries());
         if (suspended.length > 0) {
             statsMessage += `\n${t(userId, 'suspended_users_list')}\n`;
             suspended.forEach(([user, data]) => {
                 const date = data.suspendedUntil.toLocaleDateString();
-                statsMessage += `${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}\n`;
+                const debtText = data.punishmentDebt > 0 ? ` (${data.punishmentDebt} punishment turns)` : '';
+                statsMessage += `${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}${debtText}\n`;
             });
         }
         
