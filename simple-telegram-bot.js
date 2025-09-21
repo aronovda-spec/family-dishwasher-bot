@@ -2,7 +2,7 @@
 const https = require('https');
 const fs = require('fs');
 
-const token = process.env.TELEGRAM_BOT_TOKEN || '8488813166:AAEk3G5Qe8Yw0B3OlAfLLYq8qszdPL0obUI';
+const token = process.env.TELEGRAM_BOT_TOKEN || '8488813166:AAGxggIaU6TiYcC1HgecXQUCDFW-7SwgiJY';
 const botUrl = `https://api.telegram.org/bot${token}`;
 
 // Simple queue management
