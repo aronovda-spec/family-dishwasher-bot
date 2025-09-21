@@ -1,6 +1,6 @@
-# WhatsApp Dishwasher Bot
+# Telegram Dishwasher Bot
 
-A comprehensive WhatsApp bot for managing dishwasher queue with turn tracking, punishments, and admin controls.
+A comprehensive Telegram bot for managing dishwasher queue with turn tracking, punishments, and admin controls.
 
 ## Features
 
@@ -27,28 +27,35 @@ A comprehensive WhatsApp bot for managing dishwasher queue with turn tracking, p
 - **Request Processing**: Approve/reject punishment and skip requests
 - **Statistics**: View punishment statistics and history
 
-### 📱 WhatsApp Integration
-- **Direct Integration**: All interactions happen directly in WhatsApp chats
+### 📱 Telegram Integration
+- **Direct Integration**: All interactions happen directly in Telegram chats
 - **Instant Replies**: Users and admins get immediate confirmation of actions
-- **QR Code Authentication**: Easy setup with QR code scanning
+- **Bot Token Authentication**: Secure setup with Telegram bot token
 
 ## Installation
 
 1. **Clone or download** this repository to your local machine
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+2. **Set up your Telegram Bot Token**:
+   - Get a bot token from [@BotFather](https://t.me/BotFather) on Telegram
+   - Set the environment variable:
+     ```bash
+     # Windows (PowerShell)
+     $env:TELEGRAM_BOT_TOKEN="your_bot_token_here"
+     
+     # Windows (Command Prompt)
+     set TELEGRAM_BOT_TOKEN=your_bot_token_here
+     
+     # Linux/Mac
+     export TELEGRAM_BOT_TOKEN="your_bot_token_here"
+     ```
 
 3. **Start the bot**:
    ```bash
-   npm start
+   node simple-telegram-bot.js
    ```
 
-4. **Scan QR Code**: When the bot starts, scan the QR code with your WhatsApp app
-
-5. **Configure Admins**: Add admins using the `addadmin` command
+4. **Configure Admins**: Add admins using the `addadmin` command
 
 ## Usage
 
@@ -164,9 +171,10 @@ Dishwasher/
 
 ### Common Issues
 
-1. **QR Code Not Appearing**:
-   - Make sure you have a stable internet connection
-   - Restart the bot if needed
+1. **Bot Token Error**:
+   - Make sure you've set the TELEGRAM_BOT_TOKEN environment variable
+   - Verify your bot token is correct by checking with @BotFather
+   - Restart the bot after setting the environment variable
 
 2. **Commands Not Working**:
    - Check if you're authorized (for queue commands)
@@ -185,9 +193,10 @@ Dishwasher/
 
 ## Security Notes
 
-- The bot uses WhatsApp Web API, so keep your session secure
+- **Never commit your bot token to version control** - always use environment variables
 - Admin commands should only be used by trusted users
 - Regular backups are automatically created in the `data/backups/` directory
+- Keep your bot token secure and don't share it publicly
 
 ## Contributing
 

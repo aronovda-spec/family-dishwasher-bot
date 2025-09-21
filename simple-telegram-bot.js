@@ -2,7 +2,13 @@
 const https = require('https');
 const fs = require('fs');
 
-const token = process.env.TELEGRAM_BOT_TOKEN || '8488813166:AAGxggIaU6TiYcC1HgecXQUCDFW-7SwgiJY';
+const token = process.env.TELEGRAM_BOT_TOKEN;
+
+if (!token) {
+    console.error('Error: TELEGRAM_BOT_TOKEN environment variable is required');
+    console.error('Please set your bot token: set TELEGRAM_BOT_TOKEN=your_bot_token_here');
+    process.exit(1);
+}
 const botUrl = `https://api.telegram.org/bot${token}`;
 
 // Simple queue management
