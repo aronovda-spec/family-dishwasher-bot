@@ -553,6 +553,7 @@ const translations = {
         'swapped_positions': 'swapped positions',
         'new_queue_order': 'New queue order',
         'current_turn_status': 'CURRENT TURN',
+        'next_lap': 'Next Lap Preview',
         'admin_force_swap_executed': 'Admin Force Swap Executed!',
         'apply_punishment_select_user': 'Apply Punishment - Select user to punish:',
         
@@ -829,6 +830,7 @@ const translations = {
         'swapped_positions': 'החליפו מקומות',
         'new_queue_order': 'סדר התור החדש',
         'current_turn_status': 'התור הנוכחי',
+        'next_lap': 'תצוגת הסיבוב הבא',
         'admin_force_swap_executed': 'מנהל ביצע החלפה בכוח!',
         'apply_punishment_select_user': 'הפעל עונש - בחר משתמש לעונש:',
         
@@ -1767,8 +1769,17 @@ function executeSwap(swapRequest, requestId, status) {
         console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
         
         // Notify both users in their language
-        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(fromUserId, 'new_queue_order')}:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`).join('\n')}`;
-        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(toUserId, 'new_queue_order')}:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ` (${t(toUserId, 'current_turn_status')})` : ''}`).join('\n')}`;
+        // Create queue starting from current turn
+        const currentTurnUser = queue[currentTurn];
+        const queueFromCurrentTurn = [...queue.slice(currentTurn), ...queue.slice(0, currentTurn)];
+        const queueDisplay = queueFromCurrentTurn.map((name, index) => {
+            const actualIndex = (currentTurn + index) % queue.length;
+            const isCurrentTurn = actualIndex === currentTurn;
+            return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`;
+        }).join('\n');
+        
+        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(fromUserId, 'new_queue_order')}:**\n${queueDisplay}\n\n🔄 **${t(fromUserId, 'next_lap')}:**\n${queueDisplay}`;
+        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(toUserId, 'new_queue_order')}:**\n${queueDisplay}\n\n🔄 **${t(toUserId, 'next_lap')}:**\n${queueDisplay}`;
         
         sendMessage(fromUserId, fromUserMessage);
         sendMessage(toUserId, toUserMessage);
@@ -2606,8 +2617,16 @@ function handleCallback(chatId, userId, userName, data) {
             [...authorizedUsers, ...admins].forEach(user => {
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 if (userChatId && userChatId !== chatId) { // Don't notify the admin who performed the swap
+                    // Create queue starting from current turn
+                    const queueFromCurrentTurn = [...queue.slice(currentTurn), ...queue.slice(0, currentTurn)];
+                    const queueDisplay = queueFromCurrentTurn.map((name, index) => {
+                        const actualIndex = (currentTurn + index) % queue.length;
+                        const isCurrentTurn = actualIndex === currentTurn;
+                        return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(userChatId, 'current_turn_status')})` : ''}`;
+                    }).join('\n');
+                    
                     // Create message in recipient's language
-                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n📋 **${t(userChatId, 'new_queue_order')}:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ` (${t(userChatId, 'current_turn_status')})` : ''}`).join('\n')}`;
+                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n📋 **${t(userChatId, 'new_queue_order')}:**\n${queueDisplay}\n\n🔄 **${t(userChatId, 'next_lap')}:**\n${queueDisplay}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
                 } else {
