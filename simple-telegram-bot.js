@@ -1778,8 +1778,8 @@ function executeSwap(swapRequest, requestId, status) {
             return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`;
         }).join('\n');
         
-        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(fromUserId, 'new_queue_order')}:**\n${queueDisplay}\n\n🔄 **${t(fromUserId, 'next_lap')}:**\n${queueDisplay}`;
-        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(toUserId, 'new_queue_order')}:**\n${queueDisplay}\n\n🔄 **${t(toUserId, 'next_lap')}:**\n${queueDisplay}`;
+        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n🔄 **${t(fromUserId, 'next_lap')}:**\n${queueDisplay}`;
+        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n🔄 **${t(toUserId, 'next_lap')}:**\n${queueDisplay}`;
         
         sendMessage(fromUserId, fromUserMessage);
         sendMessage(toUserId, toUserMessage);
@@ -2626,7 +2626,7 @@ function handleCallback(chatId, userId, userName, data) {
                     }).join('\n');
                     
                     // Create message in recipient's language
-                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n📋 **${t(userChatId, 'new_queue_order')}:**\n${queueDisplay}\n\n🔄 **${t(userChatId, 'next_lap')}:**\n${queueDisplay}`;
+                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n🔄 **${t(userChatId, 'next_lap')}:**\n${queueDisplay}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
                 } else {
