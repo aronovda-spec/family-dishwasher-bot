@@ -563,6 +563,7 @@ const translations = {
         'swap_request_not_found': '❌ **Swap request not found or expired!**',
         'swap_request_not_for_you': '❌ **This swap request is not for you!**',
         'swap_request_not_yours': '❌ **This swap request is not yours!**',
+        'target_user_not_found': '❌ **Target user not found!**\n\n👤 **User:** {targetUser}\n💡 **Make sure the user has sent /start to the bot.**',
         'not_authorized_punishment': '❌ **Not authorized!** You need to be authorized to request punishments.',
         'no_users_available_report': '❌ **No users available to report!**',
         
@@ -838,6 +839,7 @@ const translations = {
         'swap_request_not_found': '❌ **בקשת החלפה לא נמצאה או פגה תוקפה!**',
         'swap_request_not_for_you': '❌ **בקשת החלפה זו לא מיועדת לך!**',
         'swap_request_not_yours': '❌ **בקשת החלפה זו לא שלך!**',
+        'target_user_not_found': '❌ **משתמש יעד לא נמצא!**\n\n👤 **משתמש:** {targetUser}\n💡 **ודא שהמשתמש שלח /start לבוט.**',
         'not_authorized_punishment': '❌ **לא מורשה!** אתה צריך להיות מורשה כדי לבקש עונשים.',
         'no_users_available_report': '❌ **אין משתמשים זמינים לדיווח!**',
         
@@ -1722,20 +1724,47 @@ function reportUser(targetUser, reason, reportedBy) {
 function executeSwap(swapRequest, requestId, status) {
     const { fromUser, toUser, fromUserId, toUserId } = swapRequest;
     
+    console.log(`🔄 Executing swap: ${fromUser} ↔ ${toUser}`);
+    console.log(`🔍 Current queue:`, queue);
+    console.log(`🔍 User queue mapping:`, userQueueMapping);
+    
     // Find queue positions
-    const fromIndex = queue.indexOf(userQueueMapping.get(fromUser));
+    const fromQueueName = userQueueMapping.get(fromUser) || userQueueMapping.get(fromUser.toLowerCase());
+    const fromIndex = queue.indexOf(fromQueueName);
     const toIndex = queue.indexOf(toUser);
+    
+    console.log(`🔍 From user: ${fromUser} → Queue name: ${fromQueueName} → Index: ${fromIndex}`);
+    console.log(`🔍 To user: ${toUser} → Index: ${toIndex}`);
     
     if (fromIndex !== -1 && toIndex !== -1) {
         // Swap positions in queue
         [queue[fromIndex], queue[toIndex]] = [queue[toIndex], queue[fromIndex]];
         
         // Update current turn if needed
+        // IMPORTANT: currentTurn should follow the user who had the turn to their new position
+        console.log(`🔍 DEBUG - Before currentTurn update: currentTurn=${currentTurn}, fromIndex=${fromIndex}, toIndex=${toIndex}`);
         if (currentTurn === fromIndex) {
-            currentTurn = toIndex;
+            currentTurn = toIndex;  // The user who had the turn is now at toIndex
+            console.log(`🔍 DEBUG - Updated currentTurn from ${fromIndex} to ${toIndex} (followed fromUser)`);
         } else if (currentTurn === toIndex) {
+            currentTurn = fromIndex;  // The user who had the turn is now at fromIndex
+            console.log(`🔍 DEBUG - Updated currentTurn from ${toIndex} to ${fromIndex} (followed toUser)`);
+        } else {
+            console.log(`🔍 DEBUG - No currentTurn update needed (currentTurn=${currentTurn} not involved in swap)`);
+        }
+        console.log(`🔍 DEBUG - After currentTurn update: currentTurn=${currentTurn}`);
+        
+        // FIX: After swapping, we need to update currentTurn to reflect the new positions
+        // The user who was at currentTurn position before the swap should now be at their new position
+        if (fromIndex === currentTurn) {
+            // The user who had the current turn (fromUser) is now at toIndex
+            currentTurn = toIndex;
+        } else if (toIndex === currentTurn) {
+            // The user who had the current turn (toUser) is now at fromIndex  
             currentTurn = fromIndex;
         }
+        // If currentTurn was not involved in the swap, it stays the same
+        console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
         
         // Notify both users in their language
         const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n📋 **${t(fromUserId, 'new_queue_order')}:**\n${queue.map((name, index) => `${index + 1}. ${name}${index === currentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`).join('\n')}`;
@@ -2312,32 +2341,42 @@ function handleCallback(chatId, userId, userName, data) {
         const requestId = ++swapRequestCounter;
         const targetUserId = queueUserMapping.get(targetUser);
         
+        // Get the actual chat ID for the target user
+        const targetChatId = userChatIds.get(targetUserId) || userChatIds.get(targetUserId.toLowerCase());
+        
+        if (!targetChatId) {
+            sendMessage(chatId, t(userId, 'target_user_not_found', {targetUser: targetUser}));
+            return;
+        }
+        
         pendingSwaps.set(requestId, {
             fromUser: userName,
             toUser: targetUser,
             fromUserId: userId,
-            toUserId: targetUserId,
+            toUserId: targetChatId, // Store the actual chat ID, not username
             timestamp: Date.now()
         });
         
         // Notify the target user
-        if (targetUserId) {
-            const buttons = createLocalizedButtons(targetUserId, [
+        if (targetChatId) {
+            const buttons = createLocalizedButtons(targetChatId, [
                 [
                 { translationKey: 'approve', callback_data: `swap_approve_${requestId}` },
                 { translationKey: 'reject', callback_data: `swap_reject_${requestId}` }
                 ]
             ]);
             
-            sendMessageWithButtons(targetUserId, 
-                `🔄 **${t(targetUserId, 'swap_request_title')}**\n\n👤 **${t(targetUserId, 'from_user')}:** ${userName} (${currentUserQueueName})\n🎯 **${t(targetUserId, 'wants_to_swap_with')}:** ${targetUser}`, 
+            sendMessageWithButtons(targetChatId, 
+                `🔄 **${t(targetChatId, 'swap_request_title')}**\n\n👤 **${t(targetChatId, 'from_user')}:** ${userName} (${currentUserQueueName})\n🎯 **${t(targetChatId, 'wants_to_swap_with')}:** ${targetUser}`, 
                 buttons
             );
+        } else {
+            console.log(`❌ No chat ID found for target user: ${targetUserId}`);
         }
         
         // Notify all admins about the swap request in their language
         for (const adminChatId of adminChatIds) {
-            if (adminChatId !== chatId && adminChatId !== targetUserId) { // Don't notify the requester or target user
+            if (adminChatId !== chatId && adminChatId !== targetChatId) { // Don't notify the requester or target user
                 // Create notification in admin's language
                 const adminNotification = `🔄 **${t(adminChatId, 'new_swap_request')}**\n\n👤 **${t(adminChatId, 'from_user')}:** ${userName} (${currentUserQueueName})\n🎯 **${t(adminChatId, 'wants_to_swap_with')}:** ${targetUser}\n📅 **${t(adminChatId, 'time')}:** ${new Date().toLocaleString()}\n\n💡 **${t(adminChatId, 'request_id')}:** ${requestId}`;
                 console.log(`🔔 Sending admin swap notification to chat ID: ${adminChatId}`);
@@ -2361,17 +2400,25 @@ function handleCallback(chatId, userId, userName, data) {
         const requestId = parseInt(data.replace('swap_approve_', ''));
         const swapRequest = pendingSwaps.get(requestId);
         
+        console.log(`🔘 Button pressed: "${data}" by ${userName}`);
+        console.log(`🔍 Swap request ID: ${requestId}`);
+        console.log(`🔍 Swap request found:`, swapRequest);
+        
         if (!swapRequest) {
+            console.log(`❌ Swap request not found for ID: ${requestId}`);
             sendMessage(chatId, t(userId, 'swap_request_not_found'));
             return;
         }
         
         // Check if this is the correct user approving
+        console.log(`🔍 Checking approval: swapRequest.toUserId (${swapRequest.toUserId}) === userId (${userId})`);
         if (swapRequest.toUserId !== userId) {
+            console.log(`❌ Swap request not for this user`);
             sendMessage(chatId, t(userId, 'swap_request_not_for_you'));
             return;
         }
         
+        console.log(`✅ Approval valid, executing swap...`);
         // Execute the swap
         executeSwap(swapRequest, requestId, 'approved');
         
@@ -2516,20 +2563,28 @@ function handleCallback(chatId, userId, userName, data) {
             }, 100);
             
             // Update current turn if needed
-            // If currentTurn was pointing to one of the swapped positions, update it
+            // IMPORTANT: currentTurn should follow the user who had the turn to their new position
             if (currentTurn === firstIndex) {
-                currentTurn = secondIndex;
+                currentTurn = secondIndex;  // The user who had the turn is now at secondIndex
             } else if (currentTurn === secondIndex) {
-                currentTurn = firstIndex;
+                currentTurn = firstIndex;  // The user who had the turn is now at firstIndex
             }
             // Note: If currentTurn was not involved in the swap, it stays the same
             // This means the current turn person remains the same, just their position in queue changes
             
             console.log(`🔍 DEBUG - After currentTurn update: currentTurn=${currentTurn}`);
             
-            // FIX: Always reset currentTurn to 0 after a swap to ensure status shows from the beginning
-            currentTurn = 0;
-            console.log(`🔍 DEBUG - After currentTurn reset: currentTurn=${currentTurn}`);
+            // FIX: After swapping, we need to update currentTurn to reflect the new positions
+            // The user who was at currentTurn position before the swap should now be at their new position
+            if (firstIndex === currentTurn) {
+                // The user who had the current turn (firstUser) is now at secondIndex
+                currentTurn = secondIndex;
+            } else if (secondIndex === currentTurn) {
+                // The user who had the current turn (secondUser) is now at firstIndex  
+                currentTurn = firstIndex;
+            }
+            // If currentTurn was not involved in the swap, it stays the same
+            console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
             
             // TEMPORARY SWAP: Mark this as a temporary swap that will revert after current turn
             // We'll store the original positions to restore them later
