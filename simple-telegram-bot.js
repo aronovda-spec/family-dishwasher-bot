@@ -1863,8 +1863,15 @@ function executeSwap(swapRequest, requestId, status) {
     
     // Check if we have 3+ swaps in 10 minutes
     if (global.swapTimestamps.length >= 3) {
-        alertAdminsAboutCheating(fromUserId, fromUser, 'rapid_swap', { swapCount: global.swapTimestamps.length });
-        console.log(`🚨 RAPID SWAP DETECTED: ${fromUser} (${fromUserId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
+        // Only send alert if we haven't already alerted for this rapid swap session
+        if (!global.swapTimestamps.alertSent) {
+            alertAdminsAboutCheating(fromUserId, fromUser, 'rapid_swap', { swapCount: global.swapTimestamps.length });
+            global.swapTimestamps.alertSent = true;
+            console.log(`🚨 RAPID SWAP DETECTED: ${fromUser} (${fromUserId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
+        }
+    } else {
+        // Reset alert flag when swap count drops below threshold
+        global.swapTimestamps.alertSent = false;
     }
     
     console.log(`🔄 Executing swap: ${fromUser} ↔ ${toUser}`);
@@ -2816,8 +2823,15 @@ function handleCallback(chatId, userId, userName, data) {
             
             // Check if we have 3+ swaps in 10 minutes
             if (global.swapTimestamps.length >= 3) {
-                alertAdminsAboutCheating(userId, userName, 'rapid_swap', { swapCount: global.swapTimestamps.length });
-                console.log(`🚨 RAPID SWAP DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
+                // Only send alert if we haven't already alerted for this rapid swap session
+                if (!global.swapTimestamps.alertSent) {
+                    alertAdminsAboutCheating(userId, userName, 'rapid_swap', { swapCount: global.swapTimestamps.length });
+                    global.swapTimestamps.alertSent = true;
+                    console.log(`🚨 RAPID SWAP DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
+                }
+            } else {
+                // Reset alert flag when swap count drops below threshold
+                global.swapTimestamps.alertSent = false;
             }
             
             // Capture the original current turn user BEFORE the swap
