@@ -194,6 +194,44 @@ function advanceToNextUser() {
     return queue[currentTurn];
 }
 
+// Anti-cheating helper function
+function alertAdminsAboutCheating(userId, userName, reason, details) {
+    const now = new Date();
+    const timeString = now.toLocaleString();
+    
+    let alertMessage;
+    if (reason === 'rapid_done') {
+        alertMessage = `🚨 **CHEATING SUSPECTED!** 🚨\n\n` +
+            `⚠️ **Rapid DONE Activity Detected**\n\n` +
+            `👤 **User:** ${userName} (${userId})\n` +
+            `⏰ **Time:** ${timeString}\n` +
+            `🕐 **Last DONE:** ${details.lastDone}\n\n` +
+            `📊 **Dishwasher cannot be ready in less than 30 minutes!**`;
+    } else if (reason === 'rapid_swap') {
+        alertMessage = `🚨 **CHEATING SUSPECTED!** 🚨\n\n` +
+            `⚠️ **Rapid Swap Activity Detected**\n\n` +
+            `👤 **User:** ${userName} (${userId})\n` +
+            `⏰ **Time:** ${timeString}\n` +
+            `🔄 **Swaps in 10 minutes:** ${details.swapCount}\n\n` +
+            `📊 **Suspicious activity pattern detected!**`;
+    }
+    
+    // Send alert to all admins
+    adminChatIds.forEach(adminChatId => {
+        console.log(`🚨 Sending cheating alert to admin: ${adminChatId}`);
+        sendMessage(adminChatId, alertMessage);
+    });
+    
+    // Also send to authorized users who are admins
+    [...authorizedUsers, ...admins].forEach(user => {
+        let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+        if (userChatId && admins.has(user)) {
+            console.log(`🚨 Sending cheating alert to admin user: ${user}`);
+            sendMessage(userChatId, alertMessage);
+        }
+    });
+}
+
 // Helper function to update queue statistics
 function updateUserStatistics(userName) {
     const stats = queueStatistics.get(userName) || { totalCompletions: 0, monthlyCompletions: 0, lastCompleted: null };
@@ -441,6 +479,9 @@ const translations = {
         'alerted_user': '👤 **Alerted:**',
         'sent_to_all': '📢 **Sent to:** All authorized users and admins',
         'auto_timer': 'Auto-Timer',
+        'cheating_detected': '🚨 **CHEATING SUSPECTED!** 🚨',
+        'rapid_done_alert': '⚠️ **Rapid DONE Activity Detected**\n\n👤 **User:** {user}\n⏰ **Time:** {time}\n🕐 **Last DONE:** {lastDone}\n\n📊 **Dishwasher cannot be ready in less than 30 minutes!**',
+        'rapid_swap_alert': '⚠️ **Rapid Swap Activity Detected**\n\n👤 **User:** {user}\n⏰ **Time:** {time}\n🔄 **Swaps in 10 minutes:** {swapCount}\n\n📊 **Suspicious activity pattern detected!**',
         'swap_request_sent': '✅ **Swap request sent to admins!**',
         'punishment_request_sent': '✅ **Punishment request sent to admins!**',
         'target_user': '🎯 **Target:**',
@@ -729,6 +770,9 @@ const translations = {
         'alerted_user': '👤 **הותרע:**',
         'sent_to_all': '📢 **נשלח אל:** כל המשתמשים והמנהלים',
         'auto_timer': 'טיימר אוטומטי',
+        'cheating_detected': '🚨 **חשד לרמיה!** 🚨',
+        'rapid_done_alert': '⚠️ **פעילות DONE מהירה זוהתה**\n\n👤 **משתמש:** {user}\n⏰ **זמן:** {time}\n🕐 **DONE אחרון:** {lastDone}\n\n📊 **מדיח הכלים לא יכול להיות מוכן תוך פחות מ-30 דקות!**',
+        'rapid_swap_alert': '⚠️ **פעילות החלפה מהירה זוהתה**\n\n👤 **משתמש:** {user}\n⏰ **זמן:** {time}\n🔄 **החלפות ב-10 דקות:** {swapCount}\n\n📊 **זוהה דפוס פעילות חשוד!**',
         'swap_request_sent': '✅ **בקשת החלפה נשלחה למנהלים!**',
         'punishment_request_sent': '✅ **בקשת עונש נשלחה למנהלים!**',
         'target_user': '🎯 **יעד:**',
@@ -1356,6 +1400,22 @@ function handleCommand(chatId, userId, userName, text) {
         sendMessage(chatId, statusMessage);
         
     } else if (command === '/done' || command === 'done') {
+        // Initialize anti-cheating tracking
+        if (!global.doneTimestamps) global.doneTimestamps = new Map();
+        
+        // Check for rapid DONE activity (30 minutes)
+        const now = Date.now();
+        const lastDone = global.doneTimestamps.get('lastDone');
+        
+        if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
+            const lastDoneTime = new Date(lastDone).toLocaleString();
+            alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+            console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+        }
+        
+        // Update last DONE timestamp
+        global.doneTimestamps.set('lastDone', now);
+        
         // Check if user is admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
@@ -1779,6 +1839,25 @@ function reportUser(targetUser, reason, reportedBy) {
 // Execute approved swap
 function executeSwap(swapRequest, requestId, status) {
     const { fromUser, toUser, fromUserId, toUserId } = swapRequest;
+    
+    // Initialize anti-cheating tracking for swaps
+    if (!global.swapTimestamps) global.swapTimestamps = [];
+    
+    // Check for rapid swap activity (3+ swaps in 10 minutes)
+    const now = Date.now();
+    const tenMinutesAgo = now - (10 * 60 * 1000);
+    
+    // Remove old timestamps (older than 10 minutes)
+    global.swapTimestamps = global.swapTimestamps.filter(timestamp => timestamp > tenMinutesAgo);
+    
+    // Add current swap timestamp
+    global.swapTimestamps.push(now);
+    
+    // Check if we have 3+ swaps in 10 minutes
+    if (global.swapTimestamps.length >= 3) {
+        alertAdminsAboutCheating(fromUserId, fromUser, 'rapid_swap', { swapCount: global.swapTimestamps.length });
+        console.log(`🚨 RAPID SWAP DETECTED: ${fromUser} (${fromUserId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
+    }
     
     console.log(`🔄 Executing swap: ${fromUser} ↔ ${toUser}`);
     console.log(`🔍 Current queue:`, queue);
@@ -2714,6 +2793,25 @@ function handleCallback(chatId, userId, userName, data) {
         console.log(`🔍 DEBUG - Second user "${secondUser}" found at index: ${secondIndex}`);
         
         if (firstIndex !== -1 && secondIndex !== -1) {
+            // Initialize anti-cheating tracking for swaps
+            if (!global.swapTimestamps) global.swapTimestamps = [];
+            
+            // Check for rapid swap activity (3+ swaps in 10 minutes)
+            const now = Date.now();
+            const tenMinutesAgo = now - (10 * 60 * 1000);
+            
+            // Remove old timestamps (older than 10 minutes)
+            global.swapTimestamps = global.swapTimestamps.filter(timestamp => timestamp > tenMinutesAgo);
+            
+            // Add current swap timestamp
+            global.swapTimestamps.push(now);
+            
+            // Check if we have 3+ swaps in 10 minutes
+            if (global.swapTimestamps.length >= 3) {
+                alertAdminsAboutCheating(userId, userName, 'rapid_swap', { swapCount: global.swapTimestamps.length });
+                console.log(`🚨 RAPID SWAP DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
+            }
+            
             // Capture the original current turn user BEFORE the swap
             const originalCurrentTurnUser = queue[currentTurn];
             
