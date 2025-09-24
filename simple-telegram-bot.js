@@ -1406,15 +1406,9 @@ function handleCommand(chatId, userId, userName, text) {
         
         if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
             const lastDoneTime = new Date(lastDone).toLocaleString();
-            // Only send alert if we haven't already alerted for this rapid DONE session
-            if (!global.doneTimestamps.get('alertSent')) {
-                alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
-                global.doneTimestamps.set('alertSent', true);
-                console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
-            }
-        } else {
-            // Reset alert flag when rate limit expires
-            global.doneTimestamps.delete('alertSent');
+            // Send alert for each DONE within 30 minutes (different users get separate alerts)
+            alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+            console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
         }
         
         // Update last DONE timestamp
