@@ -695,7 +695,7 @@ const translations = {
         'force_swap': '⚡ החלף בכוח',
         'apply_punishment': '⚖️ הפעל עונש',
         'dishwasher_alert': '🚨 התראת כלים!',
-        'dishwasher_started': '🏁 כלים התחילו!',
+        'dishwasher_started': '🏁 מדיח התחיל!',
         'swap': '🔄 החלף',
         'request_punishment': '⚖️ בקש עונש',
         'language_switch': '🇺🇸 English',
@@ -805,7 +805,7 @@ const translations = {
         
         // Dishwasher alert messages
         'dishwasher_alert_message': '🚨 **התראת כלים!** 🚨\n\n👤 **זה התור של {user}!**\n⏰ **זמן לעשות כלים!**\n\n📢 **התזכורת נשלחה על ידי:** {sender}',
-        'dishwasher_started_message': '🏁 **כלים התחילו!** 🏁\n\n👤 **התור הבא:** {user}\n⏰ **מדיח הכלים פועל כעת!**\n\n📢 **הותחל על ידי:** {sender}',
+        'dishwasher_started_message': '🏁 **מדיח התחיל!** 🏁\n\n👤 **התור הבא:** {user}\n⏰ **מדיח הכלים פועל כעת!**\n\n📢 **הותחל על ידי:** {sender}',
         
         // Admin management messages
         'current_admins': '👨‍💼 **מנהלים נוכחיים:**\n\n{adminList}\n\n📊 **סך מנהלים:** {count}',
@@ -1183,8 +1183,8 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'apply_punishment'), callback_data: "apply_punishment_menu" }
                 ],
                 [
-                    { text: t(userId, 'dishwasher_alert'), callback_data: "dishwasher_alert" },
-                    { text: t(userId, 'dishwasher_started'), callback_data: "dishwasher_started" }
+                    { text: t(userId, 'dishwasher_started'), callback_data: "dishwasher_started" },
+                    { text: t(userId, 'dishwasher_alert'), callback_data: "dishwasher_alert" }
                 ],
                 [
                     { text: t(userId, 'create_announcement'), callback_data: "create_announcement" },
