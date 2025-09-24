@@ -1437,6 +1437,13 @@ function handleCommand(chatId, userId, userName, text) {
                 }
             });
             
+            // Mark that dishwasher was completed (cancel auto-alert)
+            global.dishwasherCompleted = true;
+            if (global.dishwasherAutoAlertTimer) {
+                clearTimeout(global.dishwasherAutoAlertTimer);
+                global.dishwasherAutoAlertTimer = null;
+            }
+            
         } else {
             // Regular user "Done" - Check if user is authorized
             if (!authorizedUsers.has(userName) && !authorizedUsers.has(userName.toLowerCase())) {
@@ -1521,6 +1528,13 @@ function handleCommand(chatId, userId, userName, text) {
                     console.log(`🔔 No chat ID found for ${user}`);
                 }
             });
+            
+            // Mark that dishwasher was completed (cancel auto-alert)
+            global.dishwasherCompleted = true;
+            if (global.dishwasherAutoAlertTimer) {
+                clearTimeout(global.dishwasherAutoAlertTimer);
+                global.dishwasherAutoAlertTimer = null;
+            }
         }
         
     } else if (command === '/help' || command === 'help') {
@@ -1921,6 +1935,9 @@ function handleCallback(chatId, userId, userName, data) {
         // Send confirmation to admin
         sendMessage(chatId, `${t(userId, 'dishwasher_alert_sent')}\n\n${t(userId, 'alerted_user')} ${currentUser}\n${t(userId, 'sent_to_all')}`);
         
+        // Mark that manual alert was sent (cancel auto-alert)
+        global.dishwasherAlertSent = true;
+        
     } else if (data === 'dishwasher_started') {
         console.log(`🔍 DEBUG - Dishwasher started handler triggered by ${userName} (${userId})`);
         
@@ -1961,6 +1978,41 @@ function handleCallback(chatId, userId, userName, data) {
                 sendMessage(adminChatId, adminStartedMessage);
             }
         });
+        
+        // Clear any existing auto-alert timer
+        if (global.dishwasherAutoAlertTimer) {
+            clearTimeout(global.dishwasherAutoAlertTimer);
+            global.dishwasherAutoAlertTimer = null;
+        }
+        
+        // Set up auto-alert timer (3 hours)
+        const autoAlertTimeout = setTimeout(() => {
+            // Check if we should still send the auto-alert
+            if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
+                console.log(`⏰ Auto-alert triggered after 3 hours for ${currentUser}`);
+                
+                // Send dishwasher alert to all authorized users and admins
+                [...authorizedUsers, ...admins].forEach(user => {
+                    let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                    if (userChatId) {
+                        const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: currentUser, sender: 'Auto-Timer'});
+                        console.log(`🔔 Sending auto dishwasher alert to ${user} (${userChatId})`);
+                        sendMessage(userChatId, alertMessage);
+                    }
+                });
+                
+                // Mark alert as sent
+                global.dishwasherAlertSent = true;
+            }
+        }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
+        
+        // Store timer reference for potential cleanup
+        global.dishwasherAutoAlertTimer = autoAlertTimeout;
+        
+        // Mark dishwasher as started
+        global.dishwasherStarted = true;
+        global.dishwasherAlertSent = false;
+        global.dishwasherCompleted = false;
         
         // Send confirmation to admin
         sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${currentUser}\n${t(userId, 'sent_to_all')}`);
