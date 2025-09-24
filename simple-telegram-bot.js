@@ -199,25 +199,17 @@ function alertAdminsAboutCheating(userId, userName, reason, details) {
     const now = new Date();
     const timeString = now.toLocaleString();
     
-    let alertMessage;
-    if (reason === 'rapid_done') {
-        alertMessage = `🚨 **CHEATING SUSPECTED!** 🚨\n\n` +
-            `⚠️ **Rapid DONE Activity Detected**\n\n` +
-            `👤 **User:** ${userName} (${userId})\n` +
-            `⏰ **Time:** ${timeString}\n` +
-            `🕐 **Last DONE:** ${details.lastDone}\n\n` +
-            `📊 **Dishwasher cannot be ready in less than 30 minutes!**`;
-    } else if (reason === 'rapid_swap') {
-        alertMessage = `🚨 **CHEATING SUSPECTED!** 🚨\n\n` +
-            `⚠️ **Rapid Swap Activity Detected**\n\n` +
-            `👤 **User:** ${userName} (${userId})\n` +
-            `⏰ **Time:** ${timeString}\n` +
-            `🔄 **Swaps in 10 minutes:** ${details.swapCount}\n\n` +
-            `📊 **Suspicious activity pattern detected!**`;
-    }
-    
-    // Send alert to all admins
+    // Send alert to all admins with their preferred language
     adminChatIds.forEach(adminChatId => {
+        let alertMessage;
+        if (reason === 'rapid_done') {
+            alertMessage = `${t(adminChatId, 'cheating_detected')}\n\n` +
+                `${t(adminChatId, 'rapid_done_alert', {user: userName, userId: userId, time: timeString, lastDone: details.lastDone})}`;
+        } else if (reason === 'rapid_swap') {
+            alertMessage = `${t(adminChatId, 'cheating_detected')}\n\n` +
+                `${t(adminChatId, 'rapid_swap_alert', {user: userName, userId: userId, time: timeString, swapCount: details.swapCount})}`;
+        }
+        
         console.log(`🚨 Sending cheating alert to admin: ${adminChatId}`);
         sendMessage(adminChatId, alertMessage);
     });
@@ -226,6 +218,15 @@ function alertAdminsAboutCheating(userId, userName, reason, details) {
     [...authorizedUsers, ...admins].forEach(user => {
         let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
         if (userChatId && admins.has(user)) {
+            let alertMessage;
+            if (reason === 'rapid_done') {
+                alertMessage = `${t(userChatId, 'cheating_detected')}\n\n` +
+                    `${t(userChatId, 'rapid_done_alert', {user: userName, userId: userId, time: timeString, lastDone: details.lastDone})}`;
+            } else if (reason === 'rapid_swap') {
+                alertMessage = `${t(userChatId, 'cheating_detected')}\n\n` +
+                    `${t(userChatId, 'rapid_swap_alert', {user: userName, userId: userId, time: timeString, swapCount: details.swapCount})}`;
+            }
+            
             console.log(`🚨 Sending cheating alert to admin user: ${user}`);
             sendMessage(userChatId, alertMessage);
         }
@@ -480,8 +481,8 @@ const translations = {
         'sent_to_all': '📢 **Sent to:** All authorized users and admins',
         'auto_timer': 'Auto-Timer',
         'cheating_detected': '🚨 **CHEATING SUSPECTED!** 🚨',
-        'rapid_done_alert': '⚠️ **Rapid DONE Activity Detected**\n\n👤 **User:** {user}\n⏰ **Time:** {time}\n🕐 **Last DONE:** {lastDone}\n\n📊 **Dishwasher cannot be ready in less than 30 minutes!**',
-        'rapid_swap_alert': '⚠️ **Rapid Swap Activity Detected**\n\n👤 **User:** {user}\n⏰ **Time:** {time}\n🔄 **Swaps in 10 minutes:** {swapCount}\n\n📊 **Suspicious activity pattern detected!**',
+        'rapid_done_alert': '⚠️ **Rapid DONE Activity Detected**\n\n👤 **User:** {user} ({userId})\n⏰ **Time:** {time}\n🕐 **Last DONE:** {lastDone}\n\n📊 **Dishwasher cannot be ready in less than 30 minutes!**',
+        'rapid_swap_alert': '⚠️ **Rapid Swap Activity Detected**\n\n👤 **User:** {user} ({userId})\n⏰ **Time:** {time}\n🔄 **Swaps in 10 minutes:** {swapCount}\n\n📊 **Suspicious activity pattern detected!**',
         'swap_request_sent': '✅ **Swap request sent to admins!**',
         'punishment_request_sent': '✅ **Punishment request sent to admins!**',
         'target_user': '🎯 **Target:**',
@@ -771,8 +772,8 @@ const translations = {
         'sent_to_all': '📢 **נשלח אל:** כל המשתמשים והמנהלים',
         'auto_timer': 'טיימר אוטומטי',
         'cheating_detected': '🚨 **חשד לרמיה!** 🚨',
-        'rapid_done_alert': '⚠️ **פעילות DONE מהירה זוהתה**\n\n👤 **משתמש:** {user}\n⏰ **זמן:** {time}\n🕐 **DONE אחרון:** {lastDone}\n\n📊 **מדיח הכלים לא יכול להיות מוכן תוך פחות מ-30 דקות!**',
-        'rapid_swap_alert': '⚠️ **פעילות החלפה מהירה זוהתה**\n\n👤 **משתמש:** {user}\n⏰ **זמן:** {time}\n🔄 **החלפות ב-10 דקות:** {swapCount}\n\n📊 **זוהה דפוס פעילות חשוד!**',
+        'rapid_done_alert': '⚠️ **פעילות DONE מהירה זוהתה**\n\n👤 **משתמש:** {user} ({userId})\n⏰ **זמן:** {time}\n🕐 **DONE אחרון:** {lastDone}\n\n📊 **מדיח הכלים לא יכול להיות מוכן תוך פחות מ-30 דקות!**',
+        'rapid_swap_alert': '⚠️ **פעילות החלפה מהירה זוהתה**\n\n👤 **משתמש:** {user} ({userId})\n⏰ **זמן:** {time}\n🔄 **החלפות ב-10 דקות:** {swapCount}\n\n📊 **זוהה דפוס פעילות חשוד!**',
         'swap_request_sent': '✅ **בקשת החלפה נשלחה למנהלים!**',
         'punishment_request_sent': '✅ **בקשת עונש נשלחה למנהלים!**',
         'target_user': '🎯 **יעד:**',
@@ -1409,8 +1410,15 @@ function handleCommand(chatId, userId, userName, text) {
         
         if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
             const lastDoneTime = new Date(lastDone).toLocaleString();
-            alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
-            console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+            // Only send alert if we haven't already alerted for this rapid DONE session
+            if (!global.doneTimestamps.get('alertSent')) {
+                alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+                global.doneTimestamps.set('alertSent', true);
+                console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+            }
+        } else {
+            // Reset alert flag when rate limit expires
+            global.doneTimestamps.delete('alertSent');
         }
         
         // Update last DONE timestamp
