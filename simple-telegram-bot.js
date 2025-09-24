@@ -1347,23 +1347,24 @@ function handleCommand(chatId, userId, userName, text) {
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
             
-            // Check for temporary swap reversion
-            if (global.tempSwaps && global.tempSwaps.has('current')) {
-                const tempSwap = global.tempSwaps.get('current');
-                if (tempSwap.isActive) {
-                    // Revert the temporary swap
-                    const firstIndex = queue.indexOf(tempSwap.firstUser);
-                    const secondIndex = queue.indexOf(tempSwap.secondUser);
-                    
-                    if (firstIndex !== -1 && secondIndex !== -1) {
-                        [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-                        console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser}`);
-                        console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
+            // Check for temporary swap reversion - check ALL active swaps
+            if (global.tempSwaps && global.tempSwaps.size > 0) {
+                for (const [swapId, tempSwap] of global.tempSwaps.entries()) {
+                    if (tempSwap.isActive && currentUser === tempSwap.originalCurrentTurnUser) {
+                        // Revert this specific temporary swap
+                        const firstIndex = queue.indexOf(tempSwap.firstUser);
+                        const secondIndex = queue.indexOf(tempSwap.secondUser);
+                        
+                        if (firstIndex !== -1 && secondIndex !== -1) {
+                            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
+                            console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser} (${tempSwap.swapType})`);
+                            console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
+                        }
+                        
+                        // Mark this swap as inactive and remove it
+                        tempSwap.isActive = false;
+                        global.tempSwaps.delete(swapId);
                     }
-                    
-                    // Mark swap as inactive
-                    tempSwap.isActive = false;
-                    global.tempSwaps.delete('current');
                 }
             }
             
@@ -1438,23 +1439,24 @@ function handleCommand(chatId, userId, userName, text) {
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
             
-            // Check for temporary swap reversion
-            if (global.tempSwaps && global.tempSwaps.has('current')) {
-                const tempSwap = global.tempSwaps.get('current');
-                if (tempSwap.isActive) {
-                    // Revert the temporary swap
-                    const firstIndex = queue.indexOf(tempSwap.firstUser);
-                    const secondIndex = queue.indexOf(tempSwap.secondUser);
-                    
-                    if (firstIndex !== -1 && secondIndex !== -1) {
-                        [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-                        console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser}`);
-                        console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
+            // Check for temporary swap reversion - check ALL active swaps
+            if (global.tempSwaps && global.tempSwaps.size > 0) {
+                for (const [swapId, tempSwap] of global.tempSwaps.entries()) {
+                    if (tempSwap.isActive && currentUser === tempSwap.originalCurrentTurnUser) {
+                        // Revert this specific temporary swap
+                        const firstIndex = queue.indexOf(tempSwap.firstUser);
+                        const secondIndex = queue.indexOf(tempSwap.secondUser);
+                        
+                        if (firstIndex !== -1 && secondIndex !== -1) {
+                            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
+                            console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser} (${tempSwap.swapType})`);
+                            console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
+                        }
+                        
+                        // Mark this swap as inactive and remove it
+                        tempSwap.isActive = false;
+                        global.tempSwaps.delete(swapId);
                     }
-                    
-                    // Mark swap as inactive
-                    tempSwap.isActive = false;
-                    global.tempSwaps.delete('current');
                 }
             }
             
@@ -1739,6 +1741,9 @@ function executeSwap(swapRequest, requestId, status) {
     console.log(`🔍 To user: ${toUser} → Index: ${toIndex}`);
     
     if (fromIndex !== -1 && toIndex !== -1) {
+        // Capture the original current turn user BEFORE the swap
+        const originalCurrentTurnUser = queue[currentTurn];
+        
         // Swap positions in queue
         [queue[fromIndex], queue[toIndex]] = [queue[toIndex], queue[fromIndex]];
         
@@ -1767,6 +1772,22 @@ function executeSwap(swapRequest, requestId, status) {
         }
         // If currentTurn was not involved in the swap, it stays the same
         console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
+        
+        // TEMPORARY SWAP: Mark this as a temporary swap that will revert after the original current turn person completes their turn
+        const tempSwap = {
+            firstUser: fromQueueName,
+            secondUser: toUser,
+            originalCurrentTurnUser: originalCurrentTurnUser, // Who was originally at current turn position
+            isActive: true,
+            swapType: 'user_swap'
+        };
+        
+        // Store the temporary swap info with unique ID
+        if (!global.tempSwaps) global.tempSwaps = new Map();
+        const swapId = `user_swap_${Date.now()}`;
+        global.tempSwaps.set(swapId, tempSwap);
+        
+        console.log(`🔍 DEBUG - Temporary swap stored: ${fromQueueName}↔${toUser} (will revert when ${tempSwap.originalCurrentTurnUser} completes their turn)`);
         
         // Notify both users in their language
         // Create queue starting from current turn
@@ -2559,6 +2580,9 @@ function handleCallback(chatId, userId, userName, data) {
         console.log(`🔍 DEBUG - Second user "${secondUser}" found at index: ${secondIndex}`);
         
         if (firstIndex !== -1 && secondIndex !== -1) {
+            // Capture the original current turn user BEFORE the swap
+            const originalCurrentTurnUser = queue[currentTurn];
+            
             // Swap positions in queue
             console.log(`🔍 DEBUG - Before swap: queue[${firstIndex}] = "${queue[firstIndex]}", queue[${secondIndex}] = "${queue[secondIndex]}"`);
             [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
@@ -2597,21 +2621,21 @@ function handleCallback(chatId, userId, userName, data) {
             // If currentTurn was not involved in the swap, it stays the same
             console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
             
-            // TEMPORARY SWAP: Mark this as a temporary swap that will revert after current turn
-            // We'll store the original positions to restore them later
+            // TEMPORARY SWAP: Mark this as a temporary swap that will revert after the original current turn person completes their turn
             const tempSwap = {
                 firstUser: firstUser,
                 secondUser: secondUser,
-                firstOriginalIndex: secondIndex, // Where first user should be after swap
-                secondOriginalIndex: firstIndex,  // Where second user should be after swap
-                isActive: true
+                originalCurrentTurnUser: originalCurrentTurnUser, // Who was originally at current turn position
+                isActive: true,
+                swapType: 'force_swap'
             };
             
-            // Store the temporary swap info
+            // Store the temporary swap info with unique ID
             if (!global.tempSwaps) global.tempSwaps = new Map();
-            global.tempSwaps.set('current', tempSwap);
+            const swapId = `force_swap_${Date.now()}`;
+            global.tempSwaps.set(swapId, tempSwap);
             
-            console.log(`🔍 DEBUG - Temporary swap stored: ${firstUser}↔${secondUser} (will revert after current turn)`);
+            console.log(`🔍 DEBUG - Temporary swap stored: ${firstUser}↔${secondUser} (will revert when ${tempSwap.originalCurrentTurnUser} completes their turn)`);
             
             // Notify all users in their language
             [...authorizedUsers, ...admins].forEach(user => {
