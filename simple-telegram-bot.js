@@ -665,7 +665,14 @@ const translations = {
         'announcements_sent': 'Announcements: {count}',
         'total_dishes_completed': 'Total dishes completed: {count}',
         'admin_interventions': 'Admin interventions: {count}',
-        'queue_reorders': 'Queue reorders: {count}'
+        'queue_reorders': 'Queue reorders: {count}',
+        
+        // Swap status messages
+        'temporary_swaps_active': 'Temporary Swaps Active:',
+        'no_active_swaps': 'No active swaps - normal queue order',
+        'force_swap_type': 'Force Swap',
+        'user_swap_type': 'User Swap',
+        'reverts_when_completes': 'reverts when {user} completes their turn'
     },
     he: {
         // Menu titles
@@ -942,7 +949,14 @@ const translations = {
         'announcements_sent': 'הודעות רשמיות: {count}',
         'total_dishes_completed': 'סה"כ כלים שהושלמו: {count}',
         'admin_interventions': 'התערבויות מנהל: {count}',
-        'queue_reorders': 'סידורי תור מחדש: {count}'
+        'queue_reorders': 'סידורי תור מחדש: {count}',
+        
+        // Swap status messages
+        'temporary_swaps_active': 'החלפות זמניות פעילות:',
+        'no_active_swaps': 'אין החלפות פעילות - סדר תור רגיל',
+        'force_swap_type': 'החלפה בכוח',
+        'user_swap_type': 'החלפת משתמש',
+        'reverts_when_completes': 'חוזר כאשר {user} מסיים את התור שלו'
     }
 };
 
@@ -1313,6 +1327,21 @@ function handleCommand(chatId, userId, userName, text) {
                     statusMessage += `\n• ${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}`;
                 }
             });
+        }
+        
+        // Show active temporary swaps information
+        if (global.tempSwaps && global.tempSwaps.size > 0) {
+            const activeSwaps = Array.from(global.tempSwaps.entries()).filter(([id, swap]) => swap.isActive);
+            
+            if (activeSwaps.length > 0) {
+                statusMessage += `\n\n⚠️ **${t(userId, 'temporary_swaps_active')}**`;
+                activeSwaps.forEach(([swapId, swap]) => {
+                    const swapTypeText = swap.swapType === 'force_swap' ? t(userId, 'force_swap_type') : t(userId, 'user_swap_type');
+                    statusMessage += `\n• ${swap.firstUser} ↔ ${swap.secondUser} (${swapTypeText}) - ${t(userId, 'reverts_when_completes', {user: swap.originalCurrentTurnUser})}`;
+                });
+            }
+        } else {
+            statusMessage += `\n\n✅ **${t(userId, 'no_active_swaps')}**`;
         }
         
         sendMessage(chatId, statusMessage);
