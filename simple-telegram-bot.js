@@ -199,8 +199,22 @@ function alertAdminsAboutCheating(userId, userName, reason, details) {
     const now = new Date();
     const timeString = now.toLocaleString();
     
-    // Send alert to all admins with their preferred language
-    adminChatIds.forEach(adminChatId => {
+    // Collect all unique admin chat IDs to avoid duplicates
+    const adminChatIdsToNotify = new Set();
+    
+    // Add adminChatIds
+    adminChatIds.forEach(chatId => adminChatIdsToNotify.add(chatId));
+    
+    // Add chat IDs from authorized users who are admins
+    [...authorizedUsers, ...admins].forEach(user => {
+        let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+        if (userChatId && admins.has(user)) {
+            adminChatIdsToNotify.add(userChatId);
+        }
+    });
+    
+    // Send alert to each unique admin chat ID only once
+    adminChatIdsToNotify.forEach(adminChatId => {
         let alertMessage;
         if (reason === 'rapid_done') {
             alertMessage = `${t(adminChatId, 'cheating_detected')}\n\n` +
@@ -212,24 +226,6 @@ function alertAdminsAboutCheating(userId, userName, reason, details) {
         
         console.log(`🚨 Sending cheating alert to admin: ${adminChatId}`);
         sendMessage(adminChatId, alertMessage);
-    });
-    
-    // Also send to authorized users who are admins
-    [...authorizedUsers, ...admins].forEach(user => {
-        let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
-        if (userChatId && admins.has(user)) {
-            let alertMessage;
-            if (reason === 'rapid_done') {
-                alertMessage = `${t(userChatId, 'cheating_detected')}\n\n` +
-                    `${t(userChatId, 'rapid_done_alert', {user: userName, userId: userId, time: timeString, lastDone: details.lastDone})}`;
-            } else if (reason === 'rapid_swap') {
-                alertMessage = `${t(userChatId, 'cheating_detected')}\n\n` +
-                    `${t(userChatId, 'rapid_swap_alert', {user: userName, userId: userId, time: timeString, swapCount: details.swapCount})}`;
-            }
-            
-            console.log(`🚨 Sending cheating alert to admin user: ${user}`);
-            sendMessage(userChatId, alertMessage);
-        }
     });
 }
 
