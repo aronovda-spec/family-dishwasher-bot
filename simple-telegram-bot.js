@@ -408,6 +408,7 @@ const translations = {
         'force_swap': '⚡ Force Swap',
         'apply_punishment': '⚖️ Apply Punishment',
         'dishwasher_alert': '🚨 Dishwasher Alert!',
+        'dishwasher_started': '🏁 Dishwasher Started!',
         'swap': '🔄 Swap',
         'request_punishment': '⚖️ Request Punishment',
         'language_switch': '🇮🇱 עברית',
@@ -436,6 +437,7 @@ const translations = {
         'your_queue_position': '👤 **Your queue position:**',
         'please_wait_turn': '⏳ Please wait for your turn.',
         'dishwasher_alert_sent': '✅ **Dishwasher Alert Sent!**',
+        'dishwasher_started_sent': '✅ **Dishwasher Started Notification Sent!**',
         'alerted_user': '👤 **Alerted:**',
         'sent_to_all': '📢 **Sent to:** All authorized users and admins',
         'swap_request_sent': '✅ **Swap request sent to admins!**',
@@ -516,6 +518,7 @@ const translations = {
         
         // Dishwasher alert messages
         'dishwasher_alert_message': '🚨 **DISHWASHER ALERT!** 🚨\n\n👤 **It\'s {user}\'s turn!**\n⏰ **Time to do the dishes!**\n\n📢 **Reminder sent by:** {sender}',
+        'dishwasher_started_message': '🏁 **DISHWASHER STARTED!** 🏁\n\n👤 **Next turn:** {user}\n⏰ **Dishwasher is now running!**\n\n📢 **Started by:** {sender}',
         
         // Admin management messages
         'current_admins': '👨‍💼 **Current Admins:**\n\n{adminList}\n\n📊 **Total admins:** {count}',
@@ -692,6 +695,7 @@ const translations = {
         'force_swap': '⚡ החלף בכוח',
         'apply_punishment': '⚖️ הפעל עונש',
         'dishwasher_alert': '🚨 התראת כלים!',
+        'dishwasher_started': '🏁 כלים התחילו!',
         'swap': '🔄 החלף',
         'request_punishment': '⚖️ בקש עונש',
         'language_switch': '🇺🇸 English',
@@ -720,6 +724,7 @@ const translations = {
         'your_queue_position': '👤 **המיקום שלך בתור:**',
         'please_wait_turn': '⏳ אנא המתן לתורך.',
         'dishwasher_alert_sent': '✅ **התראת כלים נשלחה!**',
+        'dishwasher_started_sent': '✅ **הודעת התחלת כלים נשלחה!**',
         'alerted_user': '👤 **הותרע:**',
         'sent_to_all': '📢 **נשלח אל:** כל המשתמשים והמנהלים',
         'swap_request_sent': '✅ **בקשת החלפה נשלחה למנהלים!**',
@@ -800,6 +805,7 @@ const translations = {
         
         // Dishwasher alert messages
         'dishwasher_alert_message': '🚨 **התראת כלים!** 🚨\n\n👤 **זה התור של {user}!**\n⏰ **זמן לעשות כלים!**\n\n📢 **התזכורת נשלחה על ידי:** {sender}',
+        'dishwasher_started_message': '🏁 **כלים התחילו!** 🏁\n\n👤 **התור הבא:** {user}\n⏰ **מדיח הכלים פועל כעת!**\n\n📢 **הותחל על ידי:** {sender}',
         
         // Admin management messages
         'current_admins': '👨‍💼 **מנהלים נוכחיים:**\n\n{adminList}\n\n📊 **סך מנהלים:** {count}',
@@ -1177,7 +1183,8 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'apply_punishment'), callback_data: "apply_punishment_menu" }
                 ],
                 [
-                    { text: t(userId, 'dishwasher_alert'), callback_data: "dishwasher_alert" }
+                    { text: t(userId, 'dishwasher_alert'), callback_data: "dishwasher_alert" },
+                    { text: t(userId, 'dishwasher_started'), callback_data: "dishwasher_started" }
                 ],
                 [
                     { text: t(userId, 'create_announcement'), callback_data: "create_announcement" },
@@ -1913,6 +1920,50 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Send confirmation to admin
         sendMessage(chatId, `${t(userId, 'dishwasher_alert_sent')}\n\n${t(userId, 'alerted_user')} ${currentUser}\n${t(userId, 'sent_to_all')}`);
+        
+    } else if (data === 'dishwasher_started') {
+        console.log(`🔍 DEBUG - Dishwasher started handler triggered by ${userName} (${userId})`);
+        
+        // Check if this is an admin
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        console.log(`🔍 DEBUG - Is admin check: ${isAdmin} (userName: ${userName}, userId: ${userId})`);
+        
+        if (!isAdmin) {
+            console.log(`🔍 DEBUG - Access denied for ${userName}`);
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        // Get next turn user (after current turn)
+        const nextUser = queue[(currentTurn + 1) % queue.length];
+        if (!nextUser) {
+            sendMessage(chatId, t(userId, 'no_one_in_queue'));
+            return;
+        }
+        
+        // Send notification to all authorized users and admins with their preferred language
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            if (userChatId && userChatId !== chatId) {
+                // Create started message in recipient's language
+                const startedMessage = t(userChatId, 'dishwasher_started_message', {user: nextUser, sender: userName});
+                console.log(`🔔 Sending dishwasher started notification to ${user} (${userChatId})`);
+                sendMessage(userChatId, startedMessage);
+            }
+        });
+        
+        // Also notify admins using adminChatIds (in case they're not in userChatIds)
+        adminChatIds.forEach(adminChatId => {
+            if (adminChatId !== chatId) {
+                // Create started message in admin's language
+                const adminStartedMessage = t(adminChatId, 'dishwasher_started_message', {user: nextUser, sender: userName});
+                console.log(`🔔 Sending dishwasher started notification to admin chat ID: ${adminChatId}`);
+                sendMessage(adminChatId, adminStartedMessage);
+            }
+        });
+        
+        // Send confirmation to admin
+        sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${nextUser}\n${t(userId, 'sent_to_all')}`);
         
     } else if (data === 'authorize_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
