@@ -440,6 +440,7 @@ const translations = {
         'dishwasher_started_sent': '✅ **Dishwasher Started Notification Sent!**',
         'alerted_user': '👤 **Alerted:**',
         'sent_to_all': '📢 **Sent to:** All authorized users and admins',
+        'auto_timer': 'Auto-Timer',
         'swap_request_sent': '✅ **Swap request sent to admins!**',
         'punishment_request_sent': '✅ **Punishment request sent to admins!**',
         'target_user': '🎯 **Target:**',
@@ -727,6 +728,7 @@ const translations = {
         'dishwasher_started_sent': '✅ **הודעת התחלת כלים נשלחה!**',
         'alerted_user': '👤 **הותרע:**',
         'sent_to_all': '📢 **נשלח אל:** כל המשתמשים והמנהלים',
+        'auto_timer': 'טיימר אוטומטי',
         'swap_request_sent': '✅ **בקשת החלפה נשלחה למנהלים!**',
         'punishment_request_sent': '✅ **בקשת עונש נשלחה למנהלים!**',
         'target_user': '🎯 **יעד:**',
@@ -1995,7 +1997,7 @@ function handleCallback(chatId, userId, userName, data) {
                 [...authorizedUsers, ...admins].forEach(user => {
                     let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                     if (userChatId) {
-                        const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: currentUser, sender: 'Auto-Timer'});
+                        const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: currentUser, sender: t(userChatId, 'auto_timer')});
                         console.log(`🔔 Sending auto dishwasher alert to ${user} (${userChatId})`);
                         sendMessage(userChatId, alertMessage);
                     }
