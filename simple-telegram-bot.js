@@ -518,7 +518,7 @@ const translations = {
         
         // Dishwasher alert messages
         'dishwasher_alert_message': '🚨 **DISHWASHER ALERT!** 🚨\n\n👤 **It\'s {user}\'s turn!**\n⏰ **Time to do the dishes!**\n\n📢 **Reminder sent by:** {sender}',
-        'dishwasher_started_message': '🏁 **DISHWASHER STARTED!** 🏁\n\n👤 **Next turn:** {user}\n⏰ **Dishwasher is now running!**\n\n📢 **Started by:** {sender}',
+        'dishwasher_started_message': '🏁 **DISHWASHER STARTED!** 🏁\n\n👤 **Currently doing dishes:** {user}\n⏰ **Dishwasher is now running!**\n\n📢 **Started by:** {sender}',
         
         // Admin management messages
         'current_admins': '👨‍💼 **Current Admins:**\n\n{adminList}\n\n📊 **Total admins:** {count}',
@@ -805,7 +805,7 @@ const translations = {
         
         // Dishwasher alert messages
         'dishwasher_alert_message': '🚨 **התראת כלים!** 🚨\n\n👤 **זה התור של {user}!**\n⏰ **זמן לעשות כלים!**\n\n📢 **התזכורת נשלחה על ידי:** {sender}',
-        'dishwasher_started_message': '🏁 **מדיח התחיל!** 🏁\n\n👤 **התור הבא:** {user}\n⏰ **מדיח הכלים פועל כעת!**\n\n📢 **הותחל על ידי:** {sender}',
+        'dishwasher_started_message': '🏁 **מדיח התחיל!** 🏁\n\n👤 **כרגע עושה כלים:** {user}\n⏰ **מדיח הכלים פועל כעת!**\n\n📢 **הותחל על ידי:** {sender}',
         
         // Admin management messages
         'current_admins': '👨‍💼 **מנהלים נוכחיים:**\n\n{adminList}\n\n📊 **סך מנהלים:** {count}',
@@ -1934,9 +1934,9 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        // Get next turn user (after current turn)
-        const nextUser = queue[(currentTurn + 1) % queue.length];
-        if (!nextUser) {
+        // Get current user doing the dishes
+        const currentUser = queue[currentTurn];
+        if (!currentUser) {
             sendMessage(chatId, t(userId, 'no_one_in_queue'));
             return;
         }
@@ -1946,7 +1946,7 @@ function handleCallback(chatId, userId, userName, data) {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId) {
                 // Create started message in recipient's language
-                const startedMessage = t(userChatId, 'dishwasher_started_message', {user: nextUser, sender: userName});
+                const startedMessage = t(userChatId, 'dishwasher_started_message', {user: currentUser, sender: userName});
                 console.log(`🔔 Sending dishwasher started notification to ${user} (${userChatId})`);
                 sendMessage(userChatId, startedMessage);
             }
@@ -1963,7 +1963,7 @@ function handleCallback(chatId, userId, userName, data) {
         });
         
         // Send confirmation to admin
-        sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${nextUser}\n${t(userId, 'sent_to_all')}`);
+        sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${currentUser}\n${t(userId, 'sent_to_all')}`);
         
     } else if (data === 'authorize_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
