@@ -2059,7 +2059,7 @@ function handleCallback(chatId, userId, userName, data) {
         adminChatIds.forEach(adminChatId => {
             if (adminChatId !== chatId) {
                 // Create started message in admin's language
-                const adminStartedMessage = t(adminChatId, 'dishwasher_started_message', {user: nextUser, sender: userName});
+                const adminStartedMessage = t(adminChatId, 'dishwasher_started_message', {user: currentUser, sender: userName});
                 console.log(`🔔 Sending dishwasher started notification to admin chat ID: ${adminChatId}`);
                 sendMessage(adminChatId, adminStartedMessage);
             }

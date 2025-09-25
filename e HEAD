@@ -1,0 +1,36 @@
+[33mcommit 49e6f4c4fc626cc2ef4755703523dcfc213bbbde[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: daniel.aronov@dfmpower.com <daniel.aronov@dfmpower.com>
+Date:   Wed Sep 24 20:12:30 2025 +0300
+
+    Fix DONE rate limiting to send alert for each DONE within 30 minutes
+    
+    Issue Fixed:
+    - DONE rate limiting was only sending 1 alert total per 30-minute window
+    - Should send 1 alert for EACH DONE within 30 minutes (different users)
+    - Current logic had alertSent flag that prevented multiple alerts
+    
+    Root Cause:
+    - Used global alertSent flag that blocked subsequent alerts
+    - Only tracked one global lastDone timestamp
+    - Different users pressing DONE should each trigger separate alerts
+    
+    Solution:
+    - Removed alertSent flag completely
+    - Each DONE within 30 minutes now triggers 1 alert
+    - Different users get separate alerts as intended
+    - Same user pressing DONE multiple times gets multiple alerts (as intended)
+    
+    Technical Changes:
+    - Removed alertSent flag and reset logic
+    - Simplified to: if (lastDone && within 30min)  send alert
+    - Each DONE now triggers exactly 1 alert (no duplicates)
+    - Maintains 30-minute window detection
+    
+    Behavior Now:
+    - User A presses DONE  1 alert
+    - User B presses DONE within 30min  1 alert (separate)
+    - User A presses DONE again within 30min  1 alert (separate)
+    - Total: 3 alerts for 3 DONE actions (correct)
+
+ simple-telegram-bot.js | 12 [32m+++[m[31m---------[m
+ 1 file changed, 3 insertions(+), 9 deletions(-)
