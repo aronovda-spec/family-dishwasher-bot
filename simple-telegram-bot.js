@@ -288,6 +288,48 @@ function getActiveDebtFavorCreditor(debtor) {
     return activeDebtFavors.get(debtor);
 }
 
+// Debt cancellation logic
+function checkAndCancelEqualDebts(user1, user2) {
+    console.log(`🔍 DEBUG - Checking debt cancellation between ${user1} and ${user2}`);
+    
+    // Check if user1 owes user2 and user2 owes user1
+    const user1OwesUser2 = hasDebtsOwedTo(user2) && getNextDebtorFor(user2) === user1;
+    const user2OwesUser1 = hasDebtsOwedTo(user1) && getNextDebtorFor(user1) === user2;
+    
+    console.log(`🔍 DEBUG - ${user1} owes ${user2}: ${user1OwesUser2}`);
+    console.log(`🔍 DEBUG - ${user2} owes ${user1}: ${user2OwesUser1}`);
+    
+    // Check if there are any debts between these two users
+    const hasDebtBetweenUsers = (hasDebtsOwedTo(user1) && getNextDebtorFor(user1) === user2) || 
+                               (hasDebtsOwedTo(user2) && getNextDebtorFor(user2) === user1);
+    
+    if (hasDebtBetweenUsers) {
+        // Cancel the existing debt(s) between these users
+        if (user1OwesUser2) {
+            repayDebt(user1, user2);
+            console.log(`💳 Cancelled debt: ${user1} no longer owes ${user2}`);
+        }
+        if (user2OwesUser1) {
+            repayDebt(user2, user1);
+            console.log(`💳 Cancelled debt: ${user2} no longer owes ${user1}`);
+        }
+        
+        // Clear any active debt favors between them
+        if (hasActiveDebtFavor(user1) && getActiveDebtFavorCreditor(user1) === user2) {
+            clearActiveDebtFavor(user1);
+        }
+        if (hasActiveDebtFavor(user2) && getActiveDebtFavorCreditor(user2) === user1) {
+            clearActiveDebtFavor(user2);
+        }
+        
+        console.log(`💳 Debt cancellation: ${user1} ↔ ${user2} - existing debt cancelled`);
+        return true; // Debts were cancelled
+    }
+    
+    console.log(`🔍 DEBUG - No debt cancellation between ${user1} and ${user2}`);
+    return false; // No cancellation occurred
+}
+
 function getActualPerformer(scheduledUser) {
     // Check if there's an active debt favor for the scheduled user
     if (hasActiveDebtFavor(scheduledUser)) {
@@ -2059,6 +2101,18 @@ function executeSwap(swapRequest, requestId, status) {
         const actualPerformer = getActualPerformer(scheduledUser);
         
         if (fromQueueName === actualPerformer) {
+            // Check for debt cancellation first
+            if (checkAndCancelEqualDebts(fromQueueName, toUser)) {
+                // Debts were cancelled - no new debts created
+                console.log(`💳 Swap cancelled debts: ${fromQueueName} ↔ ${toUser} - back to normal queue`);
+                
+                // Notify both users
+                const cancellationMessage = `✅ **Swap Completed - Debt Cancellation**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n💳 **Debt Cancellation:** Debts cancelled each other out\n\n🔄 **Status:** Back to normal queue`;
+                sendMessage(fromUserId, cancellationMessage);
+                sendMessage(toUserId, cancellationMessage);
+                return;
+            }
+            
             // Check if fromUser is currently repaying a debt (debtor performing creditor's turn)
             if (hasDebtsOwedTo(scheduledUser) && getNextDebtorFor(scheduledUser) === fromQueueName) {
                 // Clear the current debt repayment
@@ -2956,6 +3010,17 @@ function handleCallback(chatId, userId, userName, data) {
         const actualPerformer = getActualPerformer(scheduledUser);
         
         if (actualPerformer === firstUser) {
+            // Check for debt cancellation first
+            if (checkAndCancelEqualDebts(firstUser, secondUser)) {
+                // Debts were cancelled - no new debts created
+                console.log(`💳 Force swap cancelled debts: ${firstUser} ↔ ${secondUser} - back to normal queue`);
+                
+                // Notify admin
+                const adminMessage = `⚡ **${t(userId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n💳 **Debt Cancellation:** Debts cancelled each other out\n\n🔄 **Status:** Back to normal queue`;
+                sendMessage(chatId, adminMessage);
+                return;
+            }
+            
             // Check if firstUser is currently repaying a debt (debtor performing creditor's turn)
             if (hasDebtsOwedTo(scheduledUser) && getNextDebtorFor(scheduledUser) === firstUser) {
                 // Clear the current debt repayment
