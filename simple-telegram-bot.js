@@ -15,6 +15,10 @@ const botUrl = `https://api.telegram.org/bot${token}`;
 let currentTurn = 0;
 const queue = ['Eden', 'Adele', 'Emma'];
 
+// Debt/Credit system for swaps
+const debts = new Map(); // Map: creditor -> Array of debtors (FIFO)
+const debtHistory = new Map(); // Map: debtor -> Array of {creditor, timestamp, completed}
+
 // User management
 const admins = new Set(); // Set of admin user IDs
 const adminChatIds = new Set(); // Set of admin chat IDs for notifications
@@ -192,6 +196,92 @@ function reactivateUser(userName) {
 function advanceToNextUser() {
     currentTurn = (currentTurn + 1) % queue.length;
     return queue[currentTurn];
+}
+
+// Debt management functions
+function addDebt(debtor, creditor) {
+    if (!debts.has(creditor)) {
+        debts.set(creditor, []);
+    }
+    debts.get(creditor).push(debtor);
+    
+    // Track debt history
+    if (!debtHistory.has(debtor)) {
+        debtHistory.set(debtor, []);
+    }
+    debtHistory.get(debtor).push({
+        creditor: creditor,
+        timestamp: new Date(),
+        completed: false
+    });
+    
+    console.log(`💳 Debt created: ${debtor} owes ${creditor} (1 turn). Total debts for ${creditor}: ${debts.get(creditor).length}`);
+}
+
+function repayDebt(debtor, creditor) {
+    if (!debts.has(creditor)) return false;
+    
+    const creditorDebts = debts.get(creditor);
+    const debtorIndex = creditorDebts.indexOf(debtor);
+    
+    if (debtorIndex === -1) return false;
+    
+    // Remove the debt (FIFO - first in, first out)
+    creditorDebts.splice(debtorIndex, 1);
+    
+    // Mark debt as completed in history
+    if (debtHistory.has(debtor)) {
+        const history = debtHistory.get(debtor);
+        const debtRecord = history.find(record => 
+            record.creditor === creditor && !record.completed
+        );
+        if (debtRecord) {
+            debtRecord.completed = true;
+        }
+    }
+    
+    console.log(`✅ Debt repaid: ${debtor} repaid ${creditor}. Remaining debts for ${creditor}: ${creditorDebts.length}`);
+    return true;
+}
+
+function getDebtStatus() {
+    const status = {};
+    for (const [creditor, debtors] of debts.entries()) {
+        if (debtors.length > 0) {
+            status[creditor] = debtors.slice(); // Copy array
+        }
+    }
+    return status;
+}
+
+function hasDebtsOwedTo(creditor) {
+    return debts.has(creditor) && debts.get(creditor).length > 0;
+}
+
+function getNextDebtorFor(creditor) {
+    if (!hasDebtsOwedTo(creditor)) return null;
+    return debts.get(creditor)[0]; // FIFO - first debtor
+}
+
+function getActualPerformer(scheduledUser) {
+    // Check if the scheduled user owes any debts (someone should perform their turn)
+    for (const [creditor, debtors] of debts.entries()) {
+        if (debtors.includes(scheduledUser)) {
+            // The scheduled user owes a debt to this creditor
+            // The creditor should perform the scheduled user's turn
+            return creditor;
+        }
+    }
+    
+    // Check if someone owes the scheduled user a debt (someone should perform their turn)
+    if (hasDebtsOwedTo(scheduledUser)) {
+        const debtor = getNextDebtorFor(scheduledUser);
+        if (debtor) {
+            return debtor; // Debtor performs creditor's turn
+        }
+    }
+    
+    return scheduledUser; // Normal turn - scheduled user performs it
 }
 
 // Anti-cheating helper function
@@ -494,6 +584,15 @@ const translations = {
         'punishment_remaining': '⚖️ Punishment:',
         'extra_turns_remaining': 'extra turn(s) remaining.',
         
+        // Debt system messages
+        'debt_created': 'Debt Created',
+        'debt_repaid': 'Debt Repaid',
+        'active_debts': 'Active Debts',
+        'no_active_debts': 'No Active Debts',
+        'swap_error': 'Swap Error',
+        'only_scheduled_user_can_swap': 'Only the scheduled user can offer their turn',
+        'legacy_swaps_active': 'Legacy Swaps Active',
+        
         // More popup messages
         'force_swap_completed': '✅ **Force swap completed!**',
         'swap_users': '🔄 **{user1} ↔ {user2}**',
@@ -784,6 +883,15 @@ const translations = {
         'completed_turn': 'סיים את התור!',
         'punishment_remaining': '⚖️ עונש:',
         'extra_turns_remaining': 'תורות נוספים נותרו.',
+        
+        // Debt system messages
+        'debt_created': 'חוב נוצר',
+        'debt_repaid': 'חוב שולם',
+        'active_debts': 'חובות פעילים',
+        'no_active_debts': 'אין חובות פעילים',
+        'swap_error': 'שגיאת החלפה',
+        'only_scheduled_user_can_swap': 'רק המשתמש המתוזמן יכול להציע את התור שלו',
+        'legacy_swaps_active': 'החלפות ישנות פעילות',
         
         // More popup messages
         'force_swap_completed': '✅ **החלפה בכוח הושלמה!**',
@@ -1335,17 +1443,27 @@ function handleCommand(chatId, userId, userName, text) {
         // Show only the next 3 consecutive turns (current + next 2)
         for (let i = 0; i < 3; i++) {
             const turnIndex = (currentTurn + i) % queue.length;
-            const name = queue[turnIndex];
-            const royalName = addRoyalEmoji(name); // Add royal emoji
+            const scheduledUser = queue[turnIndex];
+            const actualPerformer = getActualPerformer(scheduledUser);
             const isCurrentTurn = i === 0;
             const turnIcon = isCurrentTurn ? '🔄' : '⏳';
             const turnText = isCurrentTurn ? ` ${t(userId, 'current_turn')}` : '';
             
+            // Format display: show actual performer, with scheduled user in parentheses if different
+            let displayName;
+            if (actualPerformer === scheduledUser) {
+                // Normal turn - scheduled user performs it
+                displayName = addRoyalEmoji(actualPerformer);
+            } else {
+                // Debt repayment - debtor performs creditor's turn
+                displayName = `${addRoyalEmoji(actualPerformer)} (${scheduledUser})`;
+            }
+            
             // Check if this queue member is authorized
-            const authorizedUser = queueUserMapping.get(name);
+            const authorizedUser = queueUserMapping.get(actualPerformer);
             const authText = authorizedUser ? ` (${authorizedUser})` : ` ${t(userId, 'not_authorized_user')}`;
             
-            statusMessage += `${turnIcon} ${i + 1}. ${royalName}${turnText}${authText}\n`;
+            statusMessage += `${turnIcon} ${i + 1}. ${displayName}${turnText}${authText}\n`;
         }
         
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
@@ -1379,19 +1497,31 @@ function handleCommand(chatId, userId, userName, text) {
             });
         }
         
-        // Show active temporary swaps information
+        // Show debt information
+        const debtStatus = getDebtStatus();
+        const creditorsWithDebts = Object.keys(debtStatus);
+        
+        if (creditorsWithDebts.length > 0) {
+            statusMessage += `\n\n💳 **${t(userId, 'active_debts')}**`;
+            creditorsWithDebts.forEach(creditor => {
+                const debtors = debtStatus[creditor];
+                statusMessage += `\n• ${creditor} is owed by: ${debtors.join(', ')} (${debtors.length} turn${debtors.length > 1 ? 's' : ''})`;
+            });
+        } else {
+            statusMessage += `\n\n✅ **${t(userId, 'no_active_debts')}**`;
+        }
+        
+        // Show active temporary swaps information (legacy - now using debt system)
         if (global.tempSwaps && global.tempSwaps.size > 0) {
             const activeSwaps = Array.from(global.tempSwaps.entries()).filter(([id, swap]) => swap.isActive);
             
             if (activeSwaps.length > 0) {
-                statusMessage += `\n\n⚠️ **${t(userId, 'temporary_swaps_active')}**`;
+                statusMessage += `\n\n⚠️ **${t(userId, 'legacy_swaps_active')}**`;
                 activeSwaps.forEach(([swapId, swap]) => {
                     const swapTypeText = swap.swapType === 'force_swap' ? t(userId, 'force_swap_type') : t(userId, 'user_swap_type');
                     statusMessage += `\n• ${swap.firstUser} ↔ ${swap.secondUser} (${swapTypeText}) - ${t(userId, 'reverts_when_completes', {user: swap.originalCurrentTurnUser})}`;
                 });
             }
-        } else {
-            statusMessage += `\n\n✅ **${t(userId, 'no_active_swaps')}**`;
         }
         
         sendMessage(chatId, statusMessage);
@@ -1420,6 +1550,20 @@ function handleCommand(chatId, userId, userName, text) {
         if (isAdmin) {
             // Admin "Done" - Admin takes over dishwasher duty
             const currentUser = queue[currentTurn];
+            let actualPerformer = currentUser; // Who actually performed the turn
+            let debtRepaid = false;
+            
+            // Check if this is a debt repayment turn
+            if (hasDebtsOwedTo(currentUser)) {
+                const debtor = getNextDebtorFor(currentUser);
+                if (debtor) {
+                    // Debt repayment: debtor performs creditor's turn
+                    actualPerformer = debtor;
+                    repayDebt(debtor, currentUser);
+                    debtRepaid = true;
+                    console.log(`💳 Debt repayment: ${debtor} performed ${currentUser}'s turn`);
+                }
+            }
             
             // Check if this was a punishment turn and remove it BEFORE advancing
             const punishmentTurnsRemaining = punishmentTurns.get(currentUser) || 0;
@@ -1441,37 +1585,21 @@ function handleCommand(chatId, userId, userName, text) {
             }
             
             // Update statistics for the user who completed their turn
-            updateUserStatistics(currentUser);
-            
-            // Check for temporary swap reversion - check ALL active swaps
-            if (global.tempSwaps && global.tempSwaps.size > 0) {
-                for (const [swapId, tempSwap] of global.tempSwaps.entries()) {
-                    if (tempSwap.isActive && currentUser === tempSwap.originalCurrentTurnUser) {
-                        // Revert this specific temporary swap
-                        const firstIndex = queue.indexOf(tempSwap.firstUser);
-                        const secondIndex = queue.indexOf(tempSwap.secondUser);
-                        
-                        if (firstIndex !== -1 && secondIndex !== -1) {
-                            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-                            console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser} (${tempSwap.swapType})`);
-                            console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
-                        }
-                        
-                        // Mark this swap as inactive and remove it
-                        tempSwap.isActive = false;
-                        global.tempSwaps.delete(swapId);
-                    }
-                }
-            }
+            updateUserStatistics(actualPerformer);
             
             const nextUser = queue[currentTurn];
             
-            const adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
+            let adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
                 `${t(userId, 'admin_completed_duty', {admin: userName})}\n` +
-                `${t(userId, 'helped_user', {user: currentUser})}\n` +
+                `${t(userId, 'helped_user', {user: actualPerformer})}\n` +
                 `${t(userId, 'next_turn', {user: nextUser})}` +
-                (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '') +
-                `\n\n${t(userId, 'admin_can_apply_punishment', {user: currentUser})}`;
+                (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
+            
+            if (debtRepaid) {
+                adminDoneMessage += `\n💳 **${t(userId, 'debt_repaid')}:** ${actualPerformer} repaid ${currentUser}`;
+            }
+            
+            adminDoneMessage += `\n\n${t(userId, 'admin_can_apply_punishment', {user: actualPerformer})}`;
             
             // Send confirmation to admin
             sendMessage(chatId, adminDoneMessage);
@@ -1483,12 +1611,17 @@ function handleCommand(chatId, userId, userName, text) {
                 
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
-                    const userDoneMessage = `${t(userChatId, 'admin_intervention')}\n\n` +
+                    let userDoneMessage = `${t(userChatId, 'admin_intervention')}\n\n` +
                         `${t(userChatId, 'admin_completed_duty', {admin: userName})}\n` +
-                        `${t(userChatId, 'helped_user', {user: currentUser})}\n` +
+                        `${t(userChatId, 'helped_user', {user: actualPerformer})}\n` +
                         `${t(userChatId, 'next_turn', {user: nextUser})}` +
-                        (punishmentTurnsRemaining > 0 ? `\n${t(userChatId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '') +
-                        `\n\n${t(userChatId, 'admin_can_apply_punishment', {user: currentUser})}`;
+                        (punishmentTurnsRemaining > 0 ? `\n${t(userChatId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
+                    
+                    if (debtRepaid) {
+                        userDoneMessage += `\n💳 **${t(userChatId, 'debt_repaid')}:** ${actualPerformer} repaid ${currentUser}`;
+                    }
+                    
+                    userDoneMessage += `\n\n${t(userChatId, 'admin_can_apply_punishment', {user: actualPerformer})}`;
                     
                     console.log(`🔔 Sending admin DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, userDoneMessage);
@@ -1513,9 +1646,23 @@ function handleCommand(chatId, userId, userName, text) {
             
             const currentUser = queue[currentTurn];
             const userQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
+            let actualPerformer = currentUser; // Who actually performed the turn
+            let debtRepaid = false;
             
-            // Check if it's actually their turn
-            if (userQueueName !== currentUser) {
+            // Check if this is a debt repayment turn
+            if (hasDebtsOwedTo(currentUser)) {
+                const debtor = getNextDebtorFor(currentUser);
+                if (debtor) {
+                    // Debt repayment: debtor performs creditor's turn
+                    actualPerformer = debtor;
+                    repayDebt(debtor, currentUser);
+                    debtRepaid = true;
+                    console.log(`💳 Debt repayment: ${debtor} performed ${currentUser}'s turn`);
+                }
+            }
+            
+            // Check if it's actually their turn (for normal turns, not debt repayments)
+            if (!debtRepaid && userQueueName !== currentUser) {
                 sendMessage(chatId, `${t(userId, 'not_your_turn')}\n\n${t(userId, 'current_turn_user')} ${currentUser}\n${t(userId, 'your_queue_position')} ${userQueueName}\n\n${t(userId, 'please_wait_turn')}`);
                 return;
             }
@@ -1540,35 +1687,18 @@ function handleCommand(chatId, userId, userName, text) {
             }
             
             // Update statistics for the user who completed their turn
-            updateUserStatistics(currentUser);
-            
-            // Check for temporary swap reversion - check ALL active swaps
-            if (global.tempSwaps && global.tempSwaps.size > 0) {
-                for (const [swapId, tempSwap] of global.tempSwaps.entries()) {
-                    if (tempSwap.isActive && currentUser === tempSwap.originalCurrentTurnUser) {
-                        // Revert this specific temporary swap
-                        const firstIndex = queue.indexOf(tempSwap.firstUser);
-                        const secondIndex = queue.indexOf(tempSwap.secondUser);
-                        
-                        if (firstIndex !== -1 && secondIndex !== -1) {
-                            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-                            console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser} (${tempSwap.swapType})`);
-                            console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
-                        }
-                        
-                        // Mark this swap as inactive and remove it
-                        tempSwap.isActive = false;
-                        global.tempSwaps.delete(swapId);
-                    }
-                }
-            }
+            updateUserStatistics(actualPerformer);
             
             const nextUser = queue[currentTurn];
             
-            const doneMessage = `${t(userId, 'turn_completed')}\n\n` +
-                `${t(userId, 'completed_by', {user: currentUser})}\n` +
+            let doneMessage = `${t(userId, 'turn_completed')}\n\n` +
+                `${t(userId, 'completed_by', {user: actualPerformer})}\n` +
                 `${t(userId, 'next_turn', {user: nextUser})}` +
                 (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
+            
+            if (debtRepaid) {
+                doneMessage += `\n💳 **${t(userId, 'debt_repaid')}:** ${actualPerformer} repaid ${currentUser}`;
+            }
             
             // Notify all authorized users and admins in their language
             [...authorizedUsers, ...admins].forEach(user => {
@@ -1577,10 +1707,14 @@ function handleCommand(chatId, userId, userName, text) {
                 
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
-                    const userDoneMessage = `${t(userChatId, 'turn_completed')}\n\n` +
-                        `${t(userChatId, 'completed_by', {user: currentUser})}\n` +
+                    let userDoneMessage = `${t(userChatId, 'turn_completed')}\n\n` +
+                        `${t(userChatId, 'completed_by', {user: actualPerformer})}\n` +
                         `${t(userChatId, 'next_turn', {user: nextUser})}` +
                         (punishmentTurnsRemaining > 0 ? `\n${t(userChatId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
+                    
+                    if (debtRepaid) {
+                        userDoneMessage += `\n💳 **${t(userChatId, 'debt_repaid')}:** ${actualPerformer} repaid ${currentUser}`;
+                    }
                     
                     console.log(`🔔 Sending user DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, userDoneMessage);
@@ -1834,7 +1968,7 @@ function reportUser(targetUser, reason, reportedBy) {
     console.log(`📢 Punishment request for ${targetUser}: ${reason} (by ${reportedBy})`);
 }
 
-// Execute approved swap
+// Execute approved swap (now creates debt instead of swapping positions)
 function executeSwap(swapRequest, requestId, status) {
     const { fromUser, toUser, fromUserId, toUserId } = swapRequest;
     
@@ -1877,84 +2011,40 @@ function executeSwap(swapRequest, requestId, status) {
     console.log(`🔍 To user: ${toUser} → Index: ${toIndex}`);
     
     if (fromIndex !== -1 && toIndex !== -1) {
-        // Capture the original current turn user BEFORE the swap
-        const originalCurrentTurnUser = queue[currentTurn];
-        
-        // Swap positions in queue
-        [queue[fromIndex], queue[toIndex]] = [queue[toIndex], queue[fromIndex]];
-        
-        // Update current turn if needed
-        // IMPORTANT: currentTurn should follow the user who had the turn to their new position
-        console.log(`🔍 DEBUG - Before currentTurn update: currentTurn=${currentTurn}, fromIndex=${fromIndex}, toIndex=${toIndex}`);
-        if (currentTurn === fromIndex) {
-            currentTurn = toIndex;  // The user who had the turn is now at toIndex
-            console.log(`🔍 DEBUG - Updated currentTurn from ${fromIndex} to ${toIndex} (followed fromUser)`);
-        } else if (currentTurn === toIndex) {
-            currentTurn = fromIndex;  // The user who had the turn is now at fromIndex
-            console.log(`🔍 DEBUG - Updated currentTurn from ${toIndex} to ${fromIndex} (followed toUser)`);
-        } else {
-            console.log(`🔍 DEBUG - No currentTurn update needed (currentTurn=${currentTurn} not involved in swap)`);
-        }
-        console.log(`🔍 DEBUG - After currentTurn update: currentTurn=${currentTurn}`);
-        
-        // FIX: After swapping, we need to update currentTurn to reflect the new positions
-        // The user who was at currentTurn position before the swap should now be at their new position
+        // NEW DEBT SYSTEM: Create debt instead of swapping positions
+        // Only the scheduled user (fromUser) can offer their turn
         if (fromIndex === currentTurn) {
-            // The user who had the current turn (fromUser) is now at toIndex
-            currentTurn = toIndex;
-        } else if (toIndex === currentTurn) {
-            // The user who had the current turn (toUser) is now at fromIndex  
-            currentTurn = fromIndex;
-        }
-        // If currentTurn was not involved in the swap, it stays the same
-        console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
-        
-        // TEMPORARY SWAP: Mark this as a temporary swap that will revert after the original current turn person completes their turn
-        const tempSwap = {
-            firstUser: fromQueueName,
-            secondUser: toUser,
-            originalCurrentTurnUser: originalCurrentTurnUser, // Who was originally at current turn position
-            isActive: true,
-            swapType: 'user_swap'
-        };
-        
-        // Store the temporary swap info with unique ID
-        if (!global.tempSwaps) global.tempSwaps = new Map();
-        const swapId = `user_swap_${Date.now()}`;
-        global.tempSwaps.set(swapId, tempSwap);
-        
-        console.log(`🔍 DEBUG - Temporary swap stored: ${fromQueueName}↔${toUser} (will revert when ${tempSwap.originalCurrentTurnUser} completes their turn)`);
-        
-        // Notify both users in their language
-        // Create queue starting from current turn
-        const currentTurnUser = queue[currentTurn];
-        const queueFromCurrentTurn = [...queue.slice(currentTurn), ...queue.slice(0, currentTurn)];
-        const queueDisplay = queueFromCurrentTurn.map((name, index) => {
-            const actualIndex = (currentTurn + index) % queue.length;
-            const isCurrentTurn = actualIndex === currentTurn;
-            return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`;
-        }).join('\n');
-        
-        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n🔄 **${t(fromUserId, 'next_lap')}:**\n${queueDisplay}`;
-        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n🔄 **${t(toUserId, 'next_lap')}:**\n${queueDisplay}`;
-        
-        sendMessage(fromUserId, fromUserMessage);
-        sendMessage(toUserId, toUserMessage);
-        
-        // Notify all other authorized users and admins using userChatIds in their language
-        [...authorizedUsers, ...admins].forEach(user => {
-            if (user !== fromUser && user !== toUser) {
-                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
-                if (userChatId) {
-                    // Create swap notification in recipient's language
-                    const swapNotification = `🔄 **${t(userChatId, 'queue_update')}:** ${fromUser} ↔ ${toUser} ${t(userChatId, 'swapped_positions')}!`;
-                    console.log(`🔔 Sending swap approval notification to ${user} (${userChatId})`);
-                    sendMessage(userChatId, swapNotification);
-                } else {
-                    console.log(`🔔 No chat ID found for ${user}`);
+            // Create debt: fromUser owes toUser (1 turn)
+            addDebt(fromQueueName, toUser);
+            
+            console.log(`💳 Debt created: ${fromQueueName} owes ${toUser} (1 turn)`);
+            
+            // Notify both users in their language
+            const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n💳 **${t(fromUserId, 'debt_created')}:** ${fromUser} owes ${toUser} (1 turn)\n\n🔄 **${t(fromUserId, 'next_turn')}:** ${toUser}`;
+            const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n💳 **${t(toUserId, 'debt_created')}:** ${fromUser} owes ${toUser} (1 turn)\n\n🔄 **${t(toUserId, 'next_turn')}:** ${toUser}`;
+            
+            sendMessage(fromUserId, fromUserMessage);
+            sendMessage(toUserId, toUserMessage);
+            
+            // Notify all other authorized users and admins using userChatIds in their language
+            [...authorizedUsers, ...admins].forEach(user => {
+                if (user !== fromUser && user !== toUser) {
+                    let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                    if (userChatId) {
+                        // Create swap notification in recipient's language
+                        const swapNotification = `🔄 **${t(userChatId, 'queue_update')}:** ${fromUser} ↔ ${toUser} ${t(userChatId, 'swapped_positions')}!\n💳 **${t(userChatId, 'debt_created')}:** ${fromUser} owes ${toUser} (1 turn)`;
+                        console.log(`🔔 Sending swap approval notification to ${user} (${userChatId})`);
+                        sendMessage(userChatId, swapNotification);
+                    } else {
+                        console.log(`🔔 No chat ID found for ${user}`);
+                    }
                 }
-            }
-        });
+            });
+        } else {
+            // Not the scheduled user's turn - cannot swap
+            const errorMessage = `❌ **${t(fromUserId, 'swap_error')}**\n\n${t(fromUserId, 'only_scheduled_user_can_swap')}\n\n${t(fromUserId, 'current_turn_user')} ${queue[currentTurn]}`;
+            sendMessage(fromUserId, errorMessage);
+        }
     }
     
     // Remove the request
@@ -2788,123 +2878,37 @@ function handleCallback(chatId, userId, userName, data) {
         const firstUser = dataWithoutPrefix.substring(0, lastUnderscoreIndex);
         const secondUser = dataWithoutPrefix.substring(lastUnderscoreIndex + 1);
         
-        // Execute immediate swap
-        const firstIndex = queue.indexOf(firstUser);
-        const secondIndex = queue.indexOf(secondUser);
-        
         console.log(`🔍 DEBUG - Force swap: ${firstUser} ↔ ${secondUser}`);
         console.log(`🔍 DEBUG - Current queue: [${queue.join(', ')}]`);
-        console.log(`🔍 DEBUG - First user "${firstUser}" found at index: ${firstIndex}`);
-        console.log(`🔍 DEBUG - Second user "${secondUser}" found at index: ${secondIndex}`);
+        console.log(`🔍 DEBUG - Current turn: ${currentTurn}`);
         
-        if (firstIndex !== -1 && secondIndex !== -1) {
-            // Initialize anti-cheating tracking for swaps
-            if (!global.swapTimestamps) global.swapTimestamps = [];
+        // NEW DEBT SYSTEM: Force swap creates debt instead of swapping positions
+        // Only the scheduled user (firstUser) can be force swapped
+        if (queue[currentTurn] === firstUser) {
+            // Create debt: firstUser owes secondUser (1 turn)
+            addDebt(firstUser, secondUser);
             
-            // Check for rapid swap activity (3+ swaps in 10 minutes)
-            const now = Date.now();
-            const tenMinutesAgo = now - (10 * 60 * 1000);
+            console.log(`💳 Force swap debt created: ${firstUser} owes ${secondUser} (1 turn)`);
             
-            // Remove old timestamps (older than 10 minutes)
-            global.swapTimestamps = global.swapTimestamps.filter(timestamp => timestamp > tenMinutesAgo);
+            // Notify admin
+            const adminMessage = `⚡ **${t(userId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n💳 **${t(userId, 'debt_created')}:** ${firstUser} owes ${secondUser} (1 turn)\n\n🔄 **${t(userId, 'next_turn')}:** ${secondUser}`;
+            sendMessage(chatId, adminMessage);
             
-            // Add current swap timestamp
-            global.swapTimestamps.push(now);
-            
-            // Check if we have 3+ swaps in 10 minutes
-            if (global.swapTimestamps.length >= 3) {
-                // Only send alert if we haven't already alerted for this rapid swap session
-                if (!global.swapTimestamps.alertSent) {
-                    alertAdminsAboutCheating(userId, userName, 'rapid_swap', { swapCount: global.swapTimestamps.length });
-                    global.swapTimestamps.alertSent = true;
-                    console.log(`🚨 RAPID SWAP DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
-                }
-            } else {
-                // Reset alert flag when swap count drops below threshold
-                global.swapTimestamps.alertSent = false;
-            }
-            
-            // Capture the original current turn user BEFORE the swap
-            const originalCurrentTurnUser = queue[currentTurn];
-            
-            // Swap positions in queue
-            console.log(`🔍 DEBUG - Before swap: queue[${firstIndex}] = "${queue[firstIndex]}", queue[${secondIndex}] = "${queue[secondIndex]}"`);
-            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-            console.log(`🔍 DEBUG - After swap: queue[${firstIndex}] = "${queue[firstIndex]}", queue[${secondIndex}] = "${queue[secondIndex]}"`);
-            console.log(`🔍 DEBUG - After swap: [${queue.join(', ')}]`);
-            
-            // Verify the swap actually happened
-            console.log(`🔍 DEBUG - Queue reference check: queue === global queue? ${queue === global.queue || 'No global.queue'}`);
-            
-            // Check if queue is being reset somewhere
-            setTimeout(() => {
-                console.log(`🔍 DEBUG - Queue after 100ms: [${queue.join(', ')}]`);
-            }, 100);
-            
-            // Update current turn if needed
-            // IMPORTANT: currentTurn should follow the user who had the turn to their new position
-            if (currentTurn === firstIndex) {
-                currentTurn = secondIndex;  // The user who had the turn is now at secondIndex
-            } else if (currentTurn === secondIndex) {
-                currentTurn = firstIndex;  // The user who had the turn is now at firstIndex
-            }
-            // Note: If currentTurn was not involved in the swap, it stays the same
-            // This means the current turn person remains the same, just their position in queue changes
-            
-            console.log(`🔍 DEBUG - After currentTurn update: currentTurn=${currentTurn}`);
-            
-            // FIX: After swapping, we need to update currentTurn to reflect the new positions
-            // The user who was at currentTurn position before the swap should now be at their new position
-            if (firstIndex === currentTurn) {
-                // The user who had the current turn (firstUser) is now at secondIndex
-                currentTurn = secondIndex;
-            } else if (secondIndex === currentTurn) {
-                // The user who had the current turn (secondUser) is now at firstIndex  
-                currentTurn = firstIndex;
-            }
-            // If currentTurn was not involved in the swap, it stays the same
-            console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
-            
-            // TEMPORARY SWAP: Mark this as a temporary swap that will revert after the original current turn person completes their turn
-            const tempSwap = {
-                firstUser: firstUser,
-                secondUser: secondUser,
-                originalCurrentTurnUser: originalCurrentTurnUser, // Who was originally at current turn position
-                isActive: true,
-                swapType: 'force_swap'
-            };
-            
-            // Store the temporary swap info with unique ID
-            if (!global.tempSwaps) global.tempSwaps = new Map();
-            const swapId = `force_swap_${Date.now()}`;
-            global.tempSwaps.set(swapId, tempSwap);
-            
-            console.log(`🔍 DEBUG - Temporary swap stored: ${firstUser}↔${secondUser} (will revert when ${tempSwap.originalCurrentTurnUser} completes their turn)`);
-            
-            // Notify all users in their language
+            // Notify all authorized users and admins
             [...authorizedUsers, ...admins].forEach(user => {
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
-                if (userChatId && userChatId !== chatId) { // Don't notify the admin who performed the swap
-                    // Create queue starting from current turn
-                    const queueFromCurrentTurn = [...queue.slice(currentTurn), ...queue.slice(0, currentTurn)];
-                    const queueDisplay = queueFromCurrentTurn.map((name, index) => {
-                        const actualIndex = (currentTurn + index) % queue.length;
-                        const isCurrentTurn = actualIndex === currentTurn;
-                        return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(userChatId, 'current_turn_status')})` : ''}`;
-                    }).join('\n');
-                    
-                    // Create message in recipient's language
-                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n🔄 **${t(userChatId, 'next_lap')}:**\n${queueDisplay}`;
+                if (userChatId && userChatId !== chatId) {
+                    const userMessage = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n💳 **${t(userChatId, 'debt_created')}:** ${firstUser} owes ${secondUser} (1 turn)\n\n🔄 **${t(userChatId, 'next_turn')}:** ${secondUser}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
-                    sendMessage(userChatId, message);
+                    sendMessage(userChatId, userMessage);
                 } else {
                     console.log(`🔔 No chat ID found for ${user} or is the admin who performed swap`);
                 }
             });
-            
-            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${firstUser} ↔ ${secondUser}**`);
         } else {
-            sendMessage(chatId, t(userId, 'error_users_not_found'));
+            // Not the scheduled user's turn - cannot force swap
+            const errorMessage = `❌ **${t(userId, 'swap_error')}**\n\n${t(userId, 'only_scheduled_user_can_swap')}\n\n${t(userId, 'current_turn_user')} ${queue[currentTurn]}`;
+            sendMessage(chatId, errorMessage);
         }
         
     } else if (data === 'request_punishment_menu') {
