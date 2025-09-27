@@ -18,6 +18,7 @@ const queue = ['Eden', 'Adele', 'Emma'];
 // Debt/Credit system for swaps
 const debts = new Map(); // Map: creditor -> Array of debtors (FIFO)
 const debtHistory = new Map(); // Map: debtor -> Array of {creditor, timestamp, completed}
+const activeDebtFavors = new Map(); // Map: debtor -> creditor (tracks active debt favors)
 
 // User management
 const admins = new Set(); // Set of admin user IDs
@@ -263,14 +264,35 @@ function getNextDebtorFor(creditor) {
     return debts.get(creditor)[0]; // FIFO - first debtor
 }
 
+// Active debt favor management functions
+function addActiveDebtFavor(debtor, creditor) {
+    activeDebtFavors.set(debtor, creditor);
+    console.log(`💳 Active debt favor: ${creditor} performing ${debtor}'s turn`);
+}
+
+function clearActiveDebtFavor(debtor) {
+    const creditor = activeDebtFavors.get(debtor);
+    if (creditor) {
+        activeDebtFavors.delete(debtor);
+        console.log(`✅ Active debt favor cleared: ${creditor} completed ${debtor}'s turn`);
+        return creditor;
+    }
+    return null;
+}
+
+function hasActiveDebtFavor(debtor) {
+    return activeDebtFavors.has(debtor);
+}
+
+function getActiveDebtFavorCreditor(debtor) {
+    return activeDebtFavors.get(debtor);
+}
+
 function getActualPerformer(scheduledUser) {
-    // Check if the scheduled user owes any debts (someone should perform their turn)
-    for (const [creditor, debtors] of debts.entries()) {
-        if (debtors.includes(scheduledUser)) {
-            // The scheduled user owes a debt to this creditor
-            // The creditor should perform the scheduled user's turn
-            return creditor;
-        }
+    // Check if there's an active debt favor for the scheduled user
+    if (hasActiveDebtFavor(scheduledUser)) {
+        const creditor = getActiveDebtFavorCreditor(scheduledUser);
+        return creditor; // Creditor performs debtor's turn
     }
     
     // Check if someone owes the scheduled user a debt (someone should perform their turn)
@@ -1553,8 +1575,18 @@ function handleCommand(chatId, userId, userName, text) {
             let actualPerformer = currentUser; // Who actually performed the turn
             let debtRepaid = false;
             
-            // Check if this is a debt repayment turn
-            if (hasDebtsOwedTo(currentUser)) {
+            // Check if this is a debt favor turn (creditor performs debtor's turn)
+            if (hasActiveDebtFavor(currentUser)) {
+                const creditor = getActiveDebtFavorCreditor(currentUser);
+                actualPerformer = creditor;
+                // Clear the active debt favor when creditor completes debtor's turn
+                clearActiveDebtFavor(currentUser);
+                debtRepaid = true;
+                console.log(`💳 Debt favor completed: ${creditor} performed ${currentUser}'s turn`);
+            }
+            
+            // If no debt favor above, check if someone owes the scheduled user a debt (debtor performs creditor's turn)
+            if (!debtRepaid && hasDebtsOwedTo(currentUser)) {
                 const debtor = getNextDebtorFor(currentUser);
                 if (debtor) {
                     // Debt repayment: debtor performs creditor's turn
@@ -1649,8 +1681,18 @@ function handleCommand(chatId, userId, userName, text) {
             let actualPerformer = currentUser; // Who actually performed the turn
             let debtRepaid = false;
             
-            // Check if this is a debt repayment turn
-            if (hasDebtsOwedTo(currentUser)) {
+            // Check if this is a debt favor turn (creditor performs debtor's turn)
+            if (hasActiveDebtFavor(currentUser)) {
+                const creditor = getActiveDebtFavorCreditor(currentUser);
+                actualPerformer = creditor;
+                // Clear the active debt favor when creditor completes debtor's turn
+                clearActiveDebtFavor(currentUser);
+                debtRepaid = true;
+                console.log(`💳 Debt favor completed: ${creditor} performed ${currentUser}'s turn`);
+            }
+            
+            // If no debt favor above, check if someone owes the scheduled user a debt (debtor performs creditor's turn)
+            if (!debtRepaid && hasDebtsOwedTo(currentUser)) {
                 const debtor = getNextDebtorFor(currentUser);
                 if (debtor) {
                     // Debt repayment: debtor performs creditor's turn
@@ -2012,34 +2054,55 @@ function executeSwap(swapRequest, requestId, status) {
     
     if (fromIndex !== -1 && toIndex !== -1) {
         // NEW DEBT SYSTEM: Create debt instead of swapping positions
-        // Only the scheduled user (fromUser) can offer their turn
-        if (fromIndex === currentTurn) {
-            // Create debt: fromUser owes toUser (1 turn)
-            addDebt(fromQueueName, toUser);
-            
-            console.log(`💳 Debt created: ${fromQueueName} owes ${toUser} (1 turn)`);
-            
-            // Notify both users in their language
+        // Only the actual performer can offer their turn
+        const scheduledUser = queue[currentTurn];
+        const actualPerformer = getActualPerformer(scheduledUser);
+        
+        if (fromQueueName === actualPerformer) {
+            // Check if fromUser is currently repaying a debt (debtor performing creditor's turn)
+            if (hasDebtsOwedTo(scheduledUser) && getNextDebtorFor(scheduledUser) === fromQueueName) {
+                // Clear the current debt repayment
+                repayDebt(fromQueueName, scheduledUser);
+                console.log(`💳 Cleared debt repayment: ${fromQueueName} no longer repays ${scheduledUser}`);
+                
+                // Create debt: fromUser owes toUser (1 turn)
+                addDebt(fromQueueName, toUser);
+                // Create active debt favor: toUser performs the CREDITOR's turn (not fromUser's turn)
+                addActiveDebtFavor(scheduledUser, toUser);
+                
+                console.log(`💳 Debt created: ${fromQueueName} owes ${toUser} (1 turn)`);
+                console.log(`💳 Active debt favor: ${toUser} performing ${scheduledUser}'s turn`);
+            } else {
+                // Normal case: fromUser is performing their own turn
+                // Create debt: fromUser owes toUser (1 turn)
+                addDebt(fromQueueName, toUser);
+                // Create active debt favor: toUser performs fromUser's turn
+                addActiveDebtFavor(fromQueueName, toUser);
+                
+                console.log(`💳 Debt created: ${fromQueueName} owes ${toUser} (1 turn)`);
+            }
+        
+        // Notify both users in their language
             const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n💳 **${t(fromUserId, 'debt_created')}:** ${fromUser} owes ${toUser} (1 turn)\n\n🔄 **${t(fromUserId, 'next_turn')}:** ${toUser}`;
             const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n💳 **${t(toUserId, 'debt_created')}:** ${fromUser} owes ${toUser} (1 turn)\n\n🔄 **${t(toUserId, 'next_turn')}:** ${toUser}`;
-            
-            sendMessage(fromUserId, fromUserMessage);
-            sendMessage(toUserId, toUserMessage);
-            
-            // Notify all other authorized users and admins using userChatIds in their language
-            [...authorizedUsers, ...admins].forEach(user => {
-                if (user !== fromUser && user !== toUser) {
-                    let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
-                    if (userChatId) {
-                        // Create swap notification in recipient's language
+        
+        sendMessage(fromUserId, fromUserMessage);
+        sendMessage(toUserId, toUserMessage);
+        
+        // Notify all other authorized users and admins using userChatIds in their language
+        [...authorizedUsers, ...admins].forEach(user => {
+            if (user !== fromUser && user !== toUser) {
+                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                if (userChatId) {
+                    // Create swap notification in recipient's language
                         const swapNotification = `🔄 **${t(userChatId, 'queue_update')}:** ${fromUser} ↔ ${toUser} ${t(userChatId, 'swapped_positions')}!\n💳 **${t(userChatId, 'debt_created')}:** ${fromUser} owes ${toUser} (1 turn)`;
-                        console.log(`🔔 Sending swap approval notification to ${user} (${userChatId})`);
-                        sendMessage(userChatId, swapNotification);
-                    } else {
-                        console.log(`🔔 No chat ID found for ${user}`);
-                    }
+                    console.log(`🔔 Sending swap approval notification to ${user} (${userChatId})`);
+                    sendMessage(userChatId, swapNotification);
+                } else {
+                    console.log(`🔔 No chat ID found for ${user}`);
                 }
-            });
+            }
+        });
         } else {
             // Not the scheduled user's turn - cannot swap
             const errorMessage = `❌ **${t(fromUserId, 'swap_error')}**\n\n${t(fromUserId, 'only_scheduled_user_can_swap')}\n\n${t(fromUserId, 'current_turn_user')} ${queue[currentTurn]}`;
@@ -2654,9 +2717,13 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        // Check if it's the current user's turn
+        // Check if it's the current user's turn (actual performer, not just scheduled)
         const currentUserIndex = queue.indexOf(currentUserQueueName);
-        if (currentTurn !== currentUserIndex) {
+        const scheduledUser = queue[currentTurn];
+        const actualPerformer = getActualPerformer(scheduledUser);
+        
+        // Only the actual performer can request swaps
+        if (actualPerformer !== currentUserQueueName) {
             sendMessage(chatId, t(userId, 'not_your_turn_swap'));
             return;
         }
@@ -2845,15 +2912,16 @@ function handleCallback(chatId, userId, userName, data) {
         console.log(`🔍 Queue contents:`, queue);
         console.log(`🔍 Current turn:`, currentTurn);
         
-        // Only show current turn user for Force Swap (avoid misleading)
-        const currentUser = queue[currentTurn];
-        const royalCurrentUser = addRoyalEmoji(currentUser);
-        const buttons = [[{ text: t(userId, 'current_turn_button', {user: royalCurrentUser}), callback_data: `force_swap_select_${currentUser}` }]];
+        // Show actual performer for Force Swap (who will actually perform the turn)
+        const scheduledUser = queue[currentTurn];
+        const actualPerformer = getActualPerformer(scheduledUser);
+        const royalActualPerformer = addRoyalEmoji(actualPerformer);
+        const buttons = [[{ text: t(userId, 'current_turn_button', {user: royalActualPerformer}), callback_data: `force_swap_select_${actualPerformer}` }]];
         
-        console.log(`🔍 Force Swap - Current turn user: ${currentUser}`);
+        console.log(`🔍 Force Swap - Actual performer: ${actualPerformer} (scheduled: ${scheduledUser})`);
         
         sendMessageWithButtons(chatId, 
-            `${t(userId, 'force_swap_current_turn')} **${royalCurrentUser}**\n\n${t(userId, 'swap_current_turn_with')}`, 
+            `${t(userId, 'force_swap_current_turn')} **${royalActualPerformer}**\n\n${t(userId, 'swap_current_turn_with')}`, 
             buttons
         );
         
@@ -2868,7 +2936,7 @@ function handleCallback(chatId, userId, userName, data) {
         const royalFirstUser = addRoyalEmoji(firstUser);
         
         sendMessageWithButtons(chatId, 
-            `${t(userId, 'force_swap_step2')}\n\n🎯 **Current turn:** ${royalFirstUser}\n${t(userId, 'swap_with_select')}`, 
+            `${t(userId, 'force_swap_step2')}\n\n🎯 **Actual performer:** ${royalFirstUser}\n${t(userId, 'swap_with_select')}`, 
             buttons
         );
         
@@ -2883,12 +2951,33 @@ function handleCallback(chatId, userId, userName, data) {
         console.log(`🔍 DEBUG - Current turn: ${currentTurn}`);
         
         // NEW DEBT SYSTEM: Force swap creates debt instead of swapping positions
-        // Only the scheduled user (firstUser) can be force swapped
-        if (queue[currentTurn] === firstUser) {
-            // Create debt: firstUser owes secondUser (1 turn)
-            addDebt(firstUser, secondUser);
-            
-            console.log(`💳 Force swap debt created: ${firstUser} owes ${secondUser} (1 turn)`);
+        // Only the actual performer can be force swapped
+        const scheduledUser = queue[currentTurn];
+        const actualPerformer = getActualPerformer(scheduledUser);
+        
+        if (actualPerformer === firstUser) {
+            // Check if firstUser is currently repaying a debt (debtor performing creditor's turn)
+            if (hasDebtsOwedTo(scheduledUser) && getNextDebtorFor(scheduledUser) === firstUser) {
+                // Clear the current debt repayment
+                repayDebt(firstUser, scheduledUser);
+                console.log(`💳 Cleared debt repayment: ${firstUser} no longer repays ${scheduledUser}`);
+                
+                // Create debt: firstUser owes secondUser (1 turn)
+                addDebt(firstUser, secondUser);
+                // Create active debt favor: secondUser performs the CREDITOR's turn (not firstUser's turn)
+                addActiveDebtFavor(scheduledUser, secondUser);
+                
+                console.log(`💳 Force swap debt created: ${firstUser} owes ${secondUser} (1 turn)`);
+                console.log(`💳 Active debt favor: ${secondUser} performing ${scheduledUser}'s turn`);
+            } else {
+                // Normal case: firstUser is performing their own turn
+                // Create debt: firstUser owes secondUser (1 turn)
+                addDebt(firstUser, secondUser);
+                // Create active debt favor: secondUser performs firstUser's turn
+                addActiveDebtFavor(firstUser, secondUser);
+                
+                console.log(`💳 Force swap debt created: ${firstUser} owes ${secondUser} (1 turn)`);
+            }
             
             // Notify admin
             const adminMessage = `⚡ **${t(userId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n💳 **${t(userId, 'debt_created')}:** ${firstUser} owes ${secondUser} (1 turn)\n\n🔄 **${t(userId, 'next_turn')}:** ${secondUser}`;
