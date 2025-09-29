@@ -2014,16 +2014,41 @@ function applyPunishment(targetUser, reason, appliedBy) {
     // Apply punishment IMMEDIATELY by adding 3 extra turns to the queue
     console.log(`🔍 DEBUG - Before punishment: queue=[${queue.join(', ')}], currentTurn=${currentTurn}`);
     
-    // Insert the punished user 3 times consecutively at the current position (immediately)
+    // Get the actual performer for the current turn
+    const scheduledUser = queue[currentTurn];
+    const actualPerformer = getActualPerformer(scheduledUser);
+    const punishedUser = actualPerformer; // Punish the actual performer, not the scheduled user
+    
+    console.log(`🔍 DEBUG - Scheduled user: ${scheduledUser}, Actual performer: ${actualPerformer}, Punishing: ${punishedUser}`);
+    
+    // Handle debt favors and debts when punishing the actual performer
+    if (actualPerformer !== scheduledUser) {
+        // The actual performer is performing someone else's turn due to a debt favor
+        if (hasActiveDebtFavor(scheduledUser) && getActiveDebtFavorCreditor(scheduledUser) === actualPerformer) {
+            // Clear the active debt favor since the actual performer is being punished
+            clearActiveDebtFavor(scheduledUser);
+            console.log(`🔍 DEBUG - Cleared active debt favor: ${actualPerformer} was performing ${scheduledUser}'s turn`);
+        }
+        
+        // Check if the actual performer owes a debt to the scheduled user
+        if (hasDebtsOwedTo(scheduledUser) && getNextDebtorFor(scheduledUser) === actualPerformer) {
+            // The actual performer is repaying a debt to the scheduled user
+            // Clear this debt repayment since the actual performer is being punished
+            repayDebt(actualPerformer, scheduledUser);
+            console.log(`🔍 DEBUG - Cleared debt repayment: ${actualPerformer} was repaying ${scheduledUser}'s debt`);
+        }
+    }
+    
+    // Insert the actual performer 3 times consecutively at the current position (immediately)
     for (let i = 0; i < extraTurns; i++) {
-        queue.splice(currentTurn, 0, targetUser);
+        queue.splice(currentTurn, 0, punishedUser);
         console.log(`🔍 DEBUG - After inserting turn ${i + 1}: queue=[${queue.join(', ')}]`);
     }
     
     console.log(`🔍 DEBUG - After punishment: queue=[${queue.join(', ')}], currentTurn=${currentTurn}`);
     
     // Notify all users
-    const message = `⚡ **PUNISHMENT APPLIED IMMEDIATELY!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${appliedBy}\n\n🚫 **Punishment:** ${extraTurns} EXTRA turns added RIGHT NOW!\n📊 **Total punishment turns:** ${currentPunishmentTurns + extraTurns}\n📅 **Ends:** ${endDate.toLocaleDateString()}`;
+    const message = `⚡ **PUNISHMENT APPLIED IMMEDIATELY!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${appliedBy}\n\n🚫 **Punishment:** ${extraTurns} EXTRA turns added RIGHT NOW!\n📊 **Total punishment turns:** ${currentPunishmentTurns + extraTurns}\n📅 **Ends:** ${endDate.toLocaleDateString()}\n\n💡 **Note:** Punishment applied to actual performer: ${punishedUser}`;
     
     // Send to all authorized users and admins
     [...authorizedUsers, ...admins].forEach(user => {
@@ -2106,6 +2131,14 @@ function executeSwap(swapRequest, requestId, status) {
                 // Debts were cancelled - no new debts created
                 console.log(`💳 Swap cancelled debts: ${fromQueueName} ↔ ${toUser} - back to normal queue`);
                 
+                // Check if we need to transfer any active debt favors
+                // If fromUser was performing a debt favor, transfer it to toUser
+                if (hasActiveDebtFavor(scheduledUser) && getActiveDebtFavorCreditor(scheduledUser) === fromQueueName) {
+                    clearActiveDebtFavor(scheduledUser);
+                    addActiveDebtFavor(scheduledUser, toUser);
+                    console.log(`💳 Transferred debt favor: ${toUser} now performs ${scheduledUser}'s turn`);
+                }
+                
                 // Notify both users
                 const cancellationMessage = `✅ **Swap Completed - Debt Cancellation**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n💳 **Debt Cancellation:** Debts cancelled each other out\n\n🔄 **Status:** Back to normal queue`;
                 sendMessage(fromUserId, cancellationMessage);
@@ -2130,10 +2163,11 @@ function executeSwap(swapRequest, requestId, status) {
                 // Normal case: fromUser is performing their own turn
                 // Create debt: fromUser owes toUser (1 turn)
                 addDebt(fromQueueName, toUser);
-                // Create active debt favor: toUser performs fromUser's turn
-                addActiveDebtFavor(fromQueueName, toUser);
+                // Create active debt favor: toUser performs the scheduled user's turn
+                addActiveDebtFavor(scheduledUser, toUser);
                 
                 console.log(`💳 Debt created: ${fromQueueName} owes ${toUser} (1 turn)`);
+                console.log(`💳 Active debt favor: ${toUser} performing ${scheduledUser}'s turn`);
             }
         
         // Notify both users in their language
@@ -3015,6 +3049,14 @@ function handleCallback(chatId, userId, userName, data) {
                 // Debts were cancelled - no new debts created
                 console.log(`💳 Force swap cancelled debts: ${firstUser} ↔ ${secondUser} - back to normal queue`);
                 
+                // Check if we need to transfer any active debt favors
+                // If firstUser was performing a debt favor, transfer it to secondUser
+                if (hasActiveDebtFavor(scheduledUser) && getActiveDebtFavorCreditor(scheduledUser) === firstUser) {
+                    clearActiveDebtFavor(scheduledUser);
+                    addActiveDebtFavor(scheduledUser, secondUser);
+                    console.log(`💳 Transferred debt favor: ${secondUser} now performs ${scheduledUser}'s turn`);
+                }
+                
                 // Notify admin
                 const adminMessage = `⚡ **${t(userId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n💳 **Debt Cancellation:** Debts cancelled each other out\n\n🔄 **Status:** Back to normal queue`;
                 sendMessage(chatId, adminMessage);
@@ -3038,10 +3080,11 @@ function handleCallback(chatId, userId, userName, data) {
                 // Normal case: firstUser is performing their own turn
                 // Create debt: firstUser owes secondUser (1 turn)
                 addDebt(firstUser, secondUser);
-                // Create active debt favor: secondUser performs firstUser's turn
-                addActiveDebtFavor(firstUser, secondUser);
+                // Create active debt favor: secondUser performs the scheduled user's turn
+                addActiveDebtFavor(scheduledUser, secondUser);
                 
                 console.log(`💳 Force swap debt created: ${firstUser} owes ${secondUser} (1 turn)`);
+                console.log(`💳 Active debt favor: ${secondUser} performing ${scheduledUser}'s turn`);
             }
             
             // Notify admin
