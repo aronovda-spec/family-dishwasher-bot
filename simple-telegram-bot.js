@@ -1046,6 +1046,48 @@ const translations = {
         'suspend_user': '✈️ השעיית משתמש',
         'reactivate_user': '✅ הפעלת משתמש מחדש',
         'reset_queue': '🔄 איפוס תור',
+        'reset_scores': '🔄 אפס ניקודים',
+        
+        // Reset Scores
+        'reset_all_scores': '🔄 אפס כל הניקודים (הכל → 0)',
+        'reset_individual': '👤 אפס יחיד',
+        'normalize_scores': '📊 נמל ניקודים',
+        'reset_system': '🔄 אפס מערכת (הכל)',
+        'confirm_reset_all': '✅ אשר אפס הכל',
+        'cancel': '❌ ביטול',
+        'confirm_reset_all_scores': '⚠️ **אשר אפס כל הניקודים**\n\nזה יאפס את כל ניקודי המשתמשים ל-0. להמשיך?',
+        'all_scores_reset': '✅ **כל הניקודים אופסו!**\n\n📊 **ניקודים חדשים:**\n{newScores}\n\n🎯 **התור הבא יהיה לפי סדר הקביעות.**',
+        'select_user_reset_score': 'בחר משתמש לאפס את הניקוד שלו ל-0:',
+        'confirm_reset_score': '⚠️ **אשר אפס ניקוד**\n\n{user} ניקוד נוכחי: **{score}**\n\nלאפס ל-0?',
+        'score_reset': '✅ **ניקוד אופס!**\n\n{user}: {oldScore} → **0**\n\n🎯 **זה עשוי להשפיע על סדר התורות.**',
+        'confirm_full_system_reset': '⚠️ **אשר אפס מערכת מלא**\n\nזה יעשה:\n• אפס כל הניקודים ל-0\n• נקה כל הקצאות תורות\n• נקה כל השעיות\n• אפס סדר קביעות\n\n**זה בלתי הפיך!**',
+        'reset_everything': '⚠️ אפס הכל',
+        'full_system_reset_complete': '✅ **אפס מערכת מלא הושלם!**\n\n📊 **כל הניקודים אופסו ל-0**\n🔄 **כל ההקצאות נוקו**\n✈️ **כל ההשעיות נוקו**\n📋 **סדר הקביעות אופס לברירת מחדל**\n\n🎯 **המערכת כעת במצב ברירת מחדל.**',
+        'normalize_scores_title': '📊 **נמל ניקודים**\n\n**ניקודים נוכחיים:**\n{currentScores}\n\n**זה יפחית {minScore} מכל הניקודים כדי לשמור על מספרים ניתנים לניהול.**\n\n**להמשיך?**',
+        'normalize_now': '✅ נמל עכשיו',
+        'scores_normalized': '✅ **ניקודים נומלו!**\n\n📊 **ניקודים חדשים:**\n{newScores}\n\n🎯 **מיקומים יחסיים נשמרו, מספרים הופחתו.**',
+        
+        // Reorder Queue
+        'reorder_tie_breaker_priority': '🔄 **סידור עדיפות קביעות מחדש**\n\n📋 **סדר עדיפות נוכחי:**\n{currentOrder}\n\n💡 **זה משפיע על מי מקבל עדיפות כאשר הניקודים שווים.**\n\n**אפשרויות:**',
+        'set_custom_order': '🔄 הגדר סדר מותאם אישית',
+        'reset_to_default': '🔄 אפס לברירת מחדל',
+        'view_current_order': '📊 צפה בסדר נוכחי',
+        'select_user_move_priority': 'בחר משתמש להעביר לעמדת עדיפות שונה:',
+        'tie_breaker_order_updated': '✅ **סדר קביעות עודכן!**\n\n📋 **סדר עדיפות חדש:**\n{newOrder}\n\n💡 **זה משפיע על מי מקבל עדיפות כאשר הניקודים שווים.**',
+        'invalid_position_selected': '❌ עמדה לא חוקית נבחרה.',
+        'tie_breaker_order_reset': '✅ **סדר קביעות אופס לברירת מחדל!**\n\n📋 **סדר עדיפות ברירת מחדל:**\n{defaultOrder}',
+        'current_tie_breaker_priority_order': '📋 **סדר עדיפות קביעות נוכחי:**\n\n{currentOrder}\n\n💡 **זה משפיע על מי מקבל עדיפות כאשר הניקודים שווים.**',
+        
+        // Queue Statistics
+        'queue_statistics_title': '📊 **סטטיסטיקות תור**\n\n',
+        'tie_breaker_priority_order': '📋 **סדר עדיפות קביעות:**\n',
+        'current_scores': '📊 **ניקודים נוכחיים:**\n',
+        'current_turn': '🎯 **תור נוכחי:**',
+        'next_3_turns': '📅 **3 התורות הבאים:**',
+        'suspended_users': '✈️ **משתמשים מושעים:**\n',
+        'days_left': 'יום נותר',
+        'days_left_plural': 'ימים נותרו',
+        'active_turn_assignments': '🔄 **הקצאות תורות פעילות:**\n',
         'select_user_to_reorder': 'בחר משתמש להעברה למיקום חדש:',
         'select_new_position': 'בחר מיקום חדש עבור {user}:',
         'position_1': '1️⃣ מיקום 1 (ראשון)',
@@ -1679,21 +1721,35 @@ function handleCommand(chatId, userId, userName, text) {
         }
         
     } else if (command === '/help' || command === 'help') {
-        const helpMessage = `🤖 **בוט מדיח הכלים של המשפחה (Family Dishwasher Bot):**\n\n` +
-            `📋 **פקודות התור (Queue Commands):**\n` +
-            `• \`/status\` - הצגת התור הנוכחי (Show current queue)\n` +
-            `• \`/done\` - השלמת התור שלך (Complete your turn)\n\n` +
-            `🔄 **החלפת תורות (Swap Turns):**\n` +
-            `• **החלפה (Swap)** - בקשה להחלפה עם משתמש אחר\n` +
+        const helpMessage = `🤖 **בוט מדיח הכלים של המשפחה:**\n\n` +
+            `📊 **מערכת ניקוד:**\n` +
+            `• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n` +
+            `• התור הבא נקבע לפי הניקוד הנמוך ביותר\n` +
+            `• במקרה של שוויון, משתמשים בסדר הקבוע (עדן → עדלה → אמה)\n` +
+            `• המערכת שומרת על הוגנות לאורך זמן\n\n` +
+            `📋 **פקודות התור:**\n` +
+            `• \`/status\` - הצגת התור הנוכחי, ניקודים, והתורות הבאים\n` +
+            `• \`/done\` - השלמת התור שלך (מעלה את הניקוד ב-1)\n\n` +
+            `🔄 **החלפת תורות:**\n` +
+            `• **החלפה** - בקשה להחלפה עם משתמש אחר\n` +
             `• **תהליך:** בחר משתמש → המשתמש מקבל הודעה → צריך לאשר או לדחות\n` +
             `• **אישור:** שני הצדדים צריכים להסכים להחלפה\n` +
-            `• **ביטול:** אתה יכול לבטל את הבקשה שלך בכל עת (כפתור "Cancel Request")\n\n` +
-            `⚡ **דיווח על משתמש (Report User):**\n` +
-            `• **בקשת ענישה (Request Punishment)** - דיווח על משתמש אחר\n` +
+            `• **ניקוד:** המשתמש שמבצע את התור מקבל +1 ניקוד\n` +
+            `• **ביטול:** אתה יכול לבטל את הבקשה שלך בכל עת\n\n` +
+            `⚡ **דיווח על משתמש:**\n` +
+            `• **בקשת ענישה** - דיווח על משתמש אחר\n` +
             `• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n` +
-            `• **אישור:** מנהל צריך לאשר את הענישה (3 תורות נוספים)\n\n` +
-            `🎯 **תור קבוע (Fixed Queue):** עדן (Eden) → עדלה (Adele) → אמה (Emma) → (חוזר)\n\n` +
-            `💡 **טיפ (Tip):** השתמש בכפתורים לניווט קל יותר! (Use buttons for easier mobile interaction!)`;
+            `• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n` +
+            `👨‍💼 **תכונות מנהל:**\n` +
+            `• **החלפה בכוח** - החלפת תור בכוח\n` +
+            `• **הפעלת עונש** - הפעלת עונש ישיר\n` +
+            `• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n` +
+            `• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n` +
+            `• **סידור תור מחדש** - שינוי סדר הקביעות\n` +
+            `• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n` +
+            `• **דוח חודשי** - דוח חודשי מפורט\n\n` +
+            `🎯 **סדר קביעות:** עדן → עדלה → אמה\n\n` +
+            `💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!`;
         
         sendMessage(chatId, helpMessage);
         
@@ -2381,15 +2437,15 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'reorder_queue_menu') {
         // Show current tie-breaker order and options to change it
         const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
-        const message = `🔄 **Reorder Tie-Breaker Priority**\n\n📋 **Current Priority Order:**\n${currentOrder}\n\n💡 **This affects who gets priority when scores are equal.**\n\n**Options:**`;
+        const message = t(userId, 'reorder_tie_breaker_priority', {currentOrder: currentOrder});
         
         const buttons = [
             [
-                { text: '🔄 Set Custom Order', callback_data: 'reorder_custom_order' },
-                { text: '🔄 Reset to Default', callback_data: 'reorder_reset_default' }
+                { text: t(userId, 'set_custom_order'), callback_data: 'reorder_custom_order' },
+                { text: t(userId, 'reset_to_default'), callback_data: 'reorder_reset_default' }
             ],
             [
-                { text: '📊 View Current Order', callback_data: 'reorder_view_current' }
+                { text: t(userId, 'view_current_order'), callback_data: 'reorder_view_current' }
             ]
         ];
         
@@ -2399,7 +2455,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Step 1: Select user to move
         const queueUsers = ['Eden', 'Adele', 'Emma'];
         const buttons = queueUsers.map(user => [{ text: addRoyalEmoji(user), callback_data: `reorder_select_${user}` }]);
-        sendMessageWithButtons(chatId, 'Select user to move to a different priority position:', buttons);
+        sendMessageWithButtons(chatId, t(userId, 'select_user_move_priority'), buttons);
         
     } else if (data.startsWith('reorder_select_')) {
         // Step 2: Select new position for user
@@ -2436,12 +2492,12 @@ function handleCallback(chatId, userId, userName, data) {
             // Track for monthly report
             trackMonthlyAction('queue_reorder', null, userName);
             
-            const newOrderText = newOrder.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
-            const message = `✅ **Tie-Breaker Order Updated!**\n\n📋 **New Priority Order:**\n${newOrderText}\n\n💡 **This affects who gets priority when scores are equal.**`;
-            
-            sendMessage(chatId, message);
+                const newOrderText = newOrder.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
+                const message = t(userId, 'tie_breaker_order_updated', {newOrder: newOrderText});
+                
+                sendMessage(chatId, message);
         } else {
-            sendMessage(chatId, '❌ Invalid position selected.');
+            sendMessage(chatId, t(userId, 'invalid_position_selected'));
         }
         
     } else if (data === 'reorder_reset_default') {
@@ -2456,30 +2512,30 @@ function handleCallback(chatId, userId, userName, data) {
         trackMonthlyAction('queue_reorder', null, userName);
         
         const defaultOrderText = defaultOrder.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
-        const message = `✅ **Tie-Breaker Order Reset to Default!**\n\n📋 **Default Priority Order:**\n${defaultOrderText}`;
+        const message = t(userId, 'tie_breaker_order_reset', {defaultOrder: defaultOrderText});
         
         sendMessage(chatId, message);
         
     } else if (data === 'reorder_view_current') {
         // Show current order
         const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
-        const message = `📋 **Current Tie-Breaker Priority Order:**\n\n${currentOrder}\n\n💡 **This affects who gets priority when scores are equal.**`;
+        const message = t(userId, 'current_tie_breaker_priority_order', {currentOrder: currentOrder});
         
         sendMessage(chatId, message);
         
     } else if (data === 'queue_statistics_show') {
         // Show queue statistics
-        let statsMessage = `📊 **Queue Statistics**\n\n`;
+        let statsMessage = t(userId, 'queue_statistics_title');
         
         // Current tie-breaker priority order
-        statsMessage += `📋 **Tie-Breaker Priority Order:**\n`;
+        statsMessage += t(userId, 'tie_breaker_priority_order');
         originalQueue.forEach((user, index) => {
             const emoji = addRoyalEmoji(user);
             statsMessage += `${index + 1}. ${emoji}\n`;
         });
         
         // Current scores
-        statsMessage += `\n📊 **Current Scores:**\n`;
+        statsMessage += `\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
         originalQueue.forEach(user => {
             const score = userScores.get(user) || 0;
@@ -2491,22 +2547,23 @@ function handleCallback(chatId, userId, userName, data) {
         // Current turn and next 3 turns
         const currentUser = getCurrentTurnUser();
         const nextThreeTurns = getNextThreeTurns();
-        statsMessage += `\n🎯 **Current Turn:** ${addRoyalEmoji(currentUser)}\n`;
-        statsMessage += `📅 **Next 3 Turns:** ${nextThreeTurns.map(user => addRoyalEmoji(user)).join(' → ')}\n`;
+        statsMessage += `\n${t(userId, 'current_turn')} ${addRoyalEmoji(currentUser)}\n`;
+        statsMessage += `${t(userId, 'next_3_turns')} ${nextThreeTurns.map(user => addRoyalEmoji(user)).join(' → ')}\n`;
         
         // Suspended users
         if (suspendedUsers.size > 0) {
-            statsMessage += `\n✈️ **Suspended Users:**\n`;
+            statsMessage += `\n${t(userId, 'suspended_users')}`;
             for (const [user, suspension] of suspendedUsers.entries()) {
                 const emoji = addRoyalEmoji(user);
                 const daysLeft = Math.ceil((suspension.suspendedUntil - new Date()) / (1000 * 60 * 60 * 24));
-                statsMessage += `${emoji}: ${daysLeft} day${daysLeft > 1 ? 's' : ''} left\n`;
+                const daysText = daysLeft > 1 ? t(userId, 'days_left_plural') : t(userId, 'days_left');
+                statsMessage += `${emoji}: ${daysLeft} ${daysText}\n`;
             }
         }
         
         // Active turn assignments
         if (turnAssignments.size > 0) {
-            statsMessage += `\n🔄 **Active Turn Assignments:**\n`;
+            statsMessage += `\n${t(userId, 'active_turn_assignments')}`;
             for (const [originalUser, assignedTo] of turnAssignments.entries()) {
                 const originalEmoji = addRoyalEmoji(originalUser);
                 const assignedEmoji = addRoyalEmoji(assignedTo);
@@ -2598,16 +2655,16 @@ function handleCallback(chatId, userId, userName, data) {
             return `${addRoyalEmoji(user)}: ${score}`;
         }).join('\n');
         
-        const message = `🔄 **Reset Scores Menu**\n\n📊 **Current Scores:**\n${currentScores}\n\n**Options:**`;
+        const message = `${t(userId, 'reset_scores')} Menu\n\n📊 **${t(userId, 'current_scores')}**\n${currentScores}\n\n**Options:**`;
         
         const buttons = [
             [
-                { text: '🔄 Reset All Scores (All → 0)', callback_data: 'reset_all_scores_confirm' },
-                { text: '👤 Reset Individual', callback_data: 'reset_individual_scores' }
+                { text: t(userId, 'reset_all_scores'), callback_data: 'reset_all_scores_confirm' },
+                { text: t(userId, 'reset_individual'), callback_data: 'reset_individual_scores' }
             ],
             [
-                { text: '📊 Normalize Scores', callback_data: 'normalize_scores_confirm' },
-                { text: '🔄 Reset System (Everything)', callback_data: 'reset_system_confirm' }
+                { text: t(userId, 'normalize_scores'), callback_data: 'normalize_scores_confirm' },
+                { text: t(userId, 'reset_system'), callback_data: 'reset_system_confirm' }
             ]
         ];
         
@@ -2616,10 +2673,10 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'reset_all_scores_confirm') {
         // Confirm reset all scores
         const confirmButtons = [
-            [{ text: '✅ Confirm Reset All', callback_data: 'reset_all_scores_execute' }],
-            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+            [{ text: t(userId, 'confirm_reset_all'), callback_data: 'reset_all_scores_execute' }],
+            [{ text: t(userId, 'cancel'), callback_data: 'reset_scores_menu' }]
         ];
-        sendMessageWithButtons(chatId, '⚠️ **Confirm Reset All Scores**\n\nThis will reset all user scores to 0. Continue?', confirmButtons);
+        sendMessageWithButtons(chatId, t(userId, 'confirm_reset_all_scores'), confirmButtons);
         
     } else if (data === 'reset_all_scores_execute') {
         // Execute reset all scores
@@ -2633,7 +2690,7 @@ function handleCallback(chatId, userId, userName, data) {
         trackMonthlyAction('queue_reorder', null, userName);
         
         const newScores = originalQueue.map(user => `${addRoyalEmoji(user)}: 0`).join('\n');
-        const message = `✅ **All Scores Reset!**\n\n📊 **New Scores:**\n${newScores}\n\n🎯 **Next turn will be based on tie-breaker order.**`;
+        const message = t(userId, 'all_scores_reset', {newScores: newScores});
         
         sendMessage(chatId, message);
         
@@ -2643,7 +2700,7 @@ function handleCallback(chatId, userId, userName, data) {
             const currentScore = userScores.get(user) || 0;
             return [{ text: `${addRoyalEmoji(user)} (${currentScore})`, callback_data: `reset_score_select_${user}` }];
         });
-        sendMessageWithButtons(chatId, 'Select user to reset their score to 0:', buttons);
+        sendMessageWithButtons(chatId, t(userId, 'select_user_reset_score'), buttons);
         
     } else if (data.startsWith('reset_score_select_')) {
         // Confirm individual score reset
@@ -2651,11 +2708,11 @@ function handleCallback(chatId, userId, userName, data) {
         const currentScore = userScores.get(selectedUser) || 0;
         
         const confirmButtons = [
-            [{ text: `✅ Reset ${addRoyalEmoji(selectedUser)}`, callback_data: `reset_score_execute_${selectedUser}` }],
-            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+            [{ text: `✅ ${t(userId, 'reset_scores')} ${addRoyalEmoji(selectedUser)}`, callback_data: `reset_score_execute_${selectedUser}` }],
+            [{ text: t(userId, 'cancel'), callback_data: 'reset_scores_menu' }]
         ];
         
-        const message = `⚠️ **Confirm Reset Score**\n\n${addRoyalEmoji(selectedUser)} current score: **${currentScore}**\n\nReset to 0?`;
+        const message = t(userId, 'confirm_reset_score', {user: addRoyalEmoji(selectedUser), score: currentScore});
         sendMessageWithButtons(chatId, message, confirmButtons);
         
     } else if (data.startsWith('reset_score_execute_')) {
@@ -2670,16 +2727,16 @@ function handleCallback(chatId, userId, userName, data) {
         // Track for monthly report
         trackMonthlyAction('queue_reorder', null, userName);
         
-        const message = `✅ **Score Reset!**\n\n${addRoyalEmoji(selectedUser)}: ${oldScore} → **0**\n\n🎯 **This may affect turn order.**`;
+        const message = t(userId, 'score_reset', {user: addRoyalEmoji(selectedUser), oldScore: oldScore});
         sendMessage(chatId, message);
         
     } else if (data === 'reset_system_confirm') {
         // Confirm full system reset
         const confirmButtons = [
-            [{ text: '⚠️ Reset Everything', callback_data: 'reset_system_execute' }],
-            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+            [{ text: t(userId, 'reset_everything'), callback_data: 'reset_system_execute' }],
+            [{ text: t(userId, 'cancel'), callback_data: 'reset_scores_menu' }]
         ];
-        sendMessageWithButtons(chatId, '⚠️ **Confirm Full System Reset**\n\nThis will:\n• Reset all scores to 0\n• Clear all turn assignments\n• Clear all suspensions\n• Reset tie-breaker order\n\n**This is irreversible!**', confirmButtons);
+        sendMessageWithButtons(chatId, t(userId, 'confirm_full_system_reset'), confirmButtons);
         
     } else if (data === 'reset_system_execute') {
         // Execute full system reset
@@ -2703,7 +2760,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Track for monthly report
         trackMonthlyAction('queue_reorder', null, userName);
         
-        const message = `✅ **Full System Reset Complete!**\n\n📊 **All scores reset to 0**\n🔄 **All assignments cleared**\n✈️ **All suspensions cleared**\n📋 **Tie-breaker order reset to default**\n\n🎯 **System is now in default state.**`;
+        const message = t(userId, 'full_system_reset_complete');
         sendMessage(chatId, message);
         
     } else if (data === 'normalize_scores_confirm') {
@@ -2718,11 +2775,11 @@ function handleCallback(chatId, userId, userName, data) {
             return `${addRoyalEmoji(user)}: ${score} → ${newScore}`;
         }).join('\n');
         
-        const message = `📊 **Normalize Scores**\n\n**Current Scores:**\n${currentScores}\n\n**This will subtract ${minScore} from all scores to keep numbers manageable.**\n\n**Continue?**`;
+        const message = t(userId, 'normalize_scores_title', {currentScores: currentScores, minScore: minScore});
         
         const confirmButtons = [
-            [{ text: '✅ Normalize Now', callback_data: 'normalize_scores_execute' }],
-            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+            [{ text: t(userId, 'normalize_now'), callback_data: 'normalize_scores_execute' }],
+            [{ text: t(userId, 'cancel'), callback_data: 'reset_scores_menu' }]
         ];
         sendMessageWithButtons(chatId, message, confirmButtons);
         
@@ -2746,7 +2803,7 @@ function handleCallback(chatId, userId, userName, data) {
             return `${addRoyalEmoji(user)}: ${score}`;
         }).join('\n');
         
-        const message = `✅ **Scores Normalized!**\n\n📊 **New Scores:**\n${newScores}\n\n🎯 **Relative positions maintained, numbers reduced.**`;
+        const message = t(userId, 'scores_normalized', {newScores: newScores});
         sendMessage(chatId, message);
         
     } else if (data === 'language_switch') {
