@@ -2819,17 +2819,6 @@ function handleCallback(chatId, userId, userName, data) {
         const message = t(userId, 'scores_normalized', {newScores: newScores});
         sendMessage(chatId, message);
         
-    } else if (data === 'help') {
-        const helpMessage = t(userId, 'help_title') +
-            t(userId, 'help_scoring_system') + t(userId, 'help_scoring_explanation') +
-            t(userId, 'help_queue_commands') + t(userId, 'help_queue_explanation') +
-            t(userId, 'help_swapping') + t(userId, 'help_swapping_explanation') +
-            t(userId, 'help_punishment') + t(userId, 'help_punishment_explanation') +
-            t(userId, 'help_admin_features') + t(userId, 'help_admin_explanation') +
-            t(userId, 'help_tie_breaker') + t(userId, 'help_tip');
-        
-        sendMessage(chatId, helpMessage);
-        
     } else if (data === 'language_switch') {
         const currentLang = getUserLanguage(userId);
         const newLang = currentLang === 'en' ? 'he' : 'en';
