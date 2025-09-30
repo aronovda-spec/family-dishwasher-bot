@@ -1499,7 +1499,7 @@ function handleCommand(chatId, userId, userName, text) {
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
         
         // Show current scores
-        statusMessage += `\n\n📊 **Current Scores:**\n`;
+        statusMessage += `\n\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
         for (const user of originalQueue) {
             const score = userScores.get(user) || 0;
@@ -1721,35 +1721,70 @@ function handleCommand(chatId, userId, userName, text) {
         }
         
     } else if (command === '/help' || command === 'help') {
-        const helpMessage = `🤖 **בוט מדיח הכלים של המשפחה:**\n\n` +
-            `📊 **מערכת ניקוד:**\n` +
-            `• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n` +
-            `• התור הבא נקבע לפי הניקוד הנמוך ביותר\n` +
-            `• במקרה של שוויון, משתמשים בסדר הקבוע (עדן → עדלה → אמה)\n` +
-            `• המערכת שומרת על הוגנות לאורך זמן\n\n` +
-            `📋 **פקודות התור:**\n` +
-            `• \`/status\` - הצגת התור הנוכחי, ניקודים, והתורות הבאים\n` +
-            `• \`/done\` - השלמת התור שלך (מעלה את הניקוד ב-1)\n\n` +
-            `🔄 **החלפת תורות:**\n` +
-            `• **החלפה** - בקשה להחלפה עם משתמש אחר\n` +
-            `• **תהליך:** בחר משתמש → המשתמש מקבל הודעה → צריך לאשר או לדחות\n` +
-            `• **אישור:** שני הצדדים צריכים להסכים להחלפה\n` +
-            `• **ניקוד:** המשתמש שמבצע את התור מקבל +1 ניקוד\n` +
-            `• **ביטול:** אתה יכול לבטל את הבקשה שלך בכל עת\n\n` +
-            `⚡ **דיווח על משתמש:**\n` +
-            `• **בקשת ענישה** - דיווח על משתמש אחר\n` +
-            `• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n` +
-            `• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n` +
-            `👨‍💼 **תכונות מנהל:**\n` +
-            `• **החלפה בכוח** - החלפת תור בכוח\n` +
-            `• **הפעלת עונש** - הפעלת עונש ישיר\n` +
-            `• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n` +
-            `• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n` +
-            `• **סידור תור מחדש** - שינוי סדר הקביעות\n` +
-            `• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n` +
-            `• **דוח חודשי** - דוח חודשי מפורט\n\n` +
-            `🎯 **סדר קביעות:** עדן → עדלה → אמה\n\n` +
-            `💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!`;
+        const currentLang = getUserLanguage(userId);
+        let helpMessage;
+        
+        if (currentLang === 'he') {
+            helpMessage = `🤖 **בוט מדיח הכלים של המשפחה:**\n\n` +
+                `📊 **מערכת ניקוד:**\n` +
+                `• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n` +
+                `• התור הבא נקבע לפי הניקוד הנמוך ביותר\n` +
+                `• במקרה של שוויון, משתמשים בסדר הקבוע (עדן → עדלה → אמה)\n` +
+                `• המערכת שומרת על הוגנות לאורך זמן\n\n` +
+                `📋 **פקודות התור:**\n` +
+                `• \`/status\` - הצגת התור הנוכחי, ניקודים, והתורות הבאים\n` +
+                `• \`/done\` - השלמת התור שלך (מעלה את הניקוד ב-1)\n\n` +
+                `🔄 **החלפת תורות:**\n` +
+                `• **החלפה** - בקשה להחלפה עם משתמש אחר\n` +
+                `• **תהליך:** בחר משתמש → המשתמש מקבל הודעה → צריך לאשר או לדחות\n` +
+                `• **אישור:** שני הצדדים צריכים להסכים להחלפה\n` +
+                `• **ניקוד:** המשתמש שמבצע את התור מקבל +1 ניקוד\n` +
+                `• **ביטול:** אתה יכול לבטל את הבקשה שלך בכל עת\n\n` +
+                `⚡ **דיווח על משתמש:**\n` +
+                `• **בקשת ענישה** - דיווח על משתמש אחר\n` +
+                `• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n` +
+                `• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n` +
+                `👨‍💼 **תכונות מנהל:**\n` +
+                `• **החלפה בכוח** - החלפת תור בכוח\n` +
+                `• **הפעלת עונש** - הפעלת עונש ישיר\n` +
+                `• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n` +
+                `• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n` +
+                `• **סידור תור מחדש** - שינוי סדר הקביעות\n` +
+                `• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n` +
+                `• **דוח חודשי** - דוח חודשי מפורט\n\n` +
+                `🎯 **סדר קביעות:** עדן → עדלה → אמה\n\n` +
+                `💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!`;
+        } else {
+            helpMessage = `🤖 **Family Dishwasher Bot:**\n\n` +
+                `📊 **Score-Based System:**\n` +
+                `• Each user has a score (number of turns performed)\n` +
+                `• Next turn is determined by lowest score\n` +
+                `• In case of tie, uses fixed order (Eden → Adele → Emma)\n` +
+                `• System maintains fairness over time\n\n` +
+                `📋 **Queue Commands:**\n` +
+                `• \`/status\` - Show current queue, scores, and next turns\n` +
+                `• \`/done\` - Complete your turn (increases score by 1)\n\n` +
+                `🔄 **Swap Turns:**\n` +
+                `• **Swap** - Request to swap with another user\n` +
+                `• **Process:** Select user → User gets notification → Must approve or reject\n` +
+                `• **Approval:** Both sides must agree to swap\n` +
+                `• **Score:** User who performs the turn gets +1 score\n` +
+                `• **Cancel:** You can cancel your request anytime\n\n` +
+                `⚡ **Report User:**\n` +
+                `• **Request Punishment** - Report another user\n` +
+                `• **Process:** Select user → Select reason → Admins get notification\n` +
+                `• **Punishment:** Admin approves punishment (reduces score by 3 points)\n\n` +
+                `👨‍💼 **Admin Features:**\n` +
+                `• **Force Swap** - Force turn swap\n` +
+                `• **Apply Punishment** - Apply direct punishment\n` +
+                `• **Suspend/Reactivate** - Suspend and reactivate users\n` +
+                `• **Reset Scores** - Reset scores (all, individual, or normalize)\n` +
+                `• **Reorder Queue** - Change tie-breaker order\n` +
+                `• **Queue Statistics** - Detailed statistics\n` +
+                `• **Monthly Report** - Detailed monthly report\n\n` +
+                `🎯 **Tie-Breaker Order:** Eden → Adele → Emma\n\n` +
+                `💡 **Tip:** Use buttons for easier mobile interaction!`;
+        }
         
         sendMessage(chatId, helpMessage);
         
