@@ -11,9 +11,88 @@ if (!token) {
 }
 const botUrl = `https://api.telegram.org/bot${token}`;
 
-// Simple queue management
-let currentTurn = 0;
-const queue = ['Eden', 'Adele', 'Emma'];
+// Score-based queue management
+const originalQueue = ['Eden', 'Adele', 'Emma']; // Original order for tie-breaking
+const userScores = new Map(); // userName -> score (number of turns performed)
+const queue = ['Eden', 'Adele', 'Emma']; // Keep for compatibility, but order doesn't matter for turn selection
+
+// Initialize scores to 0 for all users
+originalQueue.forEach(user => {
+    if (!userScores.has(user)) {
+        userScores.set(user, 0);
+    }
+});
+
+// Score-based turn selection functions
+function getCurrentTurnUser() {
+    // Find user with lowest score, using original queue order as tie-breaker
+    let lowestScore = Infinity;
+    let currentUser = null;
+    
+    for (const user of originalQueue) {
+        const score = userScores.get(user) || 0;
+        if (score < lowestScore) {
+            lowestScore = score;
+            currentUser = user;
+        }
+    }
+    
+    return currentUser;
+}
+
+function getNextThreeTurns() {
+    // Simulate next 3 turns by temporarily adjusting scores
+    const tempScores = new Map(userScores);
+    const turns = [];
+    
+    for (let i = 0; i < 3; i++) {
+        // Find user with lowest score
+        let lowestScore = Infinity;
+        let nextUser = null;
+        
+        for (const user of originalQueue) {
+            const score = tempScores.get(user) || 0;
+            if (score < lowestScore) {
+                lowestScore = score;
+                nextUser = user;
+            }
+        }
+        
+        if (nextUser) {
+            turns.push(nextUser);
+            // Increment their score for next iteration
+            tempScores.set(nextUser, (tempScores.get(nextUser) || 0) + 1);
+        }
+    }
+    
+    return turns;
+}
+
+function incrementUserScore(userName) {
+    const currentScore = userScores.get(userName) || 0;
+    userScores.set(userName, currentScore + 1);
+    console.log(`📊 ${userName} score incremented: ${currentScore} → ${currentScore + 1}`);
+}
+
+function applyPunishment(userName) {
+    // Punishment = subtract 3 from score (makes them scheduled sooner)
+    const currentScore = userScores.get(userName) || 0;
+    userScores.set(userName, currentScore - 3);
+    console.log(`⚖️ Punishment applied to ${userName}: ${currentScore} → ${currentScore - 3}`);
+}
+
+function getRelativeScores() {
+    // Calculate relative scores (score - minimum score)
+    const scores = Array.from(userScores.values());
+    const minScore = Math.min(...scores);
+    
+    const relativeScores = new Map();
+    for (const [user, score] of userScores.entries()) {
+        relativeScores.set(user, score - minScore);
+    }
+    
+    return relativeScores;
+}
 
 // User management
 const admins = new Set(); // Set of admin user IDs
@@ -1327,16 +1406,21 @@ function handleCommand(chatId, userId, userName, text) {
     } else if (command === '/status' || command === 'status') {
         let statusMessage = `${t(userId, 'dishwasher_queue_status')}\n\n`;
         
-        // Debug: Show current queue state
-        console.log(`🔍 DEBUG - Current queue: [${queue.join(', ')}]`);
-        console.log(`🔍 DEBUG - Current turn: ${currentTurn}`);
-        console.log(`🔍 DEBUG - Queue length: ${queue.length}`);
+        // Get current turn user and next 3 turns using score-based system
+        const currentUser = getCurrentTurnUser();
+        const nextThreeTurns = getNextThreeTurns();
         
-        // Show only the next 3 consecutive turns (current + next 2)
+        // Debug: Show current scores
+        console.log(`🔍 DEBUG - Current scores:`, Object.fromEntries(userScores));
+        console.log(`🔍 DEBUG - Current turn user: ${currentUser}`);
+        console.log(`🔍 DEBUG - Next 3 turns: [${nextThreeTurns.join(', ')}]`);
+        
+        // Show current turn and next 3 turns
         for (let i = 0; i < 3; i++) {
-            const turnIndex = (currentTurn + i) % queue.length;
-            const name = queue[turnIndex];
-            const royalName = addRoyalEmoji(name); // Add royal emoji
+            const name = nextThreeTurns[i];
+            if (!name) continue;
+            
+            const royalName = addRoyalEmoji(name);
             const isCurrentTurn = i === 0;
             const turnIcon = isCurrentTurn ? '🔄' : '⏳';
             const turnText = isCurrentTurn ? ` ${t(userId, 'current_turn')}` : '';
@@ -1349,6 +1433,16 @@ function handleCommand(chatId, userId, userName, text) {
         }
         
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
+        
+        // Show current scores
+        statusMessage += `\n\n📊 **Current Scores:**\n`;
+        const relativeScores = getRelativeScores();
+        for (const user of originalQueue) {
+            const score = userScores.get(user) || 0;
+            const relativeScore = relativeScores.get(user) || 0;
+            const royalName = addRoyalEmoji(user);
+            statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+        }
         
         // Show punishment information
         const usersWithPunishments = Array.from(punishmentTurns.entries()).filter(([user, turns]) => turns > 0);
@@ -1419,58 +1513,26 @@ function handleCommand(chatId, userId, userName, text) {
         
         if (isAdmin) {
             // Admin "Done" - Admin takes over dishwasher duty
-            const currentUser = queue[currentTurn];
+            const currentUser = getCurrentTurnUser();
             
-            // Check if this was a punishment turn and remove it BEFORE advancing
-            const punishmentTurnsRemaining = punishmentTurns.get(currentUser) || 0;
-            if (punishmentTurnsRemaining > 0) {
-                punishmentTurns.set(currentUser, punishmentTurnsRemaining - 1);
-                
-                // Remove the FIRST occurrence of the punished user (always the punishment turn)
-                const punishmentIndex = queue.indexOf(currentUser);
-                if (punishmentIndex !== -1) {
-                    queue.splice(punishmentIndex, 1);
-                    console.log(`⚡ Punishment turn completed for ${currentUser}. Removed from queue. Remaining: ${punishmentTurnsRemaining - 1}`);
-                }
-                
-                // For punishment turns, don't advance currentTurn since queue has already shifted
-                // currentTurn stays the same because we removed the current position
-            } else {
-                // Only advance currentTurn for normal turns
-                advanceToNextUser();
+            if (!currentUser) {
+                sendMessage(chatId, t(userId, 'no_one_in_queue'));
+                return;
             }
+            
+            // Increment the score for the user whose turn was completed
+            incrementUserScore(currentUser);
             
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
             
-            // Check for temporary swap reversion - check ALL active swaps
-            if (global.tempSwaps && global.tempSwaps.size > 0) {
-                for (const [swapId, tempSwap] of global.tempSwaps.entries()) {
-                    if (tempSwap.isActive && currentUser === tempSwap.originalCurrentTurnUser) {
-                        // Revert this specific temporary swap
-                        const firstIndex = queue.indexOf(tempSwap.firstUser);
-                        const secondIndex = queue.indexOf(tempSwap.secondUser);
-                        
-                        if (firstIndex !== -1 && secondIndex !== -1) {
-                            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-                            console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser} (${tempSwap.swapType})`);
-                            console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
-                        }
-                        
-                        // Mark this swap as inactive and remove it
-                        tempSwap.isActive = false;
-                        global.tempSwaps.delete(swapId);
-                    }
-                }
-            }
-            
-            const nextUser = queue[currentTurn];
+            // Get next user for display
+            const nextUser = getCurrentTurnUser();
             
             const adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
                 `${t(userId, 'admin_completed_duty', {admin: userName})}\n` +
                 `${t(userId, 'helped_user', {user: currentUser})}\n` +
                 `${t(userId, 'next_turn', {user: nextUser})}` +
-                (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '') +
                 `\n\n${t(userId, 'admin_can_apply_punishment', {user: currentUser})}`;
             
             // Send confirmation to admin
@@ -1487,7 +1549,6 @@ function handleCommand(chatId, userId, userName, text) {
                         `${t(userChatId, 'admin_completed_duty', {admin: userName})}\n` +
                         `${t(userChatId, 'helped_user', {user: currentUser})}\n` +
                         `${t(userChatId, 'next_turn', {user: nextUser})}` +
-                        (punishmentTurnsRemaining > 0 ? `\n${t(userChatId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '') +
                         `\n\n${t(userChatId, 'admin_can_apply_punishment', {user: currentUser})}`;
                     
                     console.log(`🔔 Sending admin DONE notification to ${user} (${userChatId})`);
@@ -1511,8 +1572,13 @@ function handleCommand(chatId, userId, userName, text) {
                 return;
             }
             
-            const currentUser = queue[currentTurn];
+            const currentUser = getCurrentTurnUser();
             const userQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
+            
+            if (!currentUser) {
+                sendMessage(chatId, t(userId, 'no_one_in_queue'));
+                return;
+            }
             
             // Check if it's actually their turn
             if (userQueueName !== currentUser) {
@@ -1520,55 +1586,21 @@ function handleCommand(chatId, userId, userName, text) {
                 return;
             }
             
-            // Check if this was a punishment turn and remove it BEFORE advancing
-            const punishmentTurnsRemaining = punishmentTurns.get(currentUser) || 0;
-            if (punishmentTurnsRemaining > 0) {
-                punishmentTurns.set(currentUser, punishmentTurnsRemaining - 1);
-                
-                // Remove the FIRST occurrence of the punished user (always the punishment turn)
-                const punishmentIndex = queue.indexOf(currentUser);
-                if (punishmentIndex !== -1) {
-                    queue.splice(punishmentIndex, 1);
-                    console.log(`⚡ Punishment turn completed for ${currentUser}. Removed from queue. Remaining: ${punishmentTurnsRemaining - 1}`);
-                }
-                
-                // For punishment turns, don't advance currentTurn since queue has already shifted
-                // currentTurn stays the same because we removed the current position
-            } else {
-                // Only advance currentTurn for normal turns
-                advanceToNextUser();
-            }
+            // Increment the score for the user who completed their turn
+            incrementUserScore(currentUser);
             
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
             
-            // Check for temporary swap reversion - check ALL active swaps
-            if (global.tempSwaps && global.tempSwaps.size > 0) {
-                for (const [swapId, tempSwap] of global.tempSwaps.entries()) {
-                    if (tempSwap.isActive && currentUser === tempSwap.originalCurrentTurnUser) {
-                        // Revert this specific temporary swap
-                        const firstIndex = queue.indexOf(tempSwap.firstUser);
-                        const secondIndex = queue.indexOf(tempSwap.secondUser);
-                        
-                        if (firstIndex !== -1 && secondIndex !== -1) {
-                            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-                            console.log(`🔄 Temporary swap reverted: ${tempSwap.firstUser} ↔ ${tempSwap.secondUser} (${tempSwap.swapType})`);
-                            console.log(`🔍 DEBUG - After reversion: [${queue.join(', ')}]`);
-                        }
-                        
-                        // Mark this swap as inactive and remove it
-                        tempSwap.isActive = false;
-                        global.tempSwaps.delete(swapId);
-                    }
-                }
-            }
-            
-            const nextUser = queue[currentTurn];
+            // Get next user for display
+            const nextUser = getCurrentTurnUser();
             
             const doneMessage = `${t(userId, 'turn_completed')}\n\n` +
                 `${t(userId, 'completed_by', {user: currentUser})}\n` +
-                `${t(userId, 'next_turn', {user: nextUser})}` +
-                (punishmentTurnsRemaining > 0 ? `\n${t(userId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
+                `${t(userId, 'next_turn', {user: nextUser})}`;
+            
+            // Send confirmation to user
+            sendMessage(chatId, doneMessage);
             
             // Notify all authorized users and admins in their language
             [...authorizedUsers, ...admins].forEach(user => {
@@ -1579,8 +1611,7 @@ function handleCommand(chatId, userId, userName, text) {
                     // Create message in recipient's language
                     const userDoneMessage = `${t(userChatId, 'turn_completed')}\n\n` +
                         `${t(userChatId, 'completed_by', {user: currentUser})}\n` +
-                        `${t(userChatId, 'next_turn', {user: nextUser})}` +
-                        (punishmentTurnsRemaining > 0 ? `\n${t(userChatId, 'punishment_turns_remaining', {count: punishmentTurnsRemaining - 1})}` : '');
+                        `${t(userChatId, 'next_turn', {user: nextUser})}`;
                     
                     console.log(`🔔 Sending user DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, userDoneMessage);
@@ -1778,34 +1809,29 @@ function handleCommand(chatId, userId, userName, text) {
 
 // Apply punishment to a user (ONLY called by admin approval or admin direct action)
 function applyPunishment(targetUser, reason, appliedBy) {
-    // Apply punishment: 3 EXTRA turns IMMEDIATELY
+    // In the new score-based system, punishment = subtract 3 from score
+    // This makes them scheduled sooner (they have fewer turns performed)
+    const currentScore = userScores.get(targetUser) || 0;
+    userScores.set(targetUser, currentScore - 3);
+    
+    console.log(`⚖️ Punishment applied to ${targetUser}: ${currentScore} → ${currentScore - 3}`);
+    console.log(`🔍 DEBUG - Updated scores:`, Object.fromEntries(userScores));
+    
+    // Track punishment for statistics
     const punishmentCount = (userPunishments.get(targetUser)?.punishmentCount || 0) + 1;
-    const extraTurns = 3;
-    const endDate = new Date(Date.now() + (extraTurns * 24 * 60 * 60 * 1000)); // 3 days from now
+    const endDate = new Date(Date.now() + (3 * 24 * 60 * 60 * 1000)); // 3 days from now
     
     userPunishments.set(targetUser, {
         punishmentCount: punishmentCount,
-        extraTurns: extraTurns,
+        extraTurns: 3,
         endDate: endDate
     });
     
-    // Track punishment turns remaining
-    const currentPunishmentTurns = punishmentTurns.get(targetUser) || 0;
-    punishmentTurns.set(targetUser, currentPunishmentTurns + extraTurns);
-    
-    // Apply punishment IMMEDIATELY by adding 3 extra turns to the queue
-    console.log(`🔍 DEBUG - Before punishment: queue=[${queue.join(', ')}], currentTurn=${currentTurn}`);
-    
-    // Insert the punished user 3 times consecutively at the current position (immediately)
-    for (let i = 0; i < extraTurns; i++) {
-        queue.splice(currentTurn, 0, targetUser);
-        console.log(`🔍 DEBUG - After inserting turn ${i + 1}: queue=[${queue.join(', ')}]`);
-    }
-    
-    console.log(`🔍 DEBUG - After punishment: queue=[${queue.join(', ')}], currentTurn=${currentTurn}`);
+    // Get current turn user for display
+    const currentTurnUser = getCurrentTurnUser();
     
     // Notify all users
-    const message = `⚡ **PUNISHMENT APPLIED IMMEDIATELY!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${appliedBy}\n\n🚫 **Punishment:** ${extraTurns} EXTRA turns added RIGHT NOW!\n📊 **Total punishment turns:** ${currentPunishmentTurns + extraTurns}\n📅 **Ends:** ${endDate.toLocaleDateString()}`;
+    const message = `⚡ **PUNISHMENT APPLIED!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${appliedBy}\n\n🚫 **Punishment:** Score reduced by 3 (scheduled sooner)\n📊 **New score:** ${currentScore - 3}\n🎯 **Current turn:** ${currentTurnUser}`;
     
     // Send to all authorized users and admins
     [...authorizedUsers, ...admins].forEach(user => {
@@ -1815,7 +1841,7 @@ function applyPunishment(targetUser, reason, appliedBy) {
         }
     });
     
-    console.log(`⚡ Punishment applied IMMEDIATELY to ${targetUser}: ${reason} (by ${appliedBy}) - ${extraTurns} extra turns added to queue`);
+    console.log(`⚡ Punishment applied to ${targetUser}: ${reason} (by ${appliedBy}) - score reduced by 3`);
 }
 
 // Report user for punishment (NO strike counting)
@@ -2753,10 +2779,9 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
         console.log(`🔍 Queue contents:`, queue);
-        console.log(`🔍 Current turn:`, currentTurn);
         
-        // Only show current turn user for Force Swap (avoid misleading)
-        const currentUser = queue[currentTurn];
+        // Get current turn user using score-based system
+        const currentUser = getCurrentTurnUser();
         const royalCurrentUser = addRoyalEmoji(currentUser);
         const buttons = [[{ text: t(userId, 'current_turn_button', {user: royalCurrentUser}), callback_data: `force_swap_select_${currentUser}` }]];
         
@@ -2788,16 +2813,14 @@ function handleCallback(chatId, userId, userName, data) {
         const firstUser = dataWithoutPrefix.substring(0, lastUnderscoreIndex);
         const secondUser = dataWithoutPrefix.substring(lastUnderscoreIndex + 1);
         
-        // Execute immediate swap
-        const firstIndex = queue.indexOf(firstUser);
-        const secondIndex = queue.indexOf(secondUser);
-        
         console.log(`🔍 DEBUG - Force swap: ${firstUser} ↔ ${secondUser}`);
-        console.log(`🔍 DEBUG - Current queue: [${queue.join(', ')}]`);
-        console.log(`🔍 DEBUG - First user "${firstUser}" found at index: ${firstIndex}`);
-        console.log(`🔍 DEBUG - Second user "${secondUser}" found at index: ${secondIndex}`);
+        console.log(`🔍 DEBUG - Current scores:`, Object.fromEntries(userScores));
         
-        if (firstIndex !== -1 && secondIndex !== -1) {
+        // In the new score-based system, force swap means:
+        // The second user performs the first user's turn (favor/debt)
+        // Only the performing user's score increases
+        
+        if (originalQueue.includes(firstUser) && originalQueue.includes(secondUser)) {
             // Initialize anti-cheating tracking for swaps
             if (!global.swapTimestamps) global.swapTimestamps = [];
             
@@ -2805,96 +2828,41 @@ function handleCallback(chatId, userId, userName, data) {
             const now = Date.now();
             const tenMinutesAgo = now - (10 * 60 * 1000);
             
-            // Remove old timestamps (older than 10 minutes)
+            // Remove old timestamps
             global.swapTimestamps = global.swapTimestamps.filter(timestamp => timestamp > tenMinutesAgo);
             
-            // Add current swap timestamp
+            // Add current timestamp
             global.swapTimestamps.push(now);
             
-            // Check if we have 3+ swaps in 10 minutes
+            // Check if too many swaps
             if (global.swapTimestamps.length >= 3) {
-                // Only send alert if we haven't already alerted for this rapid swap session
-                if (!global.swapTimestamps.alertSent) {
-                    alertAdminsAboutCheating(userId, userName, 'rapid_swap', { swapCount: global.swapTimestamps.length });
-                    global.swapTimestamps.alertSent = true;
-                    console.log(`🚨 RAPID SWAP DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
-                }
-            } else {
-                // Reset alert flag when swap count drops below threshold
-                global.swapTimestamps.alertSent = false;
+                alertAdminsAboutCheating(userId, userName, 'rapid_swaps', { 
+                    swapCount: global.swapTimestamps.length,
+                    timeWindow: '10 minutes'
+                });
+                console.log(`🚨 RAPID SWAPS DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
             }
             
-            // Capture the original current turn user BEFORE the swap
-            const originalCurrentTurnUser = queue[currentTurn];
+            // In score-based system: second user performs first user's turn
+            // Only the performing user's score increases
+            incrementUserScore(secondUser);
             
-            // Swap positions in queue
-            console.log(`🔍 DEBUG - Before swap: queue[${firstIndex}] = "${queue[firstIndex]}", queue[${secondIndex}] = "${queue[secondIndex]}"`);
-            [queue[firstIndex], queue[secondIndex]] = [queue[secondIndex], queue[firstIndex]];
-            console.log(`🔍 DEBUG - After swap: queue[${firstIndex}] = "${queue[firstIndex]}", queue[${secondIndex}] = "${queue[secondIndex]}"`);
-            console.log(`🔍 DEBUG - After swap: [${queue.join(', ')}]`);
+            console.log(`🔍 DEBUG - Force swap completed: ${secondUser} performed ${firstUser}'s turn`);
+            console.log(`🔍 DEBUG - Updated scores:`, Object.fromEntries(userScores));
             
-            // Verify the swap actually happened
-            console.log(`🔍 DEBUG - Queue reference check: queue === global queue? ${queue === global.queue || 'No global.queue'}`);
+            // Update statistics
+            updateMonthlyStatistics(userName, 'admin_force_swap');
             
-            // Check if queue is being reset somewhere
-            setTimeout(() => {
-                console.log(`🔍 DEBUG - Queue after 100ms: [${queue.join(', ')}]`);
-            }, 100);
+            // Get current turn user for display
+            const currentTurnUser = getCurrentTurnUser();
             
-            // Update current turn if needed
-            // IMPORTANT: currentTurn should follow the user who had the turn to their new position
-            if (currentTurn === firstIndex) {
-                currentTurn = secondIndex;  // The user who had the turn is now at secondIndex
-            } else if (currentTurn === secondIndex) {
-                currentTurn = firstIndex;  // The user who had the turn is now at firstIndex
-            }
-            // Note: If currentTurn was not involved in the swap, it stays the same
-            // This means the current turn person remains the same, just their position in queue changes
-            
-            console.log(`🔍 DEBUG - After currentTurn update: currentTurn=${currentTurn}`);
-            
-            // FIX: After swapping, we need to update currentTurn to reflect the new positions
-            // The user who was at currentTurn position before the swap should now be at their new position
-            if (firstIndex === currentTurn) {
-                // The user who had the current turn (firstUser) is now at secondIndex
-                currentTurn = secondIndex;
-            } else if (secondIndex === currentTurn) {
-                // The user who had the current turn (secondUser) is now at firstIndex  
-                currentTurn = firstIndex;
-            }
-            // If currentTurn was not involved in the swap, it stays the same
-            console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
-            
-            // TEMPORARY SWAP: Mark this as a temporary swap that will revert after the original current turn person completes their turn
-            const tempSwap = {
-                firstUser: firstUser,
-                secondUser: secondUser,
-                originalCurrentTurnUser: originalCurrentTurnUser, // Who was originally at current turn position
-                isActive: true,
-                swapType: 'force_swap'
-            };
-            
-            // Store the temporary swap info with unique ID
-            if (!global.tempSwaps) global.tempSwaps = new Map();
-            const swapId = `force_swap_${Date.now()}`;
-            global.tempSwaps.set(swapId, tempSwap);
-            
-            console.log(`🔍 DEBUG - Temporary swap stored: ${firstUser}↔${secondUser} (will revert when ${tempSwap.originalCurrentTurnUser} completes their turn)`);
-            
-            // Notify all users in their language
+            // Notify all authorized users and admins
             [...authorizedUsers, ...admins].forEach(user => {
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
-                if (userChatId && userChatId !== chatId) { // Don't notify the admin who performed the swap
-                    // Create queue starting from current turn
-                    const queueFromCurrentTurn = [...queue.slice(currentTurn), ...queue.slice(0, currentTurn)];
-                    const queueDisplay = queueFromCurrentTurn.map((name, index) => {
-                        const actualIndex = (currentTurn + index) % queue.length;
-                        const isCurrentTurn = actualIndex === currentTurn;
-                        return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(userChatId, 'current_turn_status')})` : ''}`;
-                    }).join('\n');
-                    
+                
+                if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
-                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${firstUser} ↔ ${secondUser}**\n\n🔄 **${t(userChatId, 'next_lap')}:**\n${queueDisplay}`;
+                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${secondUser} performed ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
                 } else {
@@ -2902,7 +2870,7 @@ function handleCallback(chatId, userId, userName, data) {
                 }
             });
             
-            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${firstUser} ↔ ${secondUser}**`);
+            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${secondUser} performed ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`);
         } else {
             sendMessage(chatId, t(userId, 'error_users_not_found'));
         }
