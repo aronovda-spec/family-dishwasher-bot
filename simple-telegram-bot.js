@@ -2014,41 +2014,16 @@ function applyPunishment(targetUser, reason, appliedBy) {
     // Apply punishment IMMEDIATELY by adding 3 extra turns to the queue
     console.log(`🔍 DEBUG - Before punishment: queue=[${queue.join(', ')}], currentTurn=${currentTurn}`);
     
-    // Get the actual performer for the current turn
-    const scheduledUser = queue[currentTurn];
-    const actualPerformer = getActualPerformer(scheduledUser);
-    const punishedUser = actualPerformer; // Punish the actual performer, not the scheduled user
-    
-    console.log(`🔍 DEBUG - Scheduled user: ${scheduledUser}, Actual performer: ${actualPerformer}, Punishing: ${punishedUser}`);
-    
-    // Handle debt favors and debts when punishing the actual performer
-    if (actualPerformer !== scheduledUser) {
-        // The actual performer is performing someone else's turn due to a debt favor
-        if (hasActiveDebtFavor(scheduledUser) && getActiveDebtFavorCreditor(scheduledUser) === actualPerformer) {
-            // Clear the active debt favor since the actual performer is being punished
-            clearActiveDebtFavor(scheduledUser);
-            console.log(`🔍 DEBUG - Cleared active debt favor: ${actualPerformer} was performing ${scheduledUser}'s turn`);
-        }
-        
-        // Check if the actual performer owes a debt to the scheduled user
-        if (hasDebtsOwedTo(scheduledUser) && getNextDebtorFor(scheduledUser) === actualPerformer) {
-            // The actual performer is repaying a debt to the scheduled user
-            // Clear this debt repayment since the actual performer is being punished
-            repayDebt(actualPerformer, scheduledUser);
-            console.log(`🔍 DEBUG - Cleared debt repayment: ${actualPerformer} was repaying ${scheduledUser}'s debt`);
-        }
-    }
-    
-    // Insert the actual performer 3 times consecutively at the current position (immediately)
+    // Insert the punished user 3 times consecutively at the current position (immediately)
     for (let i = 0; i < extraTurns; i++) {
-        queue.splice(currentTurn, 0, punishedUser);
+        queue.splice(currentTurn, 0, targetUser);
         console.log(`🔍 DEBUG - After inserting turn ${i + 1}: queue=[${queue.join(', ')}]`);
     }
     
     console.log(`🔍 DEBUG - After punishment: queue=[${queue.join(', ')}], currentTurn=${currentTurn}`);
     
     // Notify all users
-    const message = `⚡ **PUNISHMENT APPLIED IMMEDIATELY!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${appliedBy}\n\n🚫 **Punishment:** ${extraTurns} EXTRA turns added RIGHT NOW!\n📊 **Total punishment turns:** ${currentPunishmentTurns + extraTurns}\n📅 **Ends:** ${endDate.toLocaleDateString()}\n\n💡 **Note:** Punishment applied to actual performer: ${punishedUser}`;
+    const message = `⚡ **PUNISHMENT APPLIED IMMEDIATELY!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${appliedBy}\n\n🚫 **Punishment:** ${extraTurns} EXTRA turns added RIGHT NOW!\n📊 **Total punishment turns:** ${currentPunishmentTurns + extraTurns}\n📅 **Ends:** ${endDate.toLocaleDateString()}`;
     
     // Send to all authorized users and admins
     [...authorizedUsers, ...admins].forEach(user => {
