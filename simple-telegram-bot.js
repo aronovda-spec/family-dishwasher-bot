@@ -31,6 +31,11 @@ function getCurrentTurnUser() {
     let currentUser = null;
     
     for (const user of originalQueue) {
+        // Skip suspended users
+        if (suspendedUsers.has(user)) {
+            continue;
+        }
+        
         const score = userScores.get(user) || 0;
         if (score < lowestScore) {
             lowestScore = score;
@@ -59,6 +64,11 @@ function getNextThreeTurns() {
         let nextUser = null;
         
         for (const user of originalQueue) {
+            // Skip suspended users
+            if (suspendedUsers.has(user)) {
+                continue;
+            }
+            
             const score = tempScores.get(user) || 0;
             if (score < lowestScore) {
                 lowestScore = score;
@@ -88,6 +98,27 @@ function incrementUserScore(userName) {
     const currentScore = userScores.get(userName) || 0;
     userScores.set(userName, currentScore + 1);
     console.log(`📊 ${userName} score incremented: ${currentScore} → ${currentScore + 1}`);
+    
+    // Check if normalization is needed (when scores get too high)
+    normalizeScoresIfNeeded();
+}
+
+function normalizeScoresIfNeeded() {
+    const scores = Array.from(userScores.values());
+    const maxScore = Math.max(...scores);
+    
+    // Normalize when any score reaches 100 or higher
+    if (maxScore >= 100) {
+        const minScore = Math.min(...scores);
+        
+        // Subtract the minimum score from all users
+        for (const [user, score] of userScores.entries()) {
+            userScores.set(user, score - minScore);
+        }
+        
+        console.log(`🔄 Scores normalized: subtracted ${minScore} from all users`);
+        console.log(`🔍 DEBUG - Normalized scores:`, Object.fromEntries(userScores));
+    }
 }
 
 function applyPunishment(userName) {
@@ -211,50 +242,33 @@ function checkAndCleanExpiredSuspensions() {
     });
 }
 
-// Helper function to suspend user (remove from queue, preserve punishment debt)
+// Helper function to suspend user (preserve score, mark as suspended)
 function suspendUser(userName, days, reason = null) {
-    const userPositions = getAllUserPositions(userName);
-    if (userPositions.length === 0) {
-        console.log(`⚠️ Cannot suspend ${userName} - not in queue`);
+    // Check if user exists in original queue
+    if (!originalQueue.includes(userName)) {
+        console.log(`⚠️ Cannot suspend ${userName} - not in original queue`);
         return false;
     }
     
-    // Calculate punishment debt
-    const normalTurns = 1; // Every user has 1 normal turn
-    const punishmentTurnsInQueue = userPositions.length - normalTurns;
-    const punishmentTurnsInCounter = punishmentTurns.get(userName) || 0;
-    
-    // Total punishment debt is the maximum of what's in queue vs counter
-    const totalPunishmentDebt = Math.max(punishmentTurnsInQueue, punishmentTurnsInCounter);
-    
-    // Store suspension data with punishment debt
+    // Store suspension data (preserve current score)
+    const currentScore = userScores.get(userName) || 0;
     const suspendUntil = new Date();
     suspendUntil.setDate(suspendUntil.getDate() + days);
     
     suspendedUsers.set(userName, {
         suspendedUntil: suspendUntil,
         reason: reason || `Suspended for ${days} day${days > 1 ? 's' : ''}`,
-        originalPosition: userPositions[0], // Store first position
-        punishmentDebt: totalPunishmentDebt
+        originalScore: currentScore // Preserve score
     });
     
     // Track suspension for monthly report
     trackMonthlyAction('suspension', userName, null, days);
     
-    // Remove all occurrences from queue
-    const removedCount = removeAllUserOccurrences(userName);
-    
-    // Clear punishment counter (debt is now stored in suspension)
-    punishmentTurns.delete(userName);
-    
-    // Adjust currentTurn
-    adjustCurrentTurnAfterRemoval(userPositions);
-    
-    console.log(`✈️ ${userName} suspended with ${totalPunishmentDebt} punishment debt preserved. Removed ${removedCount} turns. New queue: [${queue.join(', ')}]`);
+    console.log(`✈️ ${userName} suspended for ${days} days. Score preserved: ${currentScore}`);
     return true;
 }
 
-// Helper function to reactivate user (add back to queue with punishment debt)
+// Helper function to reactivate user (restore original score)
 function reactivateUser(userName) {
     if (!suspendedUsers.has(userName)) {
         console.log(`⚠️ Cannot reactivate ${userName} - not suspended`);
@@ -262,27 +276,15 @@ function reactivateUser(userName) {
     }
     
     const suspension = suspendedUsers.get(userName);
-    const punishmentDebt = suspension.punishmentDebt || 0;
+    const originalScore = suspension.originalScore || 0;
     
-    // Add user back to queue (normal turn)
-    queue.push(userName);
-    
-    // Restore punishment debt if any
-    if (punishmentDebt > 0) {
-        punishmentTurns.set(userName, punishmentDebt);
-        
-        // Add punishment turns to queue
-        for (let i = 0; i < punishmentDebt; i++) {
-            queue.push(userName);
-        }
-        
-        console.log(`✅ ${userName} reactivated with ${punishmentDebt} punishment turns restored. New queue: [${queue.join(', ')}]`);
-    } else {
-        console.log(`✅ ${userName} reactivated with no punishment debt. New queue: [${queue.join(', ')}]`);
-    }
+    // Restore original score
+    userScores.set(userName, originalScore);
     
     // Clear suspension
     suspendedUsers.delete(userName);
+    
+    console.log(`✅ ${userName} reactivated. Score restored: ${originalScore}`);
     return true;
 }
 
@@ -2369,7 +2371,7 @@ function handleCallback(chatId, userId, userName, data) {
                 { text: t(userId, 'remove_user'), callback_data: "remove_user_menu" }
             ],
             [
-                { text: t(userId, 'reset_queue'), callback_data: "reset_queue_confirm" }
+                { text: '🔄 Reset Scores', callback_data: "reset_scores_menu" }
             ]
         ];
         
@@ -2377,10 +2379,27 @@ function handleCallback(chatId, userId, userName, data) {
         
     // Queue Management Handlers
     } else if (data === 'reorder_queue_menu') {
-        // Step 1: Select user to reorder
+        // Show current tie-breaker order and options to change it
+        const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
+        const message = `🔄 **Reorder Tie-Breaker Priority**\n\n📋 **Current Priority Order:**\n${currentOrder}\n\n💡 **This affects who gets priority when scores are equal.**\n\n**Options:**`;
+        
+        const buttons = [
+            [
+                { text: '🔄 Set Custom Order', callback_data: 'reorder_custom_order' },
+                { text: '🔄 Reset to Default', callback_data: 'reorder_reset_default' }
+            ],
+            [
+                { text: '📊 View Current Order', callback_data: 'reorder_view_current' }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, message, buttons);
+        
+    } else if (data === 'reorder_custom_order') {
+        // Step 1: Select user to move
         const queueUsers = ['Eden', 'Adele', 'Emma'];
         const buttons = queueUsers.map(user => [{ text: addRoyalEmoji(user), callback_data: `reorder_select_${user}` }]);
-        sendMessageWithButtons(chatId, t(userId, 'select_user_to_reorder'), buttons);
+        sendMessageWithButtons(chatId, 'Select user to move to a different priority position:', buttons);
         
     } else if (data.startsWith('reorder_select_')) {
         // Step 2: Select new position for user
@@ -2393,132 +2412,113 @@ function handleCallback(chatId, userId, userName, data) {
         sendMessageWithButtons(chatId, t(userId, 'select_new_position', {user: addRoyalEmoji(selectedUser)}), positionButtons);
         
     } else if (data.startsWith('reorder_position_')) {
-        // Execute reorder (rebuild queue in desired order)
+        // Execute reorder (change tie-breaker priority order)
         const parts = data.replace('reorder_position_', '').split('_');
         const selectedUser = parts[0];
         const newPosition = parseInt(parts[1]) - 1; // Convert to 0-based index
         
-        // Get all positions of user (including punishment turns)
-        const userPositions = getAllUserPositions(selectedUser);
+        // Create new priority order
+        const newOrder = [...originalQueue];
+        const currentIndex = newOrder.indexOf(selectedUser);
         
-        if (userPositions.length > 0) {
-            // Store current queue state
-            const originalQueue = [...queue];
-            const originalCurrentTurn = currentTurn;
+        if (currentIndex !== -1 && newPosition >= 0 && newPosition < newOrder.length) {
+            // Remove user from current position
+            newOrder.splice(currentIndex, 1);
+            // Insert at new position
+            newOrder.splice(newPosition, 0, selectedUser);
             
-            // Extract the user and their punishment turns
-            const removedUsers = [];
-            for (let i = userPositions.length - 1; i >= 0; i--) {
-                removedUsers.unshift(queue.splice(userPositions[i], 1)[0]);
-            }
+            // Update the originalQueue (tie-breaker order)
+            originalQueue.length = 0;
+            originalQueue.push(...newOrder);
             
-            // Get the base queue (unique users only)
-            const baseQueue = ['Eden', 'Adele', 'Emma'];
-            const otherUsers = baseQueue.filter(user => user !== selectedUser);
+            console.log(`🔄 Tie-breaker order updated: ${newOrder.join(' → ')}`);
             
-            // Build new base order
-            const newBaseOrder = [];
-            for (let i = 0; i < baseQueue.length; i++) {
-                if (i === newPosition) {
-                    newBaseOrder.push(selectedUser);
-                }
-                if (otherUsers.length > 0) {
-                    const nextUser = otherUsers.shift();
-                    if (nextUser !== selectedUser) {
-                        newBaseOrder.push(nextUser);
-                    }
-                }
-            }
+            // Track for monthly report
+            trackMonthlyAction('queue_reorder', null, userName);
             
-            // If position is at the end and not yet added
-            if (newPosition >= newBaseOrder.length && !newBaseOrder.includes(selectedUser)) {
-                newBaseOrder.push(selectedUser);
-            }
+            const newOrderText = newOrder.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
+            const message = `✅ **Tie-Breaker Order Updated!**\n\n📋 **New Priority Order:**\n${newOrderText}\n\n💡 **This affects who gets priority when scores are equal.**`;
             
-            // Rebuild queue with punishment turns
-            queue.length = 0; // Clear queue
-            
-            // Add base users
-            newBaseOrder.forEach(user => {
-                queue.push(user);
-            });
-            
-            // Add punishment turns back for the moved user
-            const punishmentCount = removedUsers.length - 1; // -1 for the normal turn
-            for (let i = 0; i < punishmentCount; i++) {
-                queue.push(selectedUser);
-            }
-            
-            // Add punishment turns for other users (if any)
-            baseQueue.forEach(user => {
-                if (user !== selectedUser) {
-                    const userPunishments = punishmentTurns.get(user) || 0;
-                    for (let i = 0; i < userPunishments; i++) {
-                        queue.push(user);
-                    }
-                }
-            });
-            
-            // Adjust currentTurn to point to the same logical position
-            const currentUserInOriginal = originalQueue[originalCurrentTurn];
-            const newCurrentIndex = queue.indexOf(currentUserInOriginal);
-            currentTurn = newCurrentIndex !== -1 ? newCurrentIndex : 0;
-            
-            const punishmentNote = punishmentCount > 0 ? ` (including ${punishmentCount} punishment turns)` : '';
-            const reorderMessage = `${t(userId, 'queue_reordered')}${punishmentNote}\n\n${t(userId, 'new_queue_order_is')}\n${queue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n')}`;
-            sendMessage(chatId, reorderMessage);
+            sendMessage(chatId, message);
         } else {
-            sendMessage(chatId, `❌ Cannot reorder ${addRoyalEmoji(selectedUser)} - not found in queue`);
+            sendMessage(chatId, '❌ Invalid position selected.');
         }
+        
+    } else if (data === 'reorder_reset_default') {
+        // Reset to default order
+        const defaultOrder = ['Eden', 'Adele', 'Emma'];
+        originalQueue.length = 0;
+        originalQueue.push(...defaultOrder);
+        
+        console.log(`🔄 Tie-breaker order reset to default: ${defaultOrder.join(' → ')}`);
+        
+        // Track for monthly report
+        trackMonthlyAction('queue_reorder', null, userName);
+        
+        const defaultOrderText = defaultOrder.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
+        const message = `✅ **Tie-Breaker Order Reset to Default!**\n\n📋 **Default Priority Order:**\n${defaultOrderText}`;
+        
+        sendMessage(chatId, message);
+        
+    } else if (data === 'reorder_view_current') {
+        // Show current order
+        const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmoji(user)}`).join('\n');
+        const message = `📋 **Current Tie-Breaker Priority Order:**\n\n${currentOrder}\n\n💡 **This affects who gets priority when scores are equal.**`;
+        
+        sendMessage(chatId, message);
         
     } else if (data === 'queue_statistics_show') {
         // Show queue statistics
-        let statsMessage = `${t(userId, 'queue_statistics_title')}\n\n`;
+        let statsMessage = `📊 **Queue Statistics**\n\n`;
         
-        // Current queue order (active users only)
-        statsMessage += `${t(userId, 'current_queue_order')}\n`;
-        queue.forEach((user, index) => {
+        // Current tie-breaker priority order
+        statsMessage += `📋 **Tie-Breaker Priority Order:**\n`;
+        originalQueue.forEach((user, index) => {
             const emoji = addRoyalEmoji(user);
             statsMessage += `${index + 1}. ${emoji}\n`;
         });
         
-        // Statistics (placeholder for now - can be enhanced later)
-        statsMessage += `\n${t(userId, 'total_completions')}\n`;
-        ['Eden', 'Adele', 'Emma'].forEach(user => {
-            const stats = queueStatistics.get(user) || { totalCompletions: 0 };
-            statsMessage += `${addRoyalEmoji(user)}: ${stats.totalCompletions}\n`;
+        // Current scores
+        statsMessage += `\n📊 **Current Scores:**\n`;
+        const relativeScores = getRelativeScores();
+        originalQueue.forEach(user => {
+            const score = userScores.get(user) || 0;
+            const relativeScore = relativeScores.get(user) || 0;
+            const emoji = addRoyalEmoji(user);
+            statsMessage += `${emoji}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
         });
         
-        // Suspended users with punishment debt
-        const suspended = Array.from(suspendedUsers.entries());
-        if (suspended.length > 0) {
-            statsMessage += `\n${t(userId, 'suspended_users_list')}\n`;
-            suspended.forEach(([user, data]) => {
-                const date = data.suspendedUntil.toLocaleDateString();
-                const debtText = data.punishmentDebt > 0 ? ` (${data.punishmentDebt} punishment turns)` : '';
-                
-                // Check if this is a permanent removal (100+ year suspension)
-                const now = new Date();
-                const yearsUntilExpiry = (data.suspendedUntil - now) / (1000 * 60 * 60 * 24 * 365);
-                const isPermanent = yearsUntilExpiry > 50; // If more than 50 years, consider it permanent
-                
-                if (isPermanent) {
-                    statsMessage += `${addRoyalEmoji(user)}: ${t(userId, 'permanently_removed')}${debtText}\n`;
-                } else {
-                    statsMessage += `${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}${debtText}\n`;
-                }
-            });
+        // Current turn and next 3 turns
+        const currentUser = getCurrentTurnUser();
+        const nextThreeTurns = getNextThreeTurns();
+        statsMessage += `\n🎯 **Current Turn:** ${addRoyalEmoji(currentUser)}\n`;
+        statsMessage += `📅 **Next 3 Turns:** ${nextThreeTurns.map(user => addRoyalEmoji(user)).join(' → ')}\n`;
+        
+        // Suspended users
+        if (suspendedUsers.size > 0) {
+            statsMessage += `\n✈️ **Suspended Users:**\n`;
+            for (const [user, suspension] of suspendedUsers.entries()) {
+                const emoji = addRoyalEmoji(user);
+                const daysLeft = Math.ceil((suspension.suspendedUntil - new Date()) / (1000 * 60 * 60 * 24));
+                statsMessage += `${emoji}: ${daysLeft} day${daysLeft > 1 ? 's' : ''} left\n`;
+            }
+        }
+        
+        // Active turn assignments
+        if (turnAssignments.size > 0) {
+            statsMessage += `\n🔄 **Active Turn Assignments:**\n`;
+            for (const [originalUser, assignedTo] of turnAssignments.entries()) {
+                const originalEmoji = addRoyalEmoji(originalUser);
+                const assignedEmoji = addRoyalEmoji(assignedTo);
+                statsMessage += `${originalEmoji} → ${assignedEmoji}\n`;
+            }
         }
         
         sendMessage(chatId, statsMessage);
         
     } else if (data === 'suspend_user_menu') {
-        // Select user to suspend (only show users currently in queue)
-        if (queue.length === 0) {
-            sendMessage(chatId, 'No users in queue to suspend.');
-            return;
-        }
-        const buttons = queue.map(user => [{ text: addRoyalEmoji(user), callback_data: `suspend_select_${user}` }]);
+        // Select user to suspend (show all users in originalQueue)
+        const buttons = originalQueue.map(user => [{ text: addRoyalEmoji(user), callback_data: `suspend_select_${user}` }]);
         sendMessageWithButtons(chatId, t(userId, 'select_user_to_suspend'), buttons);
         
     } else if (data.startsWith('suspend_select_')) {
@@ -2591,21 +2591,163 @@ function handleCallback(chatId, userId, userName, data) {
             sendMessage(chatId, `❌ Failed to remove ${addRoyalEmoji(selectedUser)}`);
         }
         
-    } else if (data === 'reset_queue_confirm') {
-        // Confirm queue reset
-        const confirmButtons = [
-            [{ text: t(userId, 'confirm_reset'), callback_data: 'reset_queue_execute' }],
-            [{ text: t(userId, 'cancel'), callback_data: 'maintenance_menu' }]
-        ];
-        sendMessageWithButtons(chatId, t(userId, 'queue_reset_confirm'), confirmButtons);
+    } else if (data === 'reset_scores_menu') {
+        // Show reset scores options
+        const currentScores = originalQueue.map(user => {
+            const score = userScores.get(user) || 0;
+            return `${addRoyalEmoji(user)}: ${score}`;
+        }).join('\n');
         
-    } else if (data === 'reset_queue_execute') {
-        // Execute queue reset
-        queue.length = 0;
-        queue.push(...originalQueueOrder);
-        currentTurn = 0;
+        const message = `🔄 **Reset Scores Menu**\n\n📊 **Current Scores:**\n${currentScores}\n\n**Options:**`;
+        
+        const buttons = [
+            [
+                { text: '🔄 Reset All Scores (All → 0)', callback_data: 'reset_all_scores_confirm' },
+                { text: '👤 Reset Individual', callback_data: 'reset_individual_scores' }
+            ],
+            [
+                { text: '📊 Normalize Scores', callback_data: 'normalize_scores_confirm' },
+                { text: '🔄 Reset System (Everything)', callback_data: 'reset_system_confirm' }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, message, buttons);
+        
+    } else if (data === 'reset_all_scores_confirm') {
+        // Confirm reset all scores
+        const confirmButtons = [
+            [{ text: '✅ Confirm Reset All', callback_data: 'reset_all_scores_execute' }],
+            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+        ];
+        sendMessageWithButtons(chatId, '⚠️ **Confirm Reset All Scores**\n\nThis will reset all user scores to 0. Continue?', confirmButtons);
+        
+    } else if (data === 'reset_all_scores_execute') {
+        // Execute reset all scores
+        originalQueue.forEach(user => {
+            userScores.set(user, 0);
+        });
+        
+        console.log('🔄 All scores reset to 0');
+        
+        // Track for monthly report
+        trackMonthlyAction('queue_reorder', null, userName);
+        
+        const newScores = originalQueue.map(user => `${addRoyalEmoji(user)}: 0`).join('\n');
+        const message = `✅ **All Scores Reset!**\n\n📊 **New Scores:**\n${newScores}\n\n🎯 **Next turn will be based on tie-breaker order.**`;
+        
+        sendMessage(chatId, message);
+        
+    } else if (data === 'reset_individual_scores') {
+        // Select user to reset score
+        const buttons = originalQueue.map(user => {
+            const currentScore = userScores.get(user) || 0;
+            return [{ text: `${addRoyalEmoji(user)} (${currentScore})`, callback_data: `reset_score_select_${user}` }];
+        });
+        sendMessageWithButtons(chatId, 'Select user to reset their score to 0:', buttons);
+        
+    } else if (data.startsWith('reset_score_select_')) {
+        // Confirm individual score reset
+        const selectedUser = data.replace('reset_score_select_', '');
+        const currentScore = userScores.get(selectedUser) || 0;
+        
+        const confirmButtons = [
+            [{ text: `✅ Reset ${addRoyalEmoji(selectedUser)}`, callback_data: `reset_score_execute_${selectedUser}` }],
+            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+        ];
+        
+        const message = `⚠️ **Confirm Reset Score**\n\n${addRoyalEmoji(selectedUser)} current score: **${currentScore}**\n\nReset to 0?`;
+        sendMessageWithButtons(chatId, message, confirmButtons);
+        
+    } else if (data.startsWith('reset_score_execute_')) {
+        // Execute individual score reset
+        const selectedUser = data.replace('reset_score_execute_', '');
+        const oldScore = userScores.get(selectedUser) || 0;
+        
+        userScores.set(selectedUser, 0);
+        
+        console.log(`🔄 ${selectedUser} score reset: ${oldScore} → 0`);
+        
+        // Track for monthly report
+        trackMonthlyAction('queue_reorder', null, userName);
+        
+        const message = `✅ **Score Reset!**\n\n${addRoyalEmoji(selectedUser)}: ${oldScore} → **0**\n\n🎯 **This may affect turn order.**`;
+        sendMessage(chatId, message);
+        
+    } else if (data === 'reset_system_confirm') {
+        // Confirm full system reset
+        const confirmButtons = [
+            [{ text: '⚠️ Reset Everything', callback_data: 'reset_system_execute' }],
+            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+        ];
+        sendMessageWithButtons(chatId, '⚠️ **Confirm Full System Reset**\n\nThis will:\n• Reset all scores to 0\n• Clear all turn assignments\n• Clear all suspensions\n• Reset tie-breaker order\n\n**This is irreversible!**', confirmButtons);
+        
+    } else if (data === 'reset_system_execute') {
+        // Execute full system reset
+        // Reset all scores
+        originalQueue.forEach(user => {
+            userScores.set(user, 0);
+        });
+        
+        // Clear all assignments
+        turnAssignments.clear();
+        
+        // Clear all suspensions
         suspendedUsers.clear();
-        sendMessage(chatId, t(userId, 'queue_reset_success'));
+        
+        // Reset tie-breaker order to default
+        originalQueue.length = 0;
+        originalQueue.push('Eden', 'Adele', 'Emma');
+        
+        console.log('🔄 Full system reset completed');
+        
+        // Track for monthly report
+        trackMonthlyAction('queue_reorder', null, userName);
+        
+        const message = `✅ **Full System Reset Complete!**\n\n📊 **All scores reset to 0**\n🔄 **All assignments cleared**\n✈️ **All suspensions cleared**\n📋 **Tie-breaker order reset to default**\n\n🎯 **System is now in default state.**`;
+        sendMessage(chatId, message);
+        
+    } else if (data === 'normalize_scores_confirm') {
+        // Show what normalization will do
+        const scores = Array.from(userScores.values());
+        const minScore = Math.min(...scores);
+        const maxScore = Math.max(...scores);
+        
+        const currentScores = originalQueue.map(user => {
+            const score = userScores.get(user) || 0;
+            const newScore = score - minScore;
+            return `${addRoyalEmoji(user)}: ${score} → ${newScore}`;
+        }).join('\n');
+        
+        const message = `📊 **Normalize Scores**\n\n**Current Scores:**\n${currentScores}\n\n**This will subtract ${minScore} from all scores to keep numbers manageable.**\n\n**Continue?**`;
+        
+        const confirmButtons = [
+            [{ text: '✅ Normalize Now', callback_data: 'normalize_scores_execute' }],
+            [{ text: '❌ Cancel', callback_data: 'reset_scores_menu' }]
+        ];
+        sendMessageWithButtons(chatId, message, confirmButtons);
+        
+    } else if (data === 'normalize_scores_execute') {
+        // Execute score normalization
+        const scores = Array.from(userScores.values());
+        const minScore = Math.min(...scores);
+        
+        // Subtract the minimum score from all users
+        for (const [user, score] of userScores.entries()) {
+            userScores.set(user, score - minScore);
+        }
+        
+        console.log(`🔄 Manual score normalization: subtracted ${minScore} from all users`);
+        
+        // Track for monthly report
+        trackMonthlyAction('queue_reorder', null, userName);
+        
+        const newScores = originalQueue.map(user => {
+            const score = userScores.get(user) || 0;
+            return `${addRoyalEmoji(user)}: ${score}`;
+        }).join('\n');
+        
+        const message = `✅ **Scores Normalized!**\n\n📊 **New Scores:**\n${newScores}\n\n🎯 **Relative positions maintained, numbers reduced.**`;
+        sendMessage(chatId, message);
         
     } else if (data === 'language_switch') {
         const currentLang = getUserLanguage(userId);
