@@ -1365,9 +1365,6 @@ function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'done'), callback_data: "done" }
                 ],
                 [
-                    { text: t(userId, 'help'), callback_data: "help" }
-                ],
-                [
                     { text: t(userId, 'force_swap'), callback_data: "force_swap_menu" },
                     { text: t(userId, 'apply_punishment'), callback_data: "apply_punishment_menu" }
                 ],
@@ -1381,6 +1378,9 @@ function handleCommand(chatId, userId, userName, text) {
                 ],
                 [
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
+                ],
+                [
+                    { text: t(userId, 'help'), callback_data: "help" }
                 ],
                 [
                     { text: t(userId, 'language_switch'), callback_data: "language_switch" }
