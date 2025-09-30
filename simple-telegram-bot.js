@@ -831,7 +831,10 @@ const translations = {
         'help_admin_features': '👨‍💼 **Admin Features:**\n',
         'help_admin_explanation': '• **Force Swap** - Force swap turns\n• **Apply Punishment** - Apply direct punishment\n• **Suspend/Reactivate** - Suspend and reactivate users\n• **Reset Scores** - Reset scores (all, individual, or normalize)\n• **Reorder Queue** - Change tie-breaker order\n• **Queue Statistics** - Detailed statistics\n• **Monthly Report** - Detailed monthly report\n\n',
         'help_tie_breaker': '🎯 **Tie-breaker Order:** Eden → Adele → Emma\n\n',
-        'help_tip': '💡 **Tip:** Use buttons for easier navigation!'
+        'help_tip': '💡 **Tip:** Use buttons for easier navigation!',
+        
+        // Queue Statistics (missing in English)
+        'current_scores': '📊 **Current Scores:**\n'
     },
     he: {
         // Menu titles
