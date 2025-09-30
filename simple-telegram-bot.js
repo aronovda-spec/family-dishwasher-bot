@@ -3518,7 +3518,7 @@ const server = http.createServer((req, res) => {
             timestamp: new Date().toISOString(),
             instance: instanceId,
             queue: queue.length,
-            currentTurn: currentTurn
+            currentTurnUser: getCurrentTurnUser()
         }));
         return;
     }
