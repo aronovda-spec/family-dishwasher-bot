@@ -15,6 +15,7 @@ const botUrl = `https://api.telegram.org/bot${token}`;
 const originalQueue = ['Eden', 'Adele', 'Emma']; // Original order for tie-breaking
 const userScores = new Map(); // userName -> score (number of turns performed)
 const queue = ['Eden', 'Adele', 'Emma']; // Keep for compatibility, but order doesn't matter for turn selection
+const turnAssignments = new Map(); // userName -> assignedTo (for force swaps)
 
 // Initialize scores to 0 for all users
 originalQueue.forEach(user => {
@@ -37,12 +38,19 @@ function getCurrentTurnUser() {
         }
     }
     
+    // Check if this user has been assigned to someone else
+    const assignedTo = turnAssignments.get(currentUser);
+    if (assignedTo) {
+        return assignedTo; // Return the assigned user instead
+    }
+    
     return currentUser;
 }
 
 function getNextThreeTurns() {
     // Simulate next 3 turns by temporarily adjusting scores
     const tempScores = new Map(userScores);
+    const tempAssignments = new Map(turnAssignments);
     const turns = [];
     
     for (let i = 0; i < 3; i++) {
@@ -59,8 +67,16 @@ function getNextThreeTurns() {
         }
         
         if (nextUser) {
-            turns.push(nextUser);
-            // Increment their score for next iteration
+            // Check if this user has been assigned to someone else
+            const assignedTo = tempAssignments.get(nextUser);
+            if (assignedTo) {
+                turns.push(assignedTo); // Show the assigned user
+                // Clear the assignment after using it
+                tempAssignments.delete(nextUser);
+            } else {
+                turns.push(nextUser);
+            }
+            // Increment the original user's score for next iteration
             tempScores.set(nextUser, (tempScores.get(nextUser) || 0) + 1);
         }
     }
@@ -1473,19 +1489,14 @@ function handleCommand(chatId, userId, userName, text) {
             });
         }
         
-        // Show active temporary swaps information
-        if (global.tempSwaps && global.tempSwaps.size > 0) {
-            const activeSwaps = Array.from(global.tempSwaps.entries()).filter(([id, swap]) => swap.isActive);
-            
-            if (activeSwaps.length > 0) {
-                statusMessage += `\n\n⚠️ **${t(userId, 'temporary_swaps_active')}**`;
-                activeSwaps.forEach(([swapId, swap]) => {
-                    const swapTypeText = swap.swapType === 'force_swap' ? t(userId, 'force_swap_type') : t(userId, 'user_swap_type');
-                    statusMessage += `\n• ${swap.firstUser} ↔ ${swap.secondUser} (${swapTypeText}) - ${t(userId, 'reverts_when_completes', {user: swap.originalCurrentTurnUser})}`;
-                });
+        // Show active turn assignments (force swaps)
+        if (turnAssignments.size > 0) {
+            statusMessage += `\n\n🔄 **Active Turn Assignments:**`;
+            for (const [originalUser, assignedUser] of turnAssignments.entries()) {
+                const royalOriginal = addRoyalEmoji(originalUser);
+                const royalAssigned = addRoyalEmoji(assignedUser);
+                statusMessage += `\n• ${royalOriginal} → ${royalAssigned}`;
             }
-        } else {
-            statusMessage += `\n\n✅ **${t(userId, 'no_active_swaps')}**`;
         }
         
         sendMessage(chatId, statusMessage);
@@ -1520,8 +1531,23 @@ function handleCommand(chatId, userId, userName, text) {
                 return;
             }
             
-            // Increment the score for the user whose turn was completed
+            // Find the original user whose turn this was (in case of assignment)
+            let originalUser = currentUser;
+            for (const [user, assignedTo] of turnAssignments.entries()) {
+                if (assignedTo === currentUser) {
+                    originalUser = user;
+                    break;
+                }
+            }
+            
+            // Increment the score for the user who actually completed the turn (currentUser)
             incrementUserScore(currentUser);
+            
+            // Clear the assignment if it was assigned
+            if (originalUser !== currentUser) {
+                turnAssignments.delete(originalUser);
+                console.log(`🔍 DEBUG - Assignment cleared: ${originalUser} -> ${currentUser}`);
+            }
             
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
@@ -1586,8 +1612,23 @@ function handleCommand(chatId, userId, userName, text) {
                 return;
             }
             
-            // Increment the score for the user who completed their turn
+            // Find the original user whose turn this was (in case of assignment)
+            let originalUser = currentUser;
+            for (const [user, assignedTo] of turnAssignments.entries()) {
+                if (assignedTo === currentUser) {
+                    originalUser = user;
+                    break;
+                }
+            }
+            
+            // Increment the score for the user who actually completed the turn (currentUser)
             incrementUserScore(currentUser);
+            
+            // Clear the assignment if it was assigned
+            if (originalUser !== currentUser) {
+                turnAssignments.delete(originalUser);
+                console.log(`🔍 DEBUG - Assignment cleared: ${originalUser} -> ${currentUser}`);
+            }
             
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
@@ -2795,9 +2836,8 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data.startsWith('force_swap_select_')) {
         const firstUser = data.replace('force_swap_select_', '');
         
-        // Get unique users excluding the current turn user
-        const uniqueUsers = [...new Set(queue)];
-        const remainingUsers = uniqueUsers.filter(name => name !== firstUser);
+        // Get all users from original queue excluding the current turn user
+        const remainingUsers = originalQueue.filter(name => name !== firstUser);
         
         const buttons = remainingUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `force_swap_execute_${firstUser}_${name}` }]);
         const royalFirstUser = addRoyalEmoji(firstUser);
@@ -2843,15 +2883,12 @@ function handleCallback(chatId, userId, userName, data) {
                 console.log(`🚨 RAPID SWAPS DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
             }
             
-            // In score-based system: second user performs first user's turn
-            // Only the performing user's score increases
-            incrementUserScore(secondUser);
-            
-            console.log(`🔍 DEBUG - Force swap completed: ${secondUser} performed ${firstUser}'s turn`);
-            console.log(`🔍 DEBUG - Updated scores:`, Object.fromEntries(userScores));
-            
-            // Update statistics
-            updateMonthlyStatistics(userName, 'admin_force_swap');
+            // In score-based system: force swap just reassigns the turn
+            // No score changes - the assigned user will complete the turn later
+            turnAssignments.set(firstUser, secondUser);
+            console.log(`🔍 DEBUG - Force swap completed: ${secondUser} assigned to perform ${firstUser}'s turn`);
+            console.log(`🔍 DEBUG - Turn assignments:`, Object.fromEntries(turnAssignments));
+            console.log(`🔍 DEBUG - Scores unchanged:`, Object.fromEntries(userScores));
             
             // Get current turn user for display
             const currentTurnUser = getCurrentTurnUser();
@@ -2862,7 +2899,7 @@ function handleCallback(chatId, userId, userName, data) {
                 
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
-                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${secondUser} performed ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`;
+                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${secondUser} assigned to perform ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
                 } else {
@@ -2870,7 +2907,7 @@ function handleCallback(chatId, userId, userName, data) {
                 }
             });
             
-            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${secondUser} performed ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`);
+            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${secondUser} assigned to perform ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`);
         } else {
             sendMessage(chatId, t(userId, 'error_users_not_found'));
         }
