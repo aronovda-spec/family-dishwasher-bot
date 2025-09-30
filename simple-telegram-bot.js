@@ -519,9 +519,9 @@ const royalEmojis = {
     'admin_1': '👑', // King - First admin
     'admin_2': '💎', // Queen - Second admin
     // Queue members
-    'Eden Aronov': '🔱', // Princess 1
-    'Adele Aronov': '⭐', // Princess 2  
-    'Emma Aronov': '✨'  // Princess 3
+    'Eden': '🔱', // Princess 1
+    'Adele': '⭐', // Princess 2  
+    'Emma': '✨'  // Princess 3
 };
 
 // Translation dictionaries
