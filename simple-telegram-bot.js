@@ -816,7 +816,22 @@ const translations = {
         'force_swap_type': 'Force Swap',
         'user_swap_type': 'User Swap',
         'reverts_when_completes': 'reverts when {user} completes their turn',
-        'undefined': 'Not in queue'
+        'undefined': 'Not in queue',
+        
+        // Help messages
+        'help_title': '🤖 **Family Dishwasher Bot:**\n\n',
+        'help_scoring_system': '📊 **Scoring System:**\n',
+        'help_scoring_explanation': '• Each user has a score (number of turns completed)\n• Next turn is determined by lowest score\n• In case of tie, uses fixed order (Eden → Adele → Emma)\n• System maintains fairness over time\n\n',
+        'help_queue_commands': '📋 **Queue Commands:**\n',
+        'help_queue_explanation': '• `/status` - Show current queue, scores, and next turns\n• `/done` - Complete your turn (increases score by 1)\n\n',
+        'help_swapping': '🔄 **Turn Swapping:**\n',
+        'help_swapping_explanation': '• **Swap** - Request to swap with another user\n• **Process:** Select user → User gets notification → Must approve or reject\n• **Approval:** Both sides need to agree to swap\n• **Score:** User who completes the turn gets +1 score\n• **Cancel:** You can cancel your request anytime\n\n',
+        'help_punishment': '⚡ **User Reporting:**\n',
+        'help_punishment_explanation': '• **Request Punishment** - Report another user\n• **Process:** Select user → Choose reason → Admins get notification\n• **Punishment:** Admin approves punishment (reduces score by 3)\n\n',
+        'help_admin_features': '👨‍💼 **Admin Features:**\n',
+        'help_admin_explanation': '• **Force Swap** - Force swap turns\n• **Apply Punishment** - Apply direct punishment\n• **Suspend/Reactivate** - Suspend and reactivate users\n• **Reset Scores** - Reset scores (all, individual, or normalize)\n• **Reorder Queue** - Change tie-breaker order\n• **Queue Statistics** - Detailed statistics\n• **Monthly Report** - Detailed monthly report\n\n',
+        'help_tie_breaker': '🎯 **Tie-breaker Order:** Eden → Adele → Emma\n\n',
+        'help_tip': '💡 **Tip:** Use buttons for easier navigation!'
     },
     he: {
         // Menu titles
@@ -1150,7 +1165,22 @@ const translations = {
         'force_swap_type': 'החלפה בכוח',
         'user_swap_type': 'החלפת משתמש',
         'reverts_when_completes': 'חוזר כאשר {user} מסיים את התור שלו',
-        'undefined': 'לא בתור'
+        'undefined': 'לא בתור',
+        
+        // Help messages
+        'help_title': '🤖 **בוט מדיח הכלים של המשפחה:**\n\n',
+        'help_scoring_system': '📊 **מערכת ניקוד:**\n',
+        'help_scoring_explanation': '• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n• התור הבא נקבע לפי הניקוד הנמוך ביותר\n• במקרה של שוויון, משתמשים בסדר הקבוע (עדן → עדלה → אמה)\n• המערכת שומרת על הוגנות לאורך זמן\n\n',
+        'help_queue_commands': '📋 **פקודות התור:**\n',
+        'help_queue_explanation': '• `/status` - הצגת התור הנוכחי, ניקודים, והתורות הבאים\n• `/done` - השלמת התור שלך (מעלה את הניקוד ב-1)\n\n',
+        'help_swapping': '🔄 **החלפת תורות:**\n',
+        'help_swapping_explanation': '• **החלפה** - בקשה להחלפה עם משתמש אחר\n• **תהליך:** בחר משתמש → המשתמש מקבל הודעה → צריך לאשר או לדחות\n• **אישור:** שני הצדדים צריכים להסכים להחלפה\n• **ניקוד:** המשתמש שמבצע את התור מקבל +1 ניקוד\n• **ביטול:** אתה יכול לבטל את הבקשה שלך בכל עת\n\n',
+        'help_punishment': '⚡ **דיווח על משתמש:**\n',
+        'help_punishment_explanation': '• **בקשת ענישה** - דיווח על משתמש אחר\n• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n',
+        'help_admin_features': '👨‍💼 **תכונות מנהל:**\n',
+        'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n\n',
+        'help_tie_breaker': '🎯 **סדר קביעות:** עדן → עדלה → אמה\n\n',
+        'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!'
     }
 };
 
@@ -1380,6 +1410,9 @@ function handleCommand(chatId, userId, userName, text) {
                 ],
                 [
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
+                ],
+                [
+                    { text: t(userId, 'help'), callback_data: "help" }
                 ],
                 [
                     { text: t(userId, 'language_switch'), callback_data: "language_switch" }
@@ -1723,35 +1756,13 @@ function handleCommand(chatId, userId, userName, text) {
         }
         
     } else if (command === '/help' || command === 'help') {
-        const helpMessage = `🤖 **בוט מדיח הכלים של המשפחה:**\n\n` +
-            `📊 **מערכת ניקוד:**\n` +
-            `• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n` +
-            `• התור הבא נקבע לפי הניקוד הנמוך ביותר\n` +
-            `• במקרה של שוויון, משתמשים בסדר הקבוע (עדן → עדלה → אמה)\n` +
-            `• המערכת שומרת על הוגנות לאורך זמן\n\n` +
-            `📋 **פקודות התור:**\n` +
-            `• \`/status\` - הצגת התור הנוכחי, ניקודים, והתורות הבאים\n` +
-            `• \`/done\` - השלמת התור שלך (מעלה את הניקוד ב-1)\n\n` +
-            `🔄 **החלפת תורות:**\n` +
-            `• **החלפה** - בקשה להחלפה עם משתמש אחר\n` +
-            `• **תהליך:** בחר משתמש → המשתמש מקבל הודעה → צריך לאשר או לדחות\n` +
-            `• **אישור:** שני הצדדים צריכים להסכים להחלפה\n` +
-            `• **ניקוד:** המשתמש שמבצע את התור מקבל +1 ניקוד\n` +
-            `• **ביטול:** אתה יכול לבטל את הבקשה שלך בכל עת\n\n` +
-            `⚡ **דיווח על משתמש:**\n` +
-            `• **בקשת ענישה** - דיווח על משתמש אחר\n` +
-            `• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n` +
-            `• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n` +
-            `👨‍💼 **תכונות מנהל:**\n` +
-            `• **החלפה בכוח** - החלפת תור בכוח\n` +
-            `• **הפעלת עונש** - הפעלת עונש ישיר\n` +
-            `• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n` +
-            `• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n` +
-            `• **סידור תור מחדש** - שינוי סדר הקביעות\n` +
-            `• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n` +
-            `• **דוח חודשי** - דוח חודשי מפורט\n\n` +
-            `🎯 **סדר קביעות:** עדן → עדלה → אמה\n\n` +
-            `💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!`;
+        const helpMessage = t(userId, 'help_title') +
+            t(userId, 'help_scoring_system') + t(userId, 'help_scoring_explanation') +
+            t(userId, 'help_queue_commands') + t(userId, 'help_queue_explanation') +
+            t(userId, 'help_swapping') + t(userId, 'help_swapping_explanation') +
+            t(userId, 'help_punishment') + t(userId, 'help_punishment_explanation') +
+            t(userId, 'help_admin_features') + t(userId, 'help_admin_explanation') +
+            t(userId, 'help_tie_breaker') + t(userId, 'help_tip');
         
         sendMessage(chatId, helpMessage);
         
@@ -2807,6 +2818,17 @@ function handleCallback(chatId, userId, userName, data) {
         
         const message = t(userId, 'scores_normalized', {newScores: newScores});
         sendMessage(chatId, message);
+        
+    } else if (data === 'help') {
+        const helpMessage = t(userId, 'help_title') +
+            t(userId, 'help_scoring_system') + t(userId, 'help_scoring_explanation') +
+            t(userId, 'help_queue_commands') + t(userId, 'help_queue_explanation') +
+            t(userId, 'help_swapping') + t(userId, 'help_swapping_explanation') +
+            t(userId, 'help_punishment') + t(userId, 'help_punishment_explanation') +
+            t(userId, 'help_admin_features') + t(userId, 'help_admin_explanation') +
+            t(userId, 'help_tie_breaker') + t(userId, 'help_tip');
+        
+        sendMessage(chatId, helpMessage);
         
     } else if (data === 'language_switch') {
         const currentLang = getUserLanguage(userId);
