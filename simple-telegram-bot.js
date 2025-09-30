@@ -238,6 +238,9 @@ function suspendUser(userName, days, reason = null) {
         punishmentDebt: totalPunishmentDebt
     });
     
+    // Track suspension for monthly report
+    trackMonthlyAction('suspension', userName, null, days);
+    
     // Remove all occurrences from queue
     const removedCount = removeAllUserOccurrences(userName);
     
@@ -285,8 +288,9 @@ function reactivateUser(userName) {
 
 // Helper function to advance to next user (no need to skip anyone now)
 function advanceToNextUser() {
-    currentTurn = (currentTurn + 1) % queue.length;
-    return queue[currentTurn];
+    // In score-based system, we don't need to advance manually
+    // The next user is determined by getCurrentTurnUser()
+    return getCurrentTurnUser();
 }
 
 // Anti-cheating helper function
@@ -1552,6 +1556,9 @@ function handleCommand(chatId, userId, userName, text) {
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
             
+            // Track admin completion for monthly report
+            trackMonthlyAction('admin_completion', currentUser, userName);
+            
             // Get next user for display
             const nextUser = getCurrentTurnUser();
             
@@ -1858,6 +1865,10 @@ function applyPunishment(targetUser, reason, appliedBy) {
     console.log(`⚖️ Punishment applied to ${targetUser}: ${currentScore} → ${currentScore - 3}`);
     console.log(`🔍 DEBUG - Updated scores:`, Object.fromEntries(userScores));
     
+    // Track punishment for monthly report
+    trackMonthlyAction('punishment_received', targetUser, null, 1);
+    trackMonthlyAction('admin_punishment', targetUser, appliedBy);
+    
     // Track punishment for statistics
     const punishmentCount = (userPunishments.get(targetUser)?.punishmentCount || 0) + 1;
     const endDate = new Date(Date.now() + (3 * 24 * 60 * 60 * 1000)); // 3 days from now
@@ -1945,7 +1956,7 @@ function executeSwap(swapRequest, requestId, status) {
     
     if (fromIndex !== -1 && toIndex !== -1) {
         // Capture the original current turn user BEFORE the swap
-        const originalCurrentTurnUser = queue[currentTurn];
+        const originalCurrentTurnUser = getCurrentTurnUser();
         
         // Swap positions in queue
         [queue[fromIndex], queue[toIndex]] = [queue[toIndex], queue[fromIndex]];
@@ -1994,11 +2005,9 @@ function executeSwap(swapRequest, requestId, status) {
         
         // Notify both users in their language
         // Create queue starting from current turn
-        const currentTurnUser = queue[currentTurn];
-        const queueFromCurrentTurn = [...queue.slice(currentTurn), ...queue.slice(0, currentTurn)];
-        const queueDisplay = queueFromCurrentTurn.map((name, index) => {
-            const actualIndex = (currentTurn + index) % queue.length;
-            const isCurrentTurn = actualIndex === currentTurn;
+        const currentTurnUser = getCurrentTurnUser();
+        const queueDisplay = originalQueue.map((name, index) => {
+            const isCurrentTurn = name === currentTurnUser;
             return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`;
         }).join('\n');
         
@@ -2057,12 +2066,15 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        // Get current turn user
-        const currentUser = queue[currentTurn];
+        // Get current turn user using score-based system
+        const currentUser = getCurrentTurnUser();
         if (!currentUser) {
             sendMessage(chatId, t(userId, 'no_one_in_queue'));
             return;
         }
+        
+        // Track admin announcement for monthly report
+        trackMonthlyAction('admin_announcement', null, userName);
         
         // Send alert to all authorized users and admins with their preferred language
         [...authorizedUsers, ...admins].forEach(user => {
@@ -2104,12 +2116,15 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        // Get current user doing the dishes
-        const currentUser = queue[currentTurn];
+        // Get current user doing the dishes using score-based system
+        const currentUser = getCurrentTurnUser();
         if (!currentUser) {
             sendMessage(chatId, t(userId, 'no_one_in_queue'));
             return;
         }
+        
+        // Track admin announcement for monthly report
+        trackMonthlyAction('admin_announcement', null, userName);
         
         // Send notification to all authorized users and admins with their preferred language
         [...authorizedUsers, ...admins].forEach(user => {
@@ -2674,6 +2689,9 @@ function handleCallback(chatId, userId, userName, data) {
             timestamp: Date.now()
         });
         
+        // Track swap request for monthly report
+        trackMonthlyAction('swap_requested', userName);
+        
         // Notify the target user
         if (targetChatId) {
             const buttons = createLocalizedButtons(targetChatId, [
@@ -2890,6 +2908,9 @@ function handleCallback(chatId, userId, userName, data) {
             console.log(`🔍 DEBUG - Turn assignments:`, Object.fromEntries(turnAssignments));
             console.log(`🔍 DEBUG - Scores unchanged:`, Object.fromEntries(userScores));
             
+            // Track admin force swap for monthly report
+            trackMonthlyAction('admin_force_swap', firstUser, userName);
+            
             // Get current turn user for display
             const currentTurnUser = getCurrentTurnUser();
             
@@ -2966,6 +2987,9 @@ function handleCallback(chatId, userId, userName, data) {
             fromUserId: userId,
             timestamp: Date.now()
         });
+        
+        // Track punishment request for monthly report
+        trackMonthlyAction('punishment_request', userName);
         
         // Notify all admins with approval/rejection buttons in their language
         // Send to all admins with localized message and buttons
