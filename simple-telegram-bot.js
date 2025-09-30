@@ -815,7 +815,8 @@ const translations = {
         'no_active_swaps': 'No active swaps - normal queue order',
         'force_swap_type': 'Force Swap',
         'user_swap_type': 'User Swap',
-        'reverts_when_completes': 'reverts when {user} completes their turn'
+        'reverts_when_completes': 'reverts when {user} completes their turn',
+        'undefined': 'Not in queue'
     },
     he: {
         // Menu titles
@@ -1148,7 +1149,8 @@ const translations = {
         'no_active_swaps': 'אין החלפות פעילות - סדר תור רגיל',
         'force_swap_type': 'החלפה בכוח',
         'user_swap_type': 'החלפת משתמש',
-        'reverts_when_completes': 'חוזר כאשר {user} מסיים את התור שלו'
+        'reverts_when_completes': 'חוזר כאשר {user} מסיים את התור שלו',
+        'undefined': 'לא בתור'
     }
 };
 
@@ -2832,7 +2834,7 @@ function handleCallback(chatId, userId, userName, data) {
         const buttons = availableUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `swap_request_${name}` }]);
         
         sendMessageWithButtons(chatId, 
-            t(userId, 'request_swap_your_position', {position: currentUserQueueName}), 
+            t(userId, 'request_swap_your_position', {position: currentUserQueueName || t(userId, 'undefined')}), 
             buttons
         );
         
