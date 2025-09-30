@@ -1063,7 +1063,7 @@ const translations = {
         'confirm_full_system_reset': '⚠️ **אשר אפס מערכת מלא**\n\nזה יעשה:\n• אפס כל הניקודים ל-0\n• נקה כל הקצאות תורות\n• נקה כל השעיות\n• אפס סדר קביעות\n\n**זה בלתי הפיך!**',
         'reset_everything': '⚠️ אפס הכל',
         'full_system_reset_complete': '✅ **אפס מערכת מלא הושלם!**\n\n📊 **כל הניקודים אופסו ל-0**\n🔄 **כל ההקצאות נוקו**\n✈️ **כל ההשעיות נוקו**\n📋 **סדר הקביעות אופס לברירת מחדל**\n\n🎯 **המערכת כעת במצב ברירת מחדל.**',
-        'normalize_scores_title': '📊 **נמל ניקודים**\n\n**ניקודים נוכחיים:**\n{currentScores}\n\n**זה יפחית {minScore} מכל הניקודים כדי לשמור על מספרים ניתנים לניהול.**\n\n**להמשיך?**',
+        'normalize_scores_title': '📊 **נמל ניקודים**\n\n**ניקוד נוכחי:**\n{currentScores}\n\n**זה יפחית {minScore} מכל הניקודים כדי לשמור על מספרים ניתנים לניהול.**\n\n**להמשיך?**',
         'normalize_now': '✅ נמל עכשיו',
         'scores_normalized': '✅ **ניקודים נומלו!**\n\n📊 **ניקודים חדשים:**\n{newScores}\n\n🎯 **מיקומים יחסיים נשמרו, מספרים הופחתו.**',
         
@@ -1081,7 +1081,7 @@ const translations = {
         // Queue Statistics
         'queue_statistics_title': '📊 **סטטיסטיקות תור**\n\n',
         'tie_breaker_priority_order': '📋 **סדר עדיפות קביעות:**\n',
-        'current_scores': '📊 **ניקודים נוכחיים:**\n',
+        'current_scores': '📊 **ניקוד נוכחי:**\n',
         'current_turn': '🎯 **תור נוכחי:**',
         'next_3_turns': '📅 **3 התורות הבאים:**',
         'suspended_users': '✈️ **משתמשים מושעים:**\n',
@@ -1499,7 +1499,7 @@ function handleCommand(chatId, userId, userName, text) {
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
         
         // Show current scores
-        statusMessage += `\n\n📊 **Current Scores:**\n`;
+        statusMessage += `\n\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
         for (const user of originalQueue) {
             const score = userScores.get(user) || 0;
