@@ -2962,7 +2962,7 @@ function handleCallback(chatId, userId, userName, data) {
         ];
         
         sendMessageWithButtons(chatId, 
-            t(userId, 'swap_request_sent_detailed', {user: targetUser}), 
+            t(userId, 'swap_request_sent_detailed', {user: translateName(targetUser, userId)}), 
             cancelButtons
         );
         
@@ -3015,7 +3015,7 @@ function handleCallback(chatId, userId, userName, data) {
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId && adminChatId !== swapRequest.fromUserId) { // Don't notify the rejector or requester
                 // Create rejection notification in admin's language
-                const adminNotification = `❌ **${t(adminChatId, 'swap_request_rejected_title')}**\n\n👤 **${t(adminChatId, 'from_user')}:** ${swapRequest.fromUser}\n👤 **${t(adminChatId, 'rejected_by')}:** ${userName}\n📅 **${t(adminChatId, 'time')}:** ${new Date().toLocaleString()}`;
+                const adminNotification = `❌ **${t(adminChatId, 'swap_request_rejected_title')}**\n\n👤 **${t(adminChatId, 'from_user')}:** ${translateName(swapRequest.fromUser, adminChatId)}\n👤 **${t(adminChatId, 'rejected_by')}:** ${translateName(userName, adminChatId)}\n📅 **${t(adminChatId, 'time')}:** ${new Date().toLocaleString()}`;
                 console.log(`🔔 Sending admin swap rejection notification to chat ID: ${adminChatId}`);
                 sendMessage(adminChatId, adminNotification);
             }
@@ -3041,20 +3041,20 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Notify the target user that the request was canceled
         if (swapRequest.toUserId) {
-            sendMessage(swapRequest.toUserId, t(swapRequest.toUserId, 'swap_request_canceled_notification', {user: userName}));
+            sendMessage(swapRequest.toUserId, t(swapRequest.toUserId, 'swap_request_canceled_notification', {user: translateName(userName, swapRequest.toUserId)}));
         }
         
         // Notify the requester
-        sendMessage(chatId, t(userId, 'swap_request_canceled_confirmation', {user: swapRequest.toUser}));
+        sendMessage(chatId, t(userId, 'swap_request_canceled_confirmation', {user: translateName(swapRequest.toUser, userId)}));
         
         // Notify all admins about the cancellation in their language
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId && adminChatId !== swapRequest.toUserId) { // Don't notify the canceler or target user
                 // Create cancellation notification in admin's language
                 const adminNotification = t(adminChatId, 'swap_request_canceled_admin', {
-                    from: swapRequest.fromUser,
-                    canceledBy: userName,
-                    target: swapRequest.toUser,
+                    from: translateName(swapRequest.fromUser, adminChatId),
+                    canceledBy: translateName(userName, adminChatId),
+                    target: translateName(swapRequest.toUser, adminChatId),
                     time: new Date().toLocaleString()
                 });
                 console.log(`🔔 Sending admin swap cancellation notification to chat ID: ${adminChatId}`);
