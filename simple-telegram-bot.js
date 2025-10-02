@@ -1258,6 +1258,27 @@ function addRoyalEmoji(userName) {
     return userName;
 }
 
+// Function to add royal emoji AND translate names based on user's language
+function addRoyalEmojiTranslated(userName, userId) {
+    const translatedName = translateName(userName, userId);
+    // Check if it's a queue member first
+    if (royalEmojis[userName]) {
+        return `${royalEmojis[userName]} ${translatedName}`;
+    }
+    
+    // Check if it's an admin (by order)
+    const adminArray = Array.from(admins);
+    if (adminArray.length > 0 && (adminArray[0] === userName || adminArray[0] === userName.toLowerCase())) {
+        return `${royalEmojis.admin_1} ${translatedName}`; // King
+    }
+    if (adminArray.length > 1 && (adminArray[1] === userName || adminArray[1] === userName.toLowerCase())) {
+        return `${royalEmojis.admin_2} ${translatedName}`; // Queen
+    }
+    
+    // Default: just return the translated name
+    return translatedName;
+}
+
 // Send message to Telegram
 function sendMessage(chatId, text) {
     const url = `${botUrl}/sendMessage`;
@@ -1540,7 +1561,7 @@ function handleCommand(chatId, userId, userName, text) {
             const name = nextThreeTurns[i];
             if (!name) continue;
             
-            const royalName = addRoyalEmoji(name);
+            const royalName = addRoyalEmojiTranslated(name, userId);
             const isCurrentTurn = i === 0;
             const turnIcon = isCurrentTurn ? '🔄' : '⏳';
             const turnText = isCurrentTurn ? ` ${t(userId, 'current_turn')}` : '';
@@ -1560,7 +1581,7 @@ function handleCommand(chatId, userId, userName, text) {
         for (const user of originalQueue) {
             const score = userScores.get(user) || 0;
             const relativeScore = relativeScores.get(user) || 0;
-            const royalName = addRoyalEmoji(user);
+            const royalName = addRoyalEmojiTranslated(user, userId);
             statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
         }
         
@@ -1586,9 +1607,9 @@ function handleCommand(chatId, userId, userName, text) {
                 const isPermanent = yearsUntilExpiry > 50; // If more than 50 years, consider it permanent
                 
                 if (isPermanent) {
-                    statusMessage += `\n• ${addRoyalEmoji(user)}: ${t(userId, 'permanently_removed')}`;
+                    statusMessage += `\n• ${addRoyalEmojiTranslated(user, userId)}: ${t(userId, 'permanently_removed')}`;
                 } else {
-                    statusMessage += `\n• ${addRoyalEmoji(user)}: ${t(userId, 'suspended_until', {date})}`;
+                    statusMessage += `\n• ${addRoyalEmojiTranslated(user, userId)}: ${t(userId, 'suspended_until', {date})}`;
                 }
             });
         }
@@ -1597,8 +1618,8 @@ function handleCommand(chatId, userId, userName, text) {
         if (turnAssignments.size > 0) {
             statusMessage += `\n\n🔄 **Active Turn Assignments:**`;
             for (const [originalUser, assignedUser] of turnAssignments.entries()) {
-                const royalOriginal = addRoyalEmoji(originalUser);
-                const royalAssigned = addRoyalEmoji(assignedUser);
+                const royalOriginal = addRoyalEmojiTranslated(originalUser, userId);
+                const royalAssigned = addRoyalEmojiTranslated(assignedUser, userId);
                 statusMessage += `\n• ${royalOriginal} → ${royalAssigned}`;
             }
         }
@@ -1662,9 +1683,9 @@ function handleCommand(chatId, userId, userName, text) {
             const nextUser = getCurrentTurnUser();
             
             const adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
-                `${t(userId, 'admin_completed_duty', {admin: userName})}\n` +
-                `${t(userId, 'helped_user', {user: currentUser})}\n` +
-                `${t(userId, 'next_turn', {user: nextUser})}` +
+                `${t(userId, 'admin_completed_duty', {admin: translateName(userName, userId)})}\n` +
+                `${t(userId, 'helped_user', {user: translateName(currentUser, userId)})}\n` +
+                `${t(userId, 'next_turn', {user: translateName(nextUser, userId)})}` +
                 `\n\n${t(userId, 'admin_can_apply_punishment', {user: currentUser})}`;
             
             // Send confirmation to admin
@@ -1742,8 +1763,8 @@ function handleCommand(chatId, userId, userName, text) {
             const nextUser = getCurrentTurnUser();
             
             const doneMessage = `${t(userId, 'turn_completed')}\n\n` +
-                `${t(userId, 'completed_by', {user: currentUser})}\n` +
-                `${t(userId, 'next_turn', {user: nextUser})}`;
+                `${t(userId, 'completed_by', {user: translateName(currentUser, userId)})}\n` +
+                `${t(userId, 'next_turn', {user: translateName(nextUser, userId)})}`;
             
             // Send confirmation to user
             sendMessage(chatId, doneMessage);
@@ -2469,7 +2490,7 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'reorder_custom_order') {
         // Step 1: Select user to move
         const queueUsers = ['Eden', 'Adele', 'Emma'];
-        const buttons = queueUsers.map(user => [{ text: addRoyalEmoji(user), callback_data: `reorder_select_${user}` }]);
+        const buttons = queueUsers.map(user => [{ text: addRoyalEmojiTranslated(user, userId), callback_data: `reorder_select_${user}` }]);
         sendMessageWithButtons(chatId, t(userId, 'select_user_move_priority'), buttons);
         
     } else if (data.startsWith('reorder_select_')) {
@@ -2562,14 +2583,14 @@ function handleCallback(chatId, userId, userName, data) {
         // Current turn and next 3 turns
         const currentUser = getCurrentTurnUser();
         const nextThreeTurns = getNextThreeTurns();
-        statsMessage += `\n${t(userId, 'current_turn')} ${addRoyalEmoji(currentUser)}\n`;
-        statsMessage += `${t(userId, 'next_3_turns')} ${nextThreeTurns.map(user => addRoyalEmoji(user)).join(' → ')}\n`;
+        statsMessage += `\n${t(userId, 'current_turn')} ${addRoyalEmojiTranslated(currentUser, userId)}\n`;
+        statsMessage += `${t(userId, 'next_3_turns')} ${nextThreeTurns.map(user => addRoyalEmojiTranslated(user, userId)).join(' → ')}\n`;
         
         // Suspended users
         if (suspendedUsers.size > 0) {
             statsMessage += `\n${t(userId, 'suspended_users')}`;
             for (const [user, suspension] of suspendedUsers.entries()) {
-                const emoji = addRoyalEmoji(user);
+                const emoji = addRoyalEmojiTranslated(user, userId);
                 const daysLeft = Math.ceil((suspension.suspendedUntil - new Date()) / (1000 * 60 * 60 * 24));
                 const daysText = daysLeft > 1 ? t(userId, 'days_left_plural') : t(userId, 'days_left');
                 statsMessage += `${emoji}: ${daysLeft} ${daysText}\n`;
@@ -2580,8 +2601,8 @@ function handleCallback(chatId, userId, userName, data) {
         if (turnAssignments.size > 0) {
             statsMessage += `\n${t(userId, 'active_turn_assignments')}`;
             for (const [originalUser, assignedTo] of turnAssignments.entries()) {
-                const originalEmoji = addRoyalEmoji(originalUser);
-                const assignedEmoji = addRoyalEmoji(assignedTo);
+                const originalEmoji = addRoyalEmojiTranslated(originalUser, userId);
+                const assignedEmoji = addRoyalEmojiTranslated(assignedTo, userId);
                 statsMessage += `${originalEmoji} → ${assignedEmoji}\n`;
             }
         }
@@ -2590,7 +2611,7 @@ function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'suspend_user_menu') {
         // Select user to suspend (show all users in originalQueue)
-        const buttons = originalQueue.map(user => [{ text: addRoyalEmoji(user), callback_data: `suspend_select_${user}` }]);
+        const buttons = originalQueue.map(user => [{ text: addRoyalEmojiTranslated(user, userId), callback_data: `suspend_select_${user}` }]);
         sendMessageWithButtons(chatId, t(userId, 'select_user_to_suspend'), buttons);
         
     } else if (data.startsWith('suspend_select_')) {
@@ -2631,7 +2652,7 @@ function handleCallback(chatId, userId, userName, data) {
             sendMessage(chatId, t(userId, 'no_suspended_users'));
             return;
         }
-        const buttons = suspendedUsersList.map(user => [{ text: addRoyalEmoji(user), callback_data: `reactivate_${user}` }]);
+        const buttons = suspendedUsersList.map(user => [{ text: addRoyalEmojiTranslated(user, userId), callback_data: `reactivate_${user}` }]);
         sendMessageWithButtons(chatId, t(userId, 'select_user_to_reactivate'), buttons);
         
     } else if (data.startsWith('reactivate_')) {
@@ -2650,7 +2671,7 @@ function handleCallback(chatId, userId, userName, data) {
             sendMessage(chatId, 'No users in queue to remove.');
             return;
         }
-        const buttons = queue.map(user => [{ text: addRoyalEmoji(user), callback_data: `remove_${user}` }]);
+        const buttons = queue.map(user => [{ text: addRoyalEmojiTranslated(user, userId), callback_data: `remove_${user}` }]);
         sendMessageWithButtons(chatId, t(userId, 'select_user_to_remove'), buttons);
         
     } else if (data.startsWith('remove_')) {
@@ -2844,7 +2865,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Show all users except the current user (can't swap with yourself)
         const uniqueUsers = [...new Set(queue)];
         const availableUsers = uniqueUsers.filter(name => name !== currentUserQueueName);
-        const buttons = availableUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `swap_request_${name}` }]);
+        const buttons = availableUsers.map(name => [{ text: addRoyalEmojiTranslated(name, userId), callback_data: `swap_request_${name}` }]);
         
         sendMessageWithButtons(chatId, 
             t(userId, 'request_swap_your_position', {position: currentUserQueueName || t(userId, 'undefined')}), 
@@ -3071,8 +3092,8 @@ function handleCallback(chatId, userId, userName, data) {
         // Get all users from original queue excluding the current turn user
         const remainingUsers = originalQueue.filter(name => name !== firstUser);
         
-        const buttons = remainingUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `force_swap_execute_${firstUser}_${name}` }]);
-        const royalFirstUser = addRoyalEmoji(firstUser);
+        const buttons = remainingUsers.map(name => [{ text: addRoyalEmojiTranslated(name, userId), callback_data: `force_swap_execute_${firstUser}_${name}` }]);
+        const royalFirstUser = addRoyalEmojiTranslated(firstUser, userId);
         
         sendMessageWithButtons(chatId, 
             `${t(userId, 'force_swap_step2')}\n\n🎯 **${t(userId, 'current_turn_label')}:** ${royalFirstUser}\n${t(userId, 'swap_with_select')}`, 
@@ -3157,7 +3178,7 @@ function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const buttons = availableUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `punishment_target_${name}` }]);
+        const buttons = availableUsers.map(name => [{ text: addRoyalEmojiTranslated(name, userId), callback_data: `punishment_target_${name}` }]);
         
         sendMessageWithButtons(chatId, 
             t(userId, 'request_punishment_select_user'), 
@@ -3325,7 +3346,7 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Get unique users from the queue to avoid duplicate buttons
         const uniqueUsers = [...new Set(queue)];
-        const buttons = uniqueUsers.map(name => [{ text: addRoyalEmoji(name), callback_data: `admin_punish_${name}` }]);
+        const buttons = uniqueUsers.map(name => [{ text: addRoyalEmojiTranslated(name, userId), callback_data: `admin_punish_${name}` }]);
         
         sendMessageWithButtons(chatId, 
             t(userId, 'apply_punishment_select_user'), 
