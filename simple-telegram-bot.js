@@ -1749,7 +1749,7 @@ function handleCommand(chatId, userId, userName, text) {
             
             // Check if it's actually their turn
             if (userQueueName !== currentUser) {
-                sendMessage(chatId, `${t(userId, 'not_your_turn')}\n\n${t(userId, 'current_turn_user')} ${currentUser}\n${t(userId, 'your_queue_position')} ${userQueueName}\n\n${t(userId, 'please_wait_turn')}`);
+                sendMessage(chatId, `${t(userId, 'not_your_turn')}\n\n${t(userId, 'current_turn_user')} ${addRoyalEmojiTranslated(currentUser, userId)}\n${t(userId, 'your_queue_position')} ${addRoyalEmojiTranslated(userQueueName, userId)}\n\n${t(userId, 'please_wait_turn')}`);
                 return;
             }
             
