@@ -3226,7 +3226,7 @@ function handleCallback(chatId, userId, userName, data) {
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId) { // Don't notify the requester
                 // Create message in admin's language
-                const adminMessage = `${t(adminChatId, 'punishment_request_title')}\n\n${t(adminChatId, 'from_user')}: ${userName}\n${t(adminChatId, 'target_user')}: ${targetUser}\n${t(adminChatId, 'reason')}: ${reason}`;
+                const adminMessage = `${t(adminChatId, 'punishment_request_title')}\n\n${t(adminChatId, 'from_user')}: ${translateName(userName, adminChatId)}\n${t(adminChatId, 'target_user')}: ${translateName(targetUser, adminChatId)}\n${t(adminChatId, 'reason')}: ${reason}`;
                 const buttons = createLocalizedButtons(adminChatId, [
                     [
                         { translationKey: 'approve', callback_data: `punishment_approve_${requestId}` },
@@ -3238,7 +3238,7 @@ function handleCallback(chatId, userId, userName, data) {
             }
         }
         
-        sendMessage(chatId, `${t(userId, 'punishment_request_submitted')}\n\n${t(userId, 'target_user')} ${targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'requested_by', {user: userName})}\n\n${t(userId, 'admins_notified')}`);
+        sendMessage(chatId, `${t(userId, 'punishment_request_submitted')}\n\n${t(userId, 'target_user')} ${translateName(targetUser, userId)}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'requested_by', {user: translateName(userName, userId)})}\n\n${t(userId, 'admins_notified')}`);
         
     } else if (data.startsWith('punishment_approve_')) {
         const requestId = parseInt(data.replace('punishment_approve_', ''));
@@ -3272,7 +3272,7 @@ function handleCallback(chatId, userId, userName, data) {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
                 // Create approval message in user's language
-                const approvalMessage = `${t(userChatId, 'punishment_request_approved')}\n\n${t(userChatId, 'requested_by', {user: punishmentRequest.fromUser})}\n${t(userChatId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userChatId, 'reason')} ${punishmentRequest.reason}\n${t(userChatId, 'approved_by')} ${userName}\n\n${t(userChatId, 'extra_turns_applied')}`;
+                const approvalMessage = `${t(userChatId, 'punishment_request_approved')}\n\n${t(userChatId, 'requested_by', {user: translateName(punishmentRequest.fromUser, userChatId)})}\n${t(userChatId, 'target_user')} ${translateName(punishmentRequest.targetUser, userChatId)}\n${t(userChatId, 'reason')} ${punishmentRequest.reason}\n${t(userChatId, 'approved_by')} ${translateName(userName, userChatId)}\n\n${t(userChatId, 'extra_turns_applied')}`;
                 console.log(`🔔 Sending punishment approval notification to ${user} (${userChatId})`);
                 sendMessage(userChatId, approvalMessage);
             }
@@ -3282,7 +3282,7 @@ function handleCallback(chatId, userId, userName, data) {
         for (const adminChatId of adminChatIds) {
             if (adminChatId !== chatId && adminChatId !== punishmentRequest.fromUserId) {
                 // Create approval message in admin's language
-                const approvalMessage = `${t(adminChatId, 'punishment_request_approved')}\n\n${t(adminChatId, 'requested_by', {user: punishmentRequest.fromUser})}\n${t(adminChatId, 'target_user')} ${punishmentRequest.targetUser}\n${t(adminChatId, 'reason')} ${punishmentRequest.reason}\n${t(adminChatId, 'approved_by')} ${userName}\n\n${t(adminChatId, 'extra_turns_applied')}`;
+                const approvalMessage = `${t(adminChatId, 'punishment_request_approved')}\n\n${t(adminChatId, 'requested_by', {user: translateName(punishmentRequest.fromUser, adminChatId)})}\n${t(adminChatId, 'target_user')} ${translateName(punishmentRequest.targetUser, adminChatId)}\n${t(adminChatId, 'reason')} ${punishmentRequest.reason}\n${t(adminChatId, 'approved_by')} ${translateName(userName, adminChatId)}\n\n${t(adminChatId, 'extra_turns_applied')}`;
                 console.log(`🔔 Sending punishment approval notification to admin chat ID: ${adminChatId}`);
                 sendMessage(adminChatId, approvalMessage);
             }
@@ -3308,8 +3308,8 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
         // Notify requester
-        sendMessage(punishmentRequest.fromUserId, `${t(punishmentRequest.fromUserId, 'punishment_request_rejected')}\n\n${t(punishmentRequest.fromUserId, 'declined_punishment_request', {admin: userName, target: punishmentRequest.targetUser})}`);
-        sendMessage(chatId, `${t(userId, 'punishment_request_rejected')}\n\n${t(userId, 'you_declined_punishment', {requester: punishmentRequest.fromUser})}`);
+        sendMessage(punishmentRequest.fromUserId, `${t(punishmentRequest.fromUserId, 'punishment_request_rejected')}\n\n${t(punishmentRequest.fromUserId, 'declined_punishment_request', {admin: translateName(userName, punishmentRequest.fromUserId), target: translateName(punishmentRequest.targetUser, punishmentRequest.fromUserId)})}`);
+        sendMessage(chatId, `${t(userId, 'punishment_request_rejected')}\n\n${t(userId, 'you_declined_punishment', {requester: translateName(punishmentRequest.fromUser, userId)})}`);
         
         // Notify all other authorized users and admins about the rejection in their language
         
@@ -3318,7 +3318,7 @@ function handleCallback(chatId, userId, userName, data) {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
                 // Create rejection message in user's language
-                const rejectionMessage = `${t(userChatId, 'punishment_request_rejected')}\n\n${t(userChatId, 'requested_by', {user: punishmentRequest.fromUser})}\n${t(userChatId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userChatId, 'reason')} ${punishmentRequest.reason}\n${t(userChatId, 'rejected_by', {user: userName})}`;
+                const rejectionMessage = `${t(userChatId, 'punishment_request_rejected')}\n\n${t(userChatId, 'requested_by', {user: translateName(punishmentRequest.fromUser, userChatId)})}\n${t(userChatId, 'target_user')} ${translateName(punishmentRequest.targetUser, userChatId)}\n${t(userChatId, 'reason')} ${punishmentRequest.reason}\n${t(userChatId, 'rejected_by', {user: translateName(userName, userChatId)})}`;
                 console.log(`🔔 Sending punishment rejection notification to ${user} (${userChatId})`);
                 sendMessage(userChatId, rejectionMessage);
             }
