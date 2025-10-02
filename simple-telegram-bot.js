@@ -794,6 +794,11 @@ const translations = {
         'suspended_users_list': 'Suspended Users:',
         'suspended_until': 'Suspended until: {date}',
         'current_queue_order': 'Current Queue Order:',
+        'active_turn_assignments': '🔄 **Active Turn Assignments:**\n',
+        'active_punishments': '⚡ **Active Punishments:**',
+        'punishment_turns_remaining': '{turns} punishment turn(s) remaining',
+        'no_admins_set': '👨‍💼 **No admins set yet.**\n\nUse `/addadmin <user>` to add an admin.',
+        'no_users_to_remove': 'No users in queue to remove.',
         'punishment_debt_preserved': 'Punishment debt preserved: {count} turns',
         'reactivated_with_punishment': '{user} reactivated with {count} punishment turns',
         'remove_user': '❌ Remove User',
@@ -1124,6 +1129,10 @@ const translations = {
         'days_left': 'יום נותר',
         'days_left_plural': 'ימים נותרו',
         'active_turn_assignments': '🔄 **הקצאות תורות פעילות:**\n',
+        'active_punishments': '⚡ **עונשים פעילים:**',
+        'punishment_turns_remaining': '{turns} תורות עונש נותרו',
+        'no_admins_set': '👨‍💼 **עדיין לא הוגדרו מנהלים.**\n\nהשתמש ב-`/addadmin <משתמש>` כדי להוסיף מנהל.',
+        'no_users_to_remove': 'אין משתמשים בתור להסרה.',
         'select_user_to_reorder': 'בחר משתמש להעברה למיקום חדש:',
         'select_new_position': 'בחר מיקום חדש עבור {user}:',
         'position_1': '1️⃣ מיקום 1 (ראשון)',
@@ -1592,9 +1601,9 @@ function handleCommand(chatId, userId, userName, text) {
         // Show punishment information
         const usersWithPunishments = Array.from(punishmentTurns.entries()).filter(([user, turns]) => turns > 0);
         if (usersWithPunishments.length > 0) {
-            statusMessage += `\n\n⚡ **Active Punishments:**`;
+            statusMessage += `\n\n${t(userId, 'active_punishments')}`;
             usersWithPunishments.forEach(([user, turns]) => {
-                statusMessage += `\n• ${user}: ${turns} punishment turn${turns > 1 ? 's' : ''} remaining`;
+                statusMessage += `\n• ${addRoyalEmojiTranslated(user, userId)}: ${t(userId, 'punishment_turns_remaining', {turns})}`;
             });
         }
         
@@ -1620,7 +1629,7 @@ function handleCommand(chatId, userId, userName, text) {
         
         // Show active turn assignments (force swaps)
         if (turnAssignments.size > 0) {
-            statusMessage += `\n\n🔄 **Active Turn Assignments:**`;
+            statusMessage += `\n\n${t(userId, 'active_turn_assignments')}`;
             for (const [originalUser, assignedUser] of turnAssignments.entries()) {
                 const royalOriginal = addRoyalEmojiTranslated(originalUser, userId);
                 const royalAssigned = addRoyalEmojiTranslated(assignedUser, userId);
@@ -1812,7 +1821,7 @@ function handleCommand(chatId, userId, userName, text) {
         
     } else if (command === '/admins' || command === 'admins') {
         if (admins.size === 0) {
-            sendMessage(chatId, '👨‍💼 **No admins set yet.**\n\nUse `/addadmin <user>` to add an admin.');
+            sendMessage(chatId, t(userId, 'no_admins_set'));
         } else {
             const adminList = Array.from(admins).map(id => {
                 // Check if it's a numeric ID or username
@@ -2672,7 +2681,7 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'remove_user_menu') {
         // Select user to remove permanently (only show users currently in queue)
         if (queue.length === 0) {
-            sendMessage(chatId, 'No users in queue to remove.');
+            sendMessage(chatId, t(userId, 'no_users_to_remove'));
             return;
         }
         const buttons = queue.map(user => [{ text: addRoyalEmojiTranslated(user, userId), callback_data: `remove_${user}` }]);
