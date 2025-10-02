@@ -608,6 +608,7 @@ const translations = {
         'admin_force_swap_executed': 'Admin Force Swap Executed',
         'assigned_to_perform': 'assigned to perform',
         'current_turn_label': 'Current turn',
+        'turn': 'turn',
         'swap_users': '🔄 **{user1} ↔ {user2}**',
         'punishment_approved': '✅ **Punishment Approved!**',
         'approved_by': '👨‍💼 **Approved by:**',
@@ -922,6 +923,7 @@ const translations = {
         'admin_force_swap_executed': 'האדמין בוצעה החלפה בכוח',
         'assigned_to_perform': 'קיבל אישור לבצע את התור של',
         'current_turn_label': 'התור הנוכחי',
+        'turn': 'תור',
         'swap_users': '🔄 **{user1} ↔ {user2}**',
         'punishment_approved': '✅ **עונש אושר!**',
         'approved_by': '👨‍💼 **אושר על ידי:**',
@@ -3010,8 +3012,8 @@ function handleCallback(chatId, userId, userName, data) {
         }
         
         // Notify the requester
-        sendMessage(swapRequest.fromUserId, t(swapRequest.fromUserId, 'swap_request_rejected_simple', {user: userName}));
-        sendMessage(chatId, t(userId, 'you_declined_swap_request', {user: swapRequest.fromUser}));
+        sendMessage(swapRequest.fromUserId, t(swapRequest.fromUserId, 'swap_request_rejected_simple', {user: translateName(userName, swapRequest.fromUserId)}));
+        sendMessage(chatId, t(userId, 'you_declined_swap_request', {user: translateName(swapRequest.fromUser, userId)}));
         
         // Notify all admins about the rejection in their language
         for (const adminChatId of adminChatIds) {
@@ -3078,7 +3080,7 @@ function handleCallback(chatId, userId, userName, data) {
         
         // Get current turn user using score-based system
         const currentUser = getCurrentTurnUser();
-        const royalCurrentUser = addRoyalEmoji(currentUser);
+        const royalCurrentUser = addRoyalEmojiTranslated(currentUser, userId);
         const buttons = [[{ text: t(userId, 'current_turn_button', {user: royalCurrentUser}), callback_data: `force_swap_select_${currentUser}` }]];
         
         console.log(`🔍 Force Swap - Current turn user: ${currentUser}`);
@@ -3152,7 +3154,7 @@ function handleCallback(chatId, userId, userName, data) {
                 
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
-                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(secondUser, userChatId)} ${t(userChatId, 'assigned_to_perform')} ${translateName(firstUser, userChatId)}'s turn**\n\n🎯 **${t(userChatId, 'current_turn_label')}:** ${translateName(currentTurnUser, userChatId)}`;
+                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(secondUser, userChatId)} ${t(userChatId, 'assigned_to_perform')} ${translateName(firstUser, userChatId)} ${t(userChatId, 'turn')}**\n\n🎯 **${t(userChatId, 'current_turn_label')}:** ${translateName(currentTurnUser, userChatId)}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
                 } else {
@@ -3160,7 +3162,7 @@ function handleCallback(chatId, userId, userName, data) {
                 }
             });
             
-            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(secondUser, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(firstUser, userId)}'s turn**\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`);
+            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(secondUser, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(firstUser, userId)} ${t(userId, 'turn')}**\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`);
         } else {
             sendMessage(chatId, t(userId, 'error_users_not_found'));
         }
