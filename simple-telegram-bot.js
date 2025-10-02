@@ -1686,7 +1686,7 @@ function handleCommand(chatId, userId, userName, text) {
                 `${t(userId, 'admin_completed_duty', {admin: translateName(userName, userId)})}\n` +
                 `${t(userId, 'helped_user', {user: translateName(currentUser, userId)})}\n` +
                 `${t(userId, 'next_turn', {user: translateName(nextUser, userId)})}` +
-                `\n\n${t(userId, 'admin_can_apply_punishment', {user: currentUser})}`;
+                `\n\n${t(userId, 'admin_can_apply_punishment', {user: translateName(currentUser, userId)})}`;
             
             // Send confirmation to admin
             sendMessage(chatId, adminDoneMessage);
@@ -1699,10 +1699,10 @@ function handleCommand(chatId, userId, userName, text) {
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
                     const userDoneMessage = `${t(userChatId, 'admin_intervention')}\n\n` +
-                        `${t(userChatId, 'admin_completed_duty', {admin: userName})}\n` +
-                        `${t(userChatId, 'helped_user', {user: currentUser})}\n` +
-                        `${t(userChatId, 'next_turn', {user: nextUser})}` +
-                        `\n\n${t(userChatId, 'admin_can_apply_punishment', {user: currentUser})}`;
+                        `${t(userChatId, 'admin_completed_duty', {admin: translateName(userName, userChatId)})}\n` +
+                        `${t(userChatId, 'helped_user', {user: translateName(currentUser, userChatId)})}\n` +
+                        `${t(userChatId, 'next_turn', {user: translateName(nextUser, userChatId)})}` +
+                        `\n\n${t(userChatId, 'admin_can_apply_punishment', {user: translateName(currentUser, userChatId)})}`;
                     
                     console.log(`🔔 Sending admin DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, userDoneMessage);
@@ -1777,8 +1777,8 @@ function handleCommand(chatId, userId, userName, text) {
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
                     const userDoneMessage = `${t(userChatId, 'turn_completed')}\n\n` +
-                        `${t(userChatId, 'completed_by', {user: currentUser})}\n` +
-                        `${t(userChatId, 'next_turn', {user: nextUser})}`;
+                        `${t(userChatId, 'completed_by', {user: translateName(currentUser, userChatId)})}\n` +
+                        `${t(userChatId, 'next_turn', {user: translateName(nextUser, userChatId)})}`;
                     
                     console.log(`🔔 Sending user DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, userDoneMessage);
@@ -1920,7 +1920,7 @@ function handleCommand(chatId, userId, userName, text) {
         // Apply punishment directly (admin doesn't need approval)
         applyPunishment(punishmentRequest.targetUser, reason, userName);
         
-        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${userName}`);
+        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${translateName(punishmentRequest.targetUser, userId)}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${translateName(userName, userId)}`);
         
         // Remove request
         pendingPunishments.delete(requestId);
@@ -2113,8 +2113,8 @@ function executeSwap(swapRequest, requestId, status) {
             return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`;
         }).join('\n');
         
-        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n🔄 **${t(fromUserId, 'next_lap')}:**\n${queueDisplay}`;
-        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${fromUser} ↔ ${toUser}**\n\n🔄 **${t(toUserId, 'next_lap')}:**\n${queueDisplay}`;
+        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(fromUser, fromUserId)} ↔ ${translateName(toUser, fromUserId)}**\n\n🔄 **${t(fromUserId, 'next_lap')}:**\n${queueDisplay}`;
+        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(fromUser, toUserId)} ↔ ${translateName(toUser, toUserId)}**\n\n🔄 **${t(toUserId, 'next_lap')}:**\n${queueDisplay}`;
         
         sendMessage(fromUserId, fromUserMessage);
         sendMessage(toUserId, toUserMessage);
@@ -2125,7 +2125,7 @@ function executeSwap(swapRequest, requestId, status) {
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 if (userChatId) {
                     // Create swap notification in recipient's language
-                    const swapNotification = `🔄 **${t(userChatId, 'queue_update')}:** ${fromUser} ↔ ${toUser} ${t(userChatId, 'swapped_positions')}!`;
+                    const swapNotification = `🔄 **${t(userChatId, 'queue_update')}:** ${translateName(fromUser, userChatId)} ↔ ${translateName(toUser, userChatId)} ${t(userChatId, 'swapped_positions')}!`;
                     console.log(`🔔 Sending swap approval notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, swapNotification);
                 } else {
@@ -2179,7 +2179,7 @@ function handleCallback(chatId, userId, userName, data) {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId) {
                 // Create alert message in recipient's language
-                const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: currentUser, sender: userName});
+                const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: translateName(currentUser, userChatId), sender: translateName(userName, userChatId)});
                 console.log(`🔔 Sending dishwasher alert to ${user} (${userChatId})`);
                 sendMessage(userChatId, alertMessage);
             }
@@ -2189,14 +2189,14 @@ function handleCallback(chatId, userId, userName, data) {
         adminChatIds.forEach(adminChatId => {
             if (adminChatId !== chatId) {
                 // Create alert message in admin's language
-                const adminAlertMessage = t(adminChatId, 'dishwasher_alert_message', {user: currentUser, sender: userName});
+                const adminAlertMessage = t(adminChatId, 'dishwasher_alert_message', {user: translateName(currentUser, adminChatId), sender: translateName(userName, adminChatId)});
                 console.log(`🔔 Sending dishwasher alert to admin chat ID: ${adminChatId}`);
                 sendMessage(adminChatId, adminAlertMessage);
             }
         });
         
         // Send confirmation to admin
-        sendMessage(chatId, `${t(userId, 'dishwasher_alert_sent')}\n\n${t(userId, 'alerted_user')} ${currentUser}\n${t(userId, 'sent_to_all')}`);
+        sendMessage(chatId, `${t(userId, 'dishwasher_alert_sent')}\n\n${t(userId, 'alerted_user')} ${translateName(currentUser, userId)}\n${t(userId, 'sent_to_all')}`);
         
         // Mark that manual alert was sent (cancel auto-alert)
         global.dishwasherAlertSent = true;
@@ -2225,7 +2225,7 @@ function handleCallback(chatId, userId, userName, data) {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
             if (userChatId && userChatId !== chatId) {
                 // Create started message in recipient's language
-                const startedMessage = t(userChatId, 'dishwasher_started_message', {user: currentUser, sender: userName});
+                const startedMessage = t(userChatId, 'dishwasher_started_message', {user: translateName(currentUser, userChatId), sender: translateName(userName, userChatId)});
                 console.log(`🔔 Sending dishwasher started notification to ${user} (${userChatId})`);
                 sendMessage(userChatId, startedMessage);
             }
@@ -2235,7 +2235,7 @@ function handleCallback(chatId, userId, userName, data) {
         adminChatIds.forEach(adminChatId => {
             if (adminChatId !== chatId) {
                 // Create started message in admin's language
-                const adminStartedMessage = t(adminChatId, 'dishwasher_started_message', {user: currentUser, sender: userName});
+                const adminStartedMessage = t(adminChatId, 'dishwasher_started_message', {user: translateName(currentUser, adminChatId), sender: translateName(userName, adminChatId)});
                 console.log(`🔔 Sending dishwasher started notification to admin chat ID: ${adminChatId}`);
                 sendMessage(adminChatId, adminStartedMessage);
             }
@@ -2277,7 +2277,7 @@ function handleCallback(chatId, userId, userName, data) {
         global.dishwasherCompleted = false;
         
         // Send confirmation to admin
-        sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${currentUser}\n${t(userId, 'sent_to_all')}`);
+        sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${translateName(currentUser, userId)}\n${t(userId, 'sent_to_all')}`);
         
     } else if (data === 'authorize_menu') {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
