@@ -1377,7 +1377,7 @@ function handleCommand(chatId, userId, userName, text) {
         const previewMessage = `${t(userId, 'announcement_preview')}:\n\n` +
                               `📢 **${t(userId, 'announcement')}**\n\n` +
                               `${announcementText}\n\n` +
-                              `👨‍💼 **${t(userId, 'from_admin')}:** ${userName}\n` +
+                              `👨‍💼 **${t(userId, 'from_admin')}:** ${translateName(userName, userId)}\n` +
                               `🕐 **${t(userId, 'time')}:** ${new Date().toLocaleString()}`;
         
         const buttons = [
@@ -1403,7 +1403,7 @@ function handleCommand(chatId, userId, userName, text) {
         
         // Show preview with confirmation buttons
         const previewMessage = `${t(userId, 'message_preview')}:\n\n` +
-                              `💬 **${t(userId, 'message_from')} ${userName}**\n\n` +
+                              `💬 **${t(userId, 'message_from')} ${translateName(userName, userId)}**\n\n` +
                               `${messageText}\n\n` +
                               `🕐 **${t(userId, 'time')}:** ${new Date().toLocaleString()}`;
         
@@ -3667,7 +3667,7 @@ function broadcastAnnouncement(announcementText, fromAdmin) {
             // Create announcement in recipient's language (interface only)
             const announcement = `📢 **${t(userChatId, 'announcement')}**\n\n` +
                                `${announcementText}\n\n` +  // Content unchanged
-                               `👨‍💼 **${t(userChatId, 'from_admin')}:** ${fromAdmin}\n` +
+                               `👨‍💼 **${t(userChatId, 'from_admin')}:** ${translateName(fromAdmin, userChatId)}\n` +
                                `🕐 **${t(userChatId, 'time')}:** ${timestamp}`;
             
             // Add acknowledgment button
@@ -3693,7 +3693,7 @@ function broadcastMessage(messageText, fromUser, isAnnouncement = false) {
         
         if (userChatId) {
             // Create message in recipient's language (interface only)
-            const message = `💬 **${t(userChatId, 'message_from')} ${fromUser}**\n\n` +
+            const message = `💬 **${t(userChatId, 'message_from')} ${translateName(fromUser, userChatId)}**\n\n` +
                            `${messageText}\n\n` +  // Content unchanged
                            `🕐 **${t(userChatId, 'time')}:** ${timestamp}`;
             
