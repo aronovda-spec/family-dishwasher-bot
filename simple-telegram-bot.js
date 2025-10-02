@@ -434,7 +434,7 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
     // User statistics
     report += `${t(userId, 'user_statistics')}\n`;
     Object.entries(monthData.users).forEach(([userName, stats]) => {
-        report += `${addRoyalEmoji(userName)}:\n`;
+        report += `${addRoyalEmojiTranslated(userName, userId)}:\n`;
         report += `  ✅ ${t(userId, 'completions_count', {count: stats.completions})}\n`;
         report += `  ⚡ ${t(userId, 'punishments_received', {count: stats.punishments})}\n`;
         report += `  ✈️ ${t(userId, 'days_suspended', {count: stats.daysSuspended})}\n`;
@@ -1850,7 +1850,7 @@ function handleCommand(chatId, userId, userName, text) {
             
             // Note: We don't add chatId here because we don't know the new admin's chat ID yet
             // The new admin's chat ID will be stored when they send /start or interact with the bot
-            sendMessage(chatId, t(userId, 'first_admin_added', {user: userToAdd}));
+            sendMessage(chatId, t(userId, 'first_admin_added', {user: translateName(userToAdd, userId)}));
             return;
         }
         
@@ -1872,12 +1872,12 @@ function handleCommand(chatId, userId, userName, text) {
         
         // Note: We don't add chatId here because we don't know the new admin's chat ID yet
         // The new admin's chat ID will be stored when they send /start or interact with the bot
-        sendMessage(chatId, t(userId, 'admin_added', {user: userToAdd}));
+        sendMessage(chatId, t(userId, 'admin_added', {user: translateName(userToAdd, userId)}));
         
     } else if (command.startsWith('/removeadmin ')) {
         // Check if user is already an admin
         if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
-            sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: userName}));
+            sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
             return;
         }
         
@@ -1892,9 +1892,9 @@ function handleCommand(chatId, userId, userName, text) {
             // Check if user exists in admins
             if (admins.has(userToRemove)) {
                 admins.delete(userToRemove);
-                sendMessage(chatId, t(userId, 'admin_removed', {user: userToRemove}));
+                sendMessage(chatId, t(userId, 'admin_removed', {user: translateName(userToRemove, userId)}));
             } else {
-                sendMessage(chatId, t(userId, 'user_not_found_admin', {user: userToRemove}));
+                sendMessage(chatId, t(userId, 'user_not_found_admin', {user: translateName(userToRemove, userId)}));
             }
         } else {
             sendMessage(chatId, t(userId, 'usage_removeadmin'));
