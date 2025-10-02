@@ -318,10 +318,10 @@ function alertAdminsAboutCheating(userId, userName, reason, details) {
         let alertMessage;
         if (reason === 'rapid_done') {
             alertMessage = `${t(adminChatId, 'cheating_detected')}\n\n` +
-                `${t(adminChatId, 'rapid_done_alert', {user: userName, userId: userId, time: timeString, lastDone: details.lastDone})}`;
+                `${t(adminChatId, 'rapid_done_alert', {user: translateName(userName, adminChatId), userId: userId, time: timeString, lastDone: details.lastDone})}`;
         } else if (reason === 'rapid_swap') {
             alertMessage = `${t(adminChatId, 'cheating_detected')}\n\n` +
-                `${t(adminChatId, 'rapid_swap_alert', {user: userName, userId: userId, time: timeString, swapCount: details.swapCount})}`;
+                `${t(adminChatId, 'rapid_swap_alert', {user: translateName(userName, adminChatId), userId: userId, time: timeString, swapCount: details.swapCount})}`;
         }
         
         console.log(`🚨 Sending cheating alert to admin: ${adminChatId}`);
