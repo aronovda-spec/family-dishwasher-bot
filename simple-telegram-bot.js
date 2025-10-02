@@ -117,7 +117,6 @@ function normalizeScoresIfNeeded() {
         }
         
         console.log(`🔄 Scores normalized: subtracted ${minScore} from all users`);
-        console.log(`🔍 DEBUG - Normalized scores:`, Object.fromEntries(userScores));
     }
 }
 
@@ -524,6 +523,15 @@ const royalEmojis = {
     'Emma': '✨'  // Princess 3
 };
 
+// Hebrew name translations
+const hebrewNames = {
+    'Eden': 'עדן',
+    'Adele': 'אדל', 
+    'Emma': 'אמה',
+    'Dani': 'דני',
+    'Marianna': 'מראינה'
+};
+
 // Translation dictionaries
 const translations = {
     en: {
@@ -597,6 +605,9 @@ const translations = {
         
         // More popup messages
         'force_swap_completed': '✅ **Force swap completed!**',
+        'admin_force_swap_executed': 'Admin Force Swap Executed',
+        'assigned_to_perform': 'assigned to perform',
+        'current_turn_label': 'Current turn',
         'swap_users': '🔄 **{user1} ↔ {user2}**',
         'punishment_approved': '✅ **Punishment Approved!**',
         'approved_by': '👨‍💼 **Approved by:**',
@@ -907,6 +918,9 @@ const translations = {
         
         // More popup messages
         'force_swap_completed': '✅ **החלפה בכוח הושלמה!**',
+        'admin_force_swap_executed': 'האדמין בוצעה החלפה בכוח',
+        'assigned_to_perform': 'קיבל אישור לבצע את התור של',
+        'current_turn_label': 'התור הנוכחי',
         'swap_users': '🔄 **{user1} ↔ {user2}**',
         'punishment_approved': '✅ **עונש אושר!**',
         'approved_by': '👨‍💼 **אושר על ידי:**',
@@ -972,7 +986,7 @@ const translations = {
         
         // Admin management messages
         'current_admins': '👨‍💼 **מנהלים נוכחיים:**\n\n{adminList}\n\n📊 **סך מנהלים:** {count}',
-        'no_authorized_users': '👥 **עדיין לא הוגדרו משתמשים מורשים.**\n\nהשתמש ב-`/authorize <user>` כדי להרשות משתמש.\n\n📋 **חברי התור הזמינים:**\n• Eden Aronov\n• Adele Aronov\n• Emma Aronov',
+        'no_authorized_users': '👥 **עדיין לא הוגדרו משתמשים מורשים.**\n\nהשתמש ב-`/authorize <user>` כדי להרשות משתמש.\n\n📋 **חברי התור הזמינים:**\n• עדן\n• אדל\n• אמה',
         'first_admin_added': '✅ **מנהל ראשון נוסף!**\n\n👨‍💼 {user} הוא כעת המנהל הראשון.\n\n🔑 **הרשאות מנהל:**\n• ניהול התור\n• הרשאת משתמשים\n• הוספה/הסרה של מנהלים\n• החלפות בכוח\n• הפעלת עונשים\n\n💡 **הערה:** {user} צריך לשלוח /start לבוט כדי לקבל התראות.',
         'admin_added': '✅ **מנהל נוסף!**\n\n👨‍💼 {user} הוא כעת מנהל.\n\n🔑 **הרשאות מנהל:**\n• ניהול התור\n• הרשאת משתמשים\n• הוספה/הסרה של מנהלים\n• החלפות בכוח\n• הפעלת עונשים\n\n💡 **הערה:** {user} צריך לשלוח /start לבוט כדי לקבל התראות.',
         
@@ -983,7 +997,7 @@ const translations = {
         'admin_removed': '✅ **מנהל הוסר!**\n\n👤 {user} אינו עוד מנהל.\n\n🔒 **הרשאות מנהל בוטלו.**',
         'user_not_found_admin': '❌ **משתמש לא נמצא!**\n\n👤 {user} אינו מנהל.\n\n💡 **השתמש ב-`/admins` כדי לראות מנהלים נוכחיים.**',
         'admin_access_required_authorize': '❌ **נדרשת גישת מנהל!**\n\n👤 {user} אינו מנהל.\n\n💡 **רק מנהלים יכולים להרשות משתמשים.**',
-        'user_not_in_queue': '❌ **משתמש לא בתור!**\n\n👥 **חברי התור הזמינים:**\n• Eden Aronov\n• Adele Aronov\n• Emma Aronov\n\n💡 **שימוש:** `/authorize Eden` או `/authorize Eden Aronov`',
+        'user_not_in_queue': '❌ **משתמש לא בתור!**\n\n👥 **חברי התור הזמינים:**\n• עדן\n• אדל\n• אמה\n\n💡 **שימוש:** `/authorize עדן` או `/authorize עדן`',
         'test_button_works': '🧪 **כפתור בדיקה עובד!**\n\n✅ כפתורים מוטבעים עובדים נכון!\n\n👤 **נלחץ על ידי:** {user}\n🆔 **מזהה משתמש:** {userId}\n🔘 **נתוני כפתור:** {data}',
         'pending_swap_exists': '❌ **יש לך כבר בקשת החלפה ממתינה!**\n\n🎯 **בקשה נוכחית:** {fromUser} ↔ {toUser}\n⏰ **מזהה בקשה:** {requestId}\n\n💡 **אתה יכול לבטל את הבקשה הנוכחית לפני יצירת חדשה.**',
         'target_has_pending_swap': '❌ **ל-{targetUser} יש כבר בקשת החלפה ממתינה!**\n\n🎯 **בקשה נוכחית:** {fromUser} ↔ {toUser}\n⏰ **מזהה בקשה:** {requestId}\n\n💡 **אנא המתן עד שהבקשה הזו תיפתר לפני יצירת חדשה.**',
@@ -996,9 +1010,9 @@ const translations = {
         'current_turn_button': '🎯 {user} (התור הנוכחי)',
         
         // Usage messages
-        'usage_addadmin': '❌ **שימוש:** `/addadmin <שם משתמש>`\n\nדוגמה: `/addadmin Dani`',
-        'usage_removeadmin': '❌ **שימוש:** `/removeadmin <שם משתמש>`\n\nדוגמה: `/removeadmin Dani`',
-        'usage_authorize': '❌ **שימוש:** `/authorize <שם משתמש>`\n\nדוגמה: `/authorize Eden`',
+        'usage_addadmin': '❌ **שימוש:** `/addadmin <שם משתמש>`\n\nדוגמה: `/addadmin דני`',
+        'usage_removeadmin': '❌ **שימוש:** `/removeadmin <שם משתמש>`\n\nדוגמה: `/removeadmin דני`',
+        'usage_authorize': '❌ **שימוש:** `/authorize <שם משתמש>`\n\nדוגמה: `/authorize עדן`',
         'unknown_command': '❌ פקודה לא מוכרת. הקלד /help כדי לראות פקודות זמינות.',
         
         // Queue update messages
@@ -1182,7 +1196,7 @@ const translations = {
         'help_punishment_explanation': '• **בקשת ענישה** - דיווח על משתמש אחר\n• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n',
         'help_admin_features': '👨‍💼 **תכונות מנהל:**\n',
         'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n\n',
-        'help_tie_breaker': '🎯 **סדר קביעות:** עדן → עדלה → אמה\n\n',
+        'help_tie_breaker': '🎯 **סדר קביעות:** עדן → אדל → אמה\n\n',
         'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!'
     }
 };
@@ -1190,6 +1204,15 @@ const translations = {
 // Get user's language preference
 function getUserLanguage(userId) {
     return userLanguage.get(userId) || 'en'; // Default to English
+}
+
+// Translate names based on user's language preference
+function translateName(name, userId) {
+    const userLang = getUserLanguage(userId);
+    if (userLang === 'he' && hebrewNames[name]) {
+        return hebrewNames[name];
+    }
+    return name; // Return original name for English or unknown names
 }
 
 // Get translated text
@@ -1512,11 +1535,6 @@ function handleCommand(chatId, userId, userName, text) {
         const currentUser = getCurrentTurnUser();
         const nextThreeTurns = getNextThreeTurns();
         
-        // Debug: Show current scores
-        console.log(`🔍 DEBUG - Current scores:`, Object.fromEntries(userScores));
-        console.log(`🔍 DEBUG - Current turn user: ${currentUser}`);
-        console.log(`🔍 DEBUG - Next 3 turns: [${nextThreeTurns.join(', ')}]`);
-        
         // Show current turn and next 3 turns
         for (let i = 0; i < 3; i++) {
             const name = nextThreeTurns[i];
@@ -1632,7 +1650,6 @@ function handleCommand(chatId, userId, userName, text) {
             // Clear the assignment if it was assigned
             if (originalUser !== currentUser) {
                 turnAssignments.delete(originalUser);
-                console.log(`🔍 DEBUG - Assignment cleared: ${originalUser} -> ${currentUser}`);
             }
             
             // Update statistics for the user who completed their turn
@@ -1716,7 +1733,6 @@ function handleCommand(chatId, userId, userName, text) {
             // Clear the assignment if it was assigned
             if (originalUser !== currentUser) {
                 turnAssignments.delete(originalUser);
-                console.log(`🔍 DEBUG - Assignment cleared: ${originalUser} -> ${currentUser}`);
             }
             
             // Update statistics for the user who completed their turn
@@ -1937,7 +1953,6 @@ function applyPunishment(targetUser, reason, appliedBy) {
     userScores.set(targetUser, currentScore - 3);
     
     console.log(`⚖️ Punishment applied to ${targetUser}: ${currentScore} → ${currentScore - 3}`);
-    console.log(`🔍 DEBUG - Updated scores:`, Object.fromEntries(userScores));
     
     // Track punishment for monthly report
     trackMonthlyAction('punishment_received', targetUser, null, 1);
@@ -2037,17 +2052,11 @@ function executeSwap(swapRequest, requestId, status) {
         
         // Update current turn if needed
         // IMPORTANT: currentTurn should follow the user who had the turn to their new position
-        console.log(`🔍 DEBUG - Before currentTurn update: currentTurn=${currentTurn}, fromIndex=${fromIndex}, toIndex=${toIndex}`);
         if (currentTurn === fromIndex) {
             currentTurn = toIndex;  // The user who had the turn is now at toIndex
-            console.log(`🔍 DEBUG - Updated currentTurn from ${fromIndex} to ${toIndex} (followed fromUser)`);
         } else if (currentTurn === toIndex) {
             currentTurn = fromIndex;  // The user who had the turn is now at fromIndex
-            console.log(`🔍 DEBUG - Updated currentTurn from ${toIndex} to ${fromIndex} (followed toUser)`);
-        } else {
-            console.log(`🔍 DEBUG - No currentTurn update needed (currentTurn=${currentTurn} not involved in swap)`);
         }
-        console.log(`🔍 DEBUG - After currentTurn update: currentTurn=${currentTurn}`);
         
         // FIX: After swapping, we need to update currentTurn to reflect the new positions
         // The user who was at currentTurn position before the swap should now be at their new position
@@ -2059,7 +2068,6 @@ function executeSwap(swapRequest, requestId, status) {
             currentTurn = fromIndex;
         }
         // If currentTurn was not involved in the swap, it stays the same
-        console.log(`🔍 DEBUG - After currentTurn correction: currentTurn=${currentTurn}`);
         
         // TEMPORARY SWAP: Mark this as a temporary swap that will revert after the original current turn person completes their turn
         const tempSwap = {
@@ -2075,7 +2083,6 @@ function executeSwap(swapRequest, requestId, status) {
         const swapId = `user_swap_${Date.now()}`;
         global.tempSwaps.set(swapId, tempSwap);
         
-        console.log(`🔍 DEBUG - Temporary swap stored: ${fromQueueName}↔${toUser} (will revert when ${tempSwap.originalCurrentTurnUser} completes their turn)`);
         
         // Notify both users in their language
         // Create queue starting from current turn
@@ -2128,14 +2135,10 @@ function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'help') {
         handleCommand(chatId, userId, userName, 'help');
     } else if (data === 'dishwasher_alert') {
-        console.log(`🔍 DEBUG - Dishwasher alert handler triggered by ${userName} (${userId})`);
-        
         // Check if this is an admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
-        console.log(`🔍 DEBUG - Is admin check: ${isAdmin} (userName: ${userName}, userId: ${userId})`);
         
         if (!isAdmin) {
-            console.log(`🔍 DEBUG - Access denied for ${userName}`);
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
@@ -2178,14 +2181,10 @@ function handleCallback(chatId, userId, userName, data) {
         global.dishwasherAlertSent = true;
         
     } else if (data === 'dishwasher_started') {
-        console.log(`🔍 DEBUG - Dishwasher started handler triggered by ${userName} (${userId})`);
-        
         // Check if this is an admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
-        console.log(`🔍 DEBUG - Is admin check: ${isAdmin} (userName: ${userName}, userId: ${userId})`);
         
         if (!isAdmin) {
-            console.log(`🔍 DEBUG - Access denied for ${userName}`);
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
@@ -3076,7 +3075,7 @@ function handleCallback(chatId, userId, userName, data) {
         const royalFirstUser = addRoyalEmoji(firstUser);
         
         sendMessageWithButtons(chatId, 
-            `${t(userId, 'force_swap_step2')}\n\n🎯 **Current turn:** ${royalFirstUser}\n${t(userId, 'swap_with_select')}`, 
+            `${t(userId, 'force_swap_step2')}\n\n🎯 **${t(userId, 'current_turn_label')}:** ${royalFirstUser}\n${t(userId, 'swap_with_select')}`, 
             buttons
         );
         
@@ -3086,8 +3085,6 @@ function handleCallback(chatId, userId, userName, data) {
         const firstUser = dataWithoutPrefix.substring(0, lastUnderscoreIndex);
         const secondUser = dataWithoutPrefix.substring(lastUnderscoreIndex + 1);
         
-        console.log(`🔍 DEBUG - Force swap: ${firstUser} ↔ ${secondUser}`);
-        console.log(`🔍 DEBUG - Current scores:`, Object.fromEntries(userScores));
         
         // In the new score-based system, force swap means:
         // The second user performs the first user's turn (favor/debt)
@@ -3119,9 +3116,6 @@ function handleCallback(chatId, userId, userName, data) {
             // In score-based system: force swap just reassigns the turn
             // No score changes - the assigned user will complete the turn later
             turnAssignments.set(firstUser, secondUser);
-            console.log(`🔍 DEBUG - Force swap completed: ${secondUser} assigned to perform ${firstUser}'s turn`);
-            console.log(`🔍 DEBUG - Turn assignments:`, Object.fromEntries(turnAssignments));
-            console.log(`🔍 DEBUG - Scores unchanged:`, Object.fromEntries(userScores));
             
             // Track admin force swap for monthly report
             trackMonthlyAction('admin_force_swap', firstUser, userName);
@@ -3135,7 +3129,7 @@ function handleCallback(chatId, userId, userName, data) {
                 
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
-                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${secondUser} assigned to perform ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`;
+                    const message = `⚡ **${t(userChatId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(secondUser, userChatId)} ${t(userChatId, 'assigned_to_perform')} ${translateName(firstUser, userChatId)}'s turn**\n\n🎯 **${t(userChatId, 'current_turn_label')}:** ${translateName(currentTurnUser, userChatId)}`;
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, message);
                 } else {
@@ -3143,7 +3137,7 @@ function handleCallback(chatId, userId, userName, data) {
                 }
             });
             
-            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${secondUser} assigned to perform ${firstUser}'s turn**\n\n🎯 **Current turn:** ${currentTurnUser}`);
+            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(secondUser, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(firstUser, userId)}'s turn**\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`);
         } else {
             sendMessage(chatId, t(userId, 'error_users_not_found'));
         }
