@@ -1640,27 +1640,28 @@ function handleCommand(chatId, userId, userName, text) {
         sendMessage(chatId, statusMessage);
         
     } else if (command === '/done' || command === 'done') {
-        // Initialize anti-cheating tracking
-        if (!global.doneTimestamps) global.doneTimestamps = new Map();
-        
-        // Check for rapid DONE activity (30 minutes)
-        const now = Date.now();
-        const lastDone = global.doneTimestamps.get('lastDone');
-        
-        if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
-            const lastDoneTime = new Date(lastDone).toLocaleString();
-            // Send alert for each DONE within 30 minutes (different users get separate alerts)
-            alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
-            console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
-        }
-        
-        // Update last DONE timestamp
-        global.doneTimestamps.set('lastDone', now);
-        
         // Check if user is admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
         if (isAdmin) {
+            // Initialize anti-cheating tracking for admin
+            if (!global.doneTimestamps) global.doneTimestamps = new Map();
+            
+            // Check for rapid DONE activity (30 minutes) - per user tracking
+            const now = Date.now();
+            const userKey = `${userId}_${userName}`;
+            const lastDone = global.doneTimestamps.get(userKey);
+            
+            if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
+                const lastDoneTime = new Date(lastDone).toLocaleString();
+                // Send alert for each DONE within 30 minutes (per user)
+                alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+                console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+            }
+            
+            // Update last DONE timestamp for this specific user
+            global.doneTimestamps.set(userKey, now);
+            
             // Admin "Done" - Admin takes over dishwasher duty
             const currentUser = getCurrentTurnUser();
             
@@ -1751,6 +1752,24 @@ function handleCommand(chatId, userId, userName, text) {
                 sendMessage(chatId, `${t(userId, 'not_your_turn')}\n\n${t(userId, 'current_turn_user')} ${currentUser}\n${t(userId, 'your_queue_position')} ${userQueueName}\n\n${t(userId, 'please_wait_turn')}`);
                 return;
             }
+            
+            // Initialize anti-cheating tracking for regular user (only after turn validation)
+            if (!global.doneTimestamps) global.doneTimestamps = new Map();
+            
+            // Check for rapid DONE activity (30 minutes) - per user tracking
+            const now = Date.now();
+            const userKey = `${userId}_${userName}`;
+            const lastDone = global.doneTimestamps.get(userKey);
+            
+            if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
+                const lastDoneTime = new Date(lastDone).toLocaleString();
+                // Send alert for each DONE within 30 minutes (per user)
+                alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+                console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+            }
+            
+            // Update last DONE timestamp for this specific user
+            global.doneTimestamps.set(userKey, now);
             
             // Find the original user whose turn this was (in case of assignment)
             let originalUser = currentUser;
