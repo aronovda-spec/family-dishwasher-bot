@@ -455,7 +455,7 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
     }
     
     // Totals
-    report += `📈 TOTALS:\n`;
+    report += `📈 ${t(userId, 'totals')}:\n`;
     report += `- ${t(userId, 'total_dishes_completed', {count: monthData.totals.dishesCompleted})}\n`;
     report += `- ${t(userId, 'admin_interventions', {count: monthData.totals.adminInterventions})}\n`;
     report += `- ${t(userId, 'queue_reorders', {count: monthData.totals.queueReorders})}`;
@@ -820,6 +820,7 @@ const translations = {
         'total_dishes_completed': 'Total dishes completed: {count}',
         'admin_interventions': 'Admin interventions: {count}',
         'queue_reorders': 'Queue reorders: {count}',
+        'totals': 'TOTALS',
         
         // Swap status messages
         'temporary_swaps_active': 'Temporary Swaps Active:',
@@ -1175,6 +1176,7 @@ const translations = {
         'total_dishes_completed': 'סה"כ כלים שהושלמו: {count}',
         'admin_interventions': 'התערבויות מנהל: {count}',
         'queue_reorders': 'סידורי תור מחדש: {count}',
+        'totals': 'סה"כ',
         
         // Swap status messages
         'temporary_swaps_active': 'החלפות זמניות פעילות:',
@@ -2463,7 +2465,7 @@ function handleCallback(chatId, userId, userName, data) {
                 { text: t(userId, 'remove_user'), callback_data: "remove_user_menu" }
             ],
             [
-                { text: '🔄 Reset Scores', callback_data: "reset_scores_menu" }
+                { text: t(userId, 'reset_scores'), callback_data: "reset_scores_menu" }
             ]
         ];
         
@@ -2688,7 +2690,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Show reset scores options
         const currentScores = originalQueue.map(user => {
             const score = userScores.get(user) || 0;
-            return `${addRoyalEmoji(user)}: ${score}`;
+            return `${addRoyalEmojiTranslated(user, userId)}: ${score}`;
         }).join('\n');
         
         const message = `${t(userId, 'reset_scores')} Menu\n\n📊 **${t(userId, 'current_scores')}**\n${currentScores}\n\n**Options:**`;
@@ -2725,7 +2727,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Track for monthly report
         trackMonthlyAction('queue_reorder', null, userName);
         
-        const newScores = originalQueue.map(user => `${addRoyalEmoji(user)}: 0`).join('\n');
+        const newScores = originalQueue.map(user => `${addRoyalEmojiTranslated(user, userId)}: 0`).join('\n');
         const message = t(userId, 'all_scores_reset', {newScores: newScores});
         
         sendMessage(chatId, message);
@@ -2734,7 +2736,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Select user to reset score
         const buttons = originalQueue.map(user => {
             const currentScore = userScores.get(user) || 0;
-            return [{ text: `${addRoyalEmoji(user)} (${currentScore})`, callback_data: `reset_score_select_${user}` }];
+            return [{ text: `${addRoyalEmojiTranslated(user, userId)} (${currentScore})`, callback_data: `reset_score_select_${user}` }];
         });
         sendMessageWithButtons(chatId, t(userId, 'select_user_reset_score'), buttons);
         
@@ -2744,11 +2746,11 @@ function handleCallback(chatId, userId, userName, data) {
         const currentScore = userScores.get(selectedUser) || 0;
         
         const confirmButtons = [
-            [{ text: `✅ ${t(userId, 'reset_scores')} ${addRoyalEmoji(selectedUser)}`, callback_data: `reset_score_execute_${selectedUser}` }],
+            [{ text: `✅ ${t(userId, 'reset_scores')} ${addRoyalEmojiTranslated(selectedUser, userId)}`, callback_data: `reset_score_execute_${selectedUser}` }],
             [{ text: t(userId, 'cancel'), callback_data: 'reset_scores_menu' }]
         ];
         
-        const message = t(userId, 'confirm_reset_score', {user: addRoyalEmoji(selectedUser), score: currentScore});
+        const message = t(userId, 'confirm_reset_score', {user: addRoyalEmojiTranslated(selectedUser, userId), score: currentScore});
         sendMessageWithButtons(chatId, message, confirmButtons);
         
     } else if (data.startsWith('reset_score_execute_')) {
@@ -2763,7 +2765,7 @@ function handleCallback(chatId, userId, userName, data) {
         // Track for monthly report
         trackMonthlyAction('queue_reorder', null, userName);
         
-        const message = t(userId, 'score_reset', {user: addRoyalEmoji(selectedUser), oldScore: oldScore});
+        const message = t(userId, 'score_reset', {user: addRoyalEmojiTranslated(selectedUser, userId), oldScore: oldScore});
         sendMessage(chatId, message);
         
     } else if (data === 'reset_system_confirm') {
@@ -2808,7 +2810,7 @@ function handleCallback(chatId, userId, userName, data) {
         const currentScores = originalQueue.map(user => {
             const score = userScores.get(user) || 0;
             const newScore = score - minScore;
-            return `${addRoyalEmoji(user)}: ${score} → ${newScore}`;
+            return `${addRoyalEmojiTranslated(user, userId)}: ${score} → ${newScore}`;
         }).join('\n');
         
         const message = t(userId, 'normalize_scores_title', {currentScores: currentScores, minScore: minScore});
