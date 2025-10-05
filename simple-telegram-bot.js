@@ -470,18 +470,22 @@ function broadcastMonthlyReport(monthKey = null, isAutoReport = false) {
     
     let recipientCount = 0;
     
-    // Send to all authorized users
+    // Collect all unique chat IDs to avoid duplicates
+    const chatIdsToNotify = new Set();
+    
+    // Add adminChatIds
+    adminChatIds.forEach(chatId => chatIdsToNotify.add(chatId));
+    
+    // Add chat IDs from authorized users
     authorizedUsers.forEach(userName => {
         const chatId = userChatIds.get(userName.toLowerCase());
         if (chatId) {
-            const report = generateMonthlyReport(currentMonthKey, chatId, isAutoReport);
-            sendMessage(chatId, report);
-            recipientCount++;
+            chatIdsToNotify.add(chatId);
         }
     });
     
-    // Send to all admins
-    adminChatIds.forEach(chatId => {
+    // Send to each unique chat ID only once
+    chatIdsToNotify.forEach(chatId => {
         const report = generateMonthlyReport(currentMonthKey, chatId, isAutoReport);
         sendMessage(chatId, report);
         recipientCount++;
@@ -529,7 +533,7 @@ const hebrewNames = {
     'Adele': 'אדל', 
     'Emma': 'אמה',
     'Dani': 'דני',
-    'Marianna': 'מראינה'
+    'Marianna': 'מריאנה'
 };
 
 // Translation dictionaries
@@ -674,7 +678,7 @@ const translations = {
         
         // Admin management messages
         'current_admins': '👨‍💼 **Current Admins:**\n\n{adminList}\n\n📊 **Total admins:** {count}',
-        'no_authorized_users': '👥 **No authorized users set yet.**\n\nUse `/authorize <user>` to authorize a user.\n\n📋 **Available queue members:**\n• Eden Aronov\n• Adele Aronov\n• Emma Aronov',
+        'no_authorized_users': '👥 **No authorized users set yet.**\n\nUse `/authorize <user>` to authorize a user.\n\n📋 **Available queue members:**\n• {Eden}\n• {Adele}\n• {Emma}',
         'first_admin_added': '✅ **First Admin Added!**\n\n👨‍💼 {user} is now the first admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** {user} needs to send /start to the bot to receive notifications.',
         'admin_added': '✅ **Admin Added!**\n\n👨‍💼 {user} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** {user} needs to send /start to the bot to receive notifications.',
         
@@ -685,7 +689,7 @@ const translations = {
         'admin_removed': '✅ **Admin Removed!**\n\n👤 {user} is no longer an admin.\n\n🔒 **Admin privileges revoked.**',
         'user_not_found_admin': '❌ **User not found!**\n\n👤 {user} is not an admin.\n\n💡 **Use `/admins` to see current admins.**',
         'admin_access_required_authorize': '❌ **Admin access required!**\n\n👤 {user} is not an admin.\n\n💡 **Only admins can authorize users.**',
-        'user_not_in_queue': '❌ **User not in queue!**\n\n👥 **Available queue members:**\n• Eden Aronov\n• Adele Aronov\n• Emma Aronov\n\n💡 **Usage:** `/authorize Eden` or `/authorize Eden Aronov`',
+        'user_not_in_queue': '❌ **User not in queue!**\n\n👥 **Available queue members:**\n• {Eden}\n• {Adele}\n• {Emma}\n\n💡 **Usage:** `/authorize Eden` or `/authorize Eden`',
         'test_button_works': '🧪 **Test Button Works!**\n\n✅ Inline buttons are working correctly!\n\n👤 **Pressed by:** {user}\n🆔 **User ID:** {userId}\n🔘 **Button data:** {data}',
         'pending_swap_exists': '❌ **You already have a pending swap request!**\n\n🎯 **Current request:** {fromUser} ↔ {toUser}\n⏰ **Request ID:** {requestId}\n\n💡 **You can cancel your current request before creating a new one.**',
         'target_has_pending_swap': '❌ **{targetUser} already has a pending swap request!**\n\n🎯 **Current request:** {fromUser} ↔ {toUser}\n⏰ **Request ID:** {requestId}\n\n💡 **Please wait for this request to be resolved before creating a new one.**',
@@ -839,7 +843,7 @@ const translations = {
         // Help messages
         'help_title': '🤖 **Family Dishwasher Bot:**\n\n',
         'help_scoring_system': '📊 **Scoring System:**\n',
-        'help_scoring_explanation': '• Each user has a score (number of turns completed)\n• Next turn is determined by lowest score\n• In case of tie, uses fixed order (Eden → Adele → Emma)\n• System maintains fairness over time\n\n',
+        'help_scoring_explanation': '• Each user has a score (number of turns completed)\n• Next turn is determined by lowest score\n• In case of tie, uses fixed order ({Eden} → {Adele} → {Emma})\n• System maintains fairness over time\n\n',
         'help_queue_commands': '📋 **Queue Commands:**\n',
         'help_queue_explanation': '• `/status` - Show current queue, scores, and next turns\n• `/done` - Complete your turn (increases score by 1)\n\n',
         'help_swapping': '🔄 **Turn Swapping:**\n',
@@ -848,7 +852,7 @@ const translations = {
         'help_punishment_explanation': '• **Request Punishment** - Report another user\n• **Process:** Select user → Choose reason → Admins get notification\n• **Punishment:** Admin approves punishment (reduces score by 3)\n\n',
         'help_admin_features': '👨‍💼 **Admin Features:**\n',
         'help_admin_explanation': '• **Force Swap** - Force swap turns\n• **Apply Punishment** - Apply direct punishment\n• **Suspend/Reactivate** - Suspend and reactivate users\n• **Reset Scores** - Reset scores (all, individual, or normalize)\n• **Reorder Queue** - Change tie-breaker order\n• **Queue Statistics** - Detailed statistics\n• **Monthly Report** - Detailed monthly report\n\n',
-        'help_tie_breaker': '🎯 **Tie-breaker Order:** Eden → Adele → Emma\n\n',
+        'help_tie_breaker': '🎯 **Tie-breaker Order:** {Eden} → {Adele} → {Emma}\n\n',
         'help_tip': '💡 **Tip:** Use buttons for easier navigation!',
         
         // Queue Statistics (missing in English)
@@ -994,7 +998,7 @@ const translations = {
         
         // Admin management messages
         'current_admins': '👨‍💼 **מנהלים נוכחיים:**\n\n{adminList}\n\n📊 **סך מנהלים:** {count}',
-        'no_authorized_users': '👥 **עדיין לא הוגדרו משתמשים מורשים.**\n\nהשתמש ב-`/authorize <user>` כדי להרשות משתמש.\n\n📋 **חברי התור הזמינים:**\n• עדן\n• אדל\n• אמה',
+        'no_authorized_users': '👥 **עדיין לא הוגדרו משתמשים מורשים.**\n\nהשתמש ב-`/authorize <user>` כדי להרשות משתמש.\n\n📋 **חברי התור הזמינים:**\n• {Eden}\n• {Adele}\n• {Emma}',
         'first_admin_added': '✅ **מנהל ראשון נוסף!**\n\n👨‍💼 {user} הוא כעת המנהל הראשון.\n\n🔑 **הרשאות מנהל:**\n• ניהול התור\n• הרשאת משתמשים\n• הוספה/הסרה של מנהלים\n• החלפות בכוח\n• הפעלת עונשים\n\n💡 **הערה:** {user} צריך לשלוח /start לבוט כדי לקבל התראות.',
         'admin_added': '✅ **מנהל נוסף!**\n\n👨‍💼 {user} הוא כעת מנהל.\n\n🔑 **הרשאות מנהל:**\n• ניהול התור\n• הרשאת משתמשים\n• הוספה/הסרה של מנהלים\n• החלפות בכוח\n• הפעלת עונשים\n\n💡 **הערה:** {user} צריך לשלוח /start לבוט כדי לקבל התראות.',
         
@@ -1005,7 +1009,7 @@ const translations = {
         'admin_removed': '✅ **מנהל הוסר!**\n\n👤 {user} אינו עוד מנהל.\n\n🔒 **הרשאות מנהל בוטלו.**',
         'user_not_found_admin': '❌ **משתמש לא נמצא!**\n\n👤 {user} אינו מנהל.\n\n💡 **השתמש ב-`/admins` כדי לראות מנהלים נוכחיים.**',
         'admin_access_required_authorize': '❌ **נדרשת גישת מנהל!**\n\n👤 {user} אינו מנהל.\n\n💡 **רק מנהלים יכולים להרשות משתמשים.**',
-        'user_not_in_queue': '❌ **משתמש לא בתור!**\n\n👥 **חברי התור הזמינים:**\n• עדן\n• אדל\n• אמה\n\n💡 **שימוש:** `/authorize עדן` או `/authorize עדן`',
+        'user_not_in_queue': '❌ **משתמש לא בתור!**\n\n👥 **חברי התור הזמינים:**\n• {Eden}\n• {Adele}\n• {Emma}\n\n💡 **שימוש:** `/authorize עדן` או `/authorize עדן`',
         'test_button_works': '🧪 **כפתור בדיקה עובד!**\n\n✅ כפתורים מוטבעים עובדים נכון!\n\n👤 **נלחץ על ידי:** {user}\n🆔 **מזהה משתמש:** {userId}\n🔘 **נתוני כפתור:** {data}',
         'pending_swap_exists': '❌ **יש לך כבר בקשת החלפה ממתינה!**\n\n🎯 **בקשה נוכחית:** {fromUser} ↔ {toUser}\n⏰ **מזהה בקשה:** {requestId}\n\n💡 **אתה יכול לבטל את הבקשה הנוכחית לפני יצירת חדשה.**',
         'target_has_pending_swap': '❌ **ל-{targetUser} יש כבר בקשת החלפה ממתינה!**\n\n🎯 **בקשה נוכחית:** {fromUser} ↔ {toUser}\n⏰ **מזהה בקשה:** {requestId}\n\n💡 **אנא המתן עד שהבקשה הזו תיפתר לפני יצירת חדשה.**',
@@ -1200,7 +1204,7 @@ const translations = {
         // Help messages
         'help_title': '🤖 **בוט מדיח הכלים של המשפחה:**\n\n',
         'help_scoring_system': '📊 **מערכת ניקוד:**\n',
-        'help_scoring_explanation': '• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n• התור הבא נקבע לפי הניקוד הנמוך ביותר\n• במקרה של שוויון, משתמשים בסדר הקבוע (עדן → עדלה → אמה)\n• המערכת שומרת על הוגנות לאורך זמן\n\n',
+        'help_scoring_explanation': '• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n• התור הבא נקבע לפי הניקוד הנמוך ביותר\n• במקרה של שוויון, משתמשים בסדר הקבוע ({Eden} → {Adele} → {Emma})\n• המערכת שומרת על הוגנות לאורך זמן\n\n',
         'help_queue_commands': '📋 **פקודות התור:**\n',
         'help_queue_explanation': '• `/status` - הצגת התור הנוכחי, ניקודים, והתורות הבאים\n• `/done` - השלמת התור שלך (מעלה את הניקוד ב-1)\n\n',
         'help_swapping': '🔄 **החלפת תורות:**\n',
@@ -1209,7 +1213,7 @@ const translations = {
         'help_punishment_explanation': '• **בקשת ענישה** - דיווח על משתמש אחר\n• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n',
         'help_admin_features': '👨‍💼 **תכונות מנהל:**\n',
         'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n\n',
-        'help_tie_breaker': '🎯 **סדר קביעות:** עדן → אדל → אמה\n\n',
+        'help_tie_breaker': '🎯 **סדר קביעות:** {Eden} → {Adele} → {Emma}\n\n',
         'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!'
     }
 };
@@ -1222,8 +1226,22 @@ function getUserLanguage(userId) {
 // Translate names based on user's language preference
 function translateName(name, userId) {
     const userLang = getUserLanguage(userId);
-    if (userLang === 'he' && hebrewNames[name]) {
-        return hebrewNames[name];
+    if (userLang === 'he') {
+        // First try exact match (case-insensitive)
+        const lowerName = name.toLowerCase();
+        for (const [englishName, hebrewName] of Object.entries(hebrewNames)) {
+            if (lowerName === englishName.toLowerCase()) {
+                return hebrewName;
+            }
+        }
+        
+        // Then try partial matches for names with surnames (case-insensitive)
+        for (const [englishName, hebrewName] of Object.entries(hebrewNames)) {
+            if (lowerName.includes(englishName.toLowerCase())) {
+                // Return only the Hebrew name, remove the surname
+                return hebrewName;
+            }
+        }
     }
     return name; // Return original name for English or unknown names
 }
@@ -1645,23 +1663,23 @@ function handleCommand(chatId, userId, userName, text) {
         
         if (isAdmin) {
             // Initialize anti-cheating tracking for admin
-            if (!global.doneTimestamps) global.doneTimestamps = new Map();
-            
+        if (!global.doneTimestamps) global.doneTimestamps = new Map();
+        
             // Check for rapid DONE activity (30 minutes) - per user tracking
-            const now = Date.now();
+        const now = Date.now();
             const userKey = `${userId}_${userName}`;
             const lastDone = global.doneTimestamps.get(userKey);
-            
-            if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
-                const lastDoneTime = new Date(lastDone).toLocaleString();
+        
+        if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
+            const lastDoneTime = new Date(lastDone).toLocaleString();
                 // Send alert for each DONE within 30 minutes (per user)
-                alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
-                console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
-            }
-            
+            alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+            console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+        }
+        
             // Update last DONE timestamp for this specific user
             global.doneTimestamps.set(userKey, now);
-            
+        
             // Admin "Done" - Admin takes over dishwasher duty
             const currentUser = getCurrentTurnUser();
             
@@ -1829,12 +1847,20 @@ function handleCommand(chatId, userId, userName, text) {
         
     } else if (command === '/help' || command === 'help') {
         const helpMessage = t(userId, 'help_title') +
-            t(userId, 'help_scoring_system') + t(userId, 'help_scoring_explanation') +
+            t(userId, 'help_scoring_system') + t(userId, 'help_scoring_explanation', {
+                Eden: translateName('Eden', userId),
+                Adele: translateName('Adele', userId),
+                Emma: translateName('Emma', userId)
+            }) +
             t(userId, 'help_queue_commands') + t(userId, 'help_queue_explanation') +
             t(userId, 'help_swapping') + t(userId, 'help_swapping_explanation') +
             t(userId, 'help_punishment') + t(userId, 'help_punishment_explanation') +
             t(userId, 'help_admin_features') + t(userId, 'help_admin_explanation') +
-            t(userId, 'help_tie_breaker') + t(userId, 'help_tip');
+            t(userId, 'help_tie_breaker', {
+                Eden: translateName('Eden', userId),
+                Adele: translateName('Adele', userId),
+                Emma: translateName('Emma', userId)
+            }) + t(userId, 'help_tip');
         
         sendMessage(chatId, helpMessage);
         
@@ -1855,7 +1881,11 @@ function handleCommand(chatId, userId, userName, text) {
         
     } else if (command === '/users' || command === 'users') {
         if (authorizedUsers.size === 0) {
-            sendMessage(chatId, t(userId, 'no_authorized_users'));
+            sendMessage(chatId, t(userId, 'no_authorized_users', {
+                Eden: translateName('Eden', userId),
+                Adele: translateName('Adele', userId),
+                Emma: translateName('Emma', userId)
+            }));
         } else {
             let userList = '👥 **Authorized Users:**\n\n';
             authorizedUsers.forEach(user => {
@@ -1986,7 +2016,11 @@ function handleCommand(chatId, userId, userName, text) {
                     // For now, we'll store it when they send /start
                     sendMessage(chatId, `${t(userId, 'user_authorized')}\n\n👥 ${userToAuth} → ${queueMember}\n\n${t(userId, 'total_authorized')} ${authorizedUsers.size}/3`);
                 } else {
-                    sendMessage(chatId, t(userId, 'user_not_in_queue'));
+                    sendMessage(chatId, t(userId, 'user_not_in_queue', {
+                        Eden: translateName('Eden', userId),
+                        Adele: translateName('Adele', userId),
+                        Emma: translateName('Emma', userId)
+                    }));
                 }
             }
         } else {
@@ -2206,24 +2240,27 @@ function handleCallback(chatId, userId, userName, data) {
         // Track admin announcement for monthly report
         trackMonthlyAction('admin_announcement', null, userName);
         
-        // Send alert to all authorized users and admins with their preferred language
+        // Collect all unique chat IDs to avoid duplicates
+        const chatIdsToNotify = new Set();
+        
+        // Add adminChatIds
+        adminChatIds.forEach(chatId => chatIdsToNotify.add(chatId));
+        
+        // Add chat IDs from authorized users who are admins
         [...authorizedUsers, ...admins].forEach(user => {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
-            if (userChatId && userChatId !== chatId) {
-                // Create alert message in recipient's language
-                const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: translateName(currentUser, userChatId), sender: translateName(userName, userChatId)});
-                console.log(`🔔 Sending dishwasher alert to ${user} (${userChatId})`);
-                sendMessage(userChatId, alertMessage);
+            if (userChatId) {
+                chatIdsToNotify.add(userChatId);
             }
         });
         
-        // Also notify admins using adminChatIds (in case they're not in userChatIds)
-        adminChatIds.forEach(adminChatId => {
-            if (adminChatId !== chatId) {
-                // Create alert message in admin's language
-                const adminAlertMessage = t(adminChatId, 'dishwasher_alert_message', {user: translateName(currentUser, adminChatId), sender: translateName(userName, adminChatId)});
-                console.log(`🔔 Sending dishwasher alert to admin chat ID: ${adminChatId}`);
-                sendMessage(adminChatId, adminAlertMessage);
+        // Send alert to each unique chat ID only once
+        chatIdsToNotify.forEach(recipientChatId => {
+            if (recipientChatId !== chatId) {
+                // Create alert message in recipient's language
+                const alertMessage = t(recipientChatId, 'dishwasher_alert_message', {user: translateName(currentUser, recipientChatId), sender: translateName(userName, recipientChatId)});
+                console.log(`🔔 Sending dishwasher alert to chat ID: ${recipientChatId}`);
+                sendMessage(recipientChatId, alertMessage);
             }
         });
         
@@ -2252,24 +2289,27 @@ function handleCallback(chatId, userId, userName, data) {
         // Track admin announcement for monthly report
         trackMonthlyAction('admin_announcement', null, userName);
         
-        // Send notification to all authorized users and admins with their preferred language
+        // Collect all unique chat IDs to avoid duplicates
+        const chatIdsToNotify = new Set();
+        
+        // Add adminChatIds
+        adminChatIds.forEach(chatId => chatIdsToNotify.add(chatId));
+        
+        // Add chat IDs from authorized users who are admins
         [...authorizedUsers, ...admins].forEach(user => {
             let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
-            if (userChatId && userChatId !== chatId) {
-                // Create started message in recipient's language
-                const startedMessage = t(userChatId, 'dishwasher_started_message', {user: translateName(currentUser, userChatId), sender: translateName(userName, userChatId)});
-                console.log(`🔔 Sending dishwasher started notification to ${user} (${userChatId})`);
-                sendMessage(userChatId, startedMessage);
+            if (userChatId) {
+                chatIdsToNotify.add(userChatId);
             }
         });
         
-        // Also notify admins using adminChatIds (in case they're not in userChatIds)
-        adminChatIds.forEach(adminChatId => {
-            if (adminChatId !== chatId) {
-                // Create started message in admin's language
-                const adminStartedMessage = t(adminChatId, 'dishwasher_started_message', {user: translateName(currentUser, adminChatId), sender: translateName(userName, adminChatId)});
-                console.log(`🔔 Sending dishwasher started notification to admin chat ID: ${adminChatId}`);
-                sendMessage(adminChatId, adminStartedMessage);
+        // Send notification to each unique chat ID only once
+        chatIdsToNotify.forEach(recipientChatId => {
+            if (recipientChatId !== chatId) {
+                // Create started message in recipient's language
+                const startedMessage = t(recipientChatId, 'dishwasher_started_message', {user: translateName(currentUser, recipientChatId), sender: translateName(userName, recipientChatId)});
+                console.log(`🔔 Sending dishwasher started notification to chat ID: ${recipientChatId}`);
+                sendMessage(recipientChatId, startedMessage);
             }
         });
         
@@ -2289,7 +2329,7 @@ function handleCallback(chatId, userId, userName, data) {
                 [...authorizedUsers, ...admins].forEach(user => {
                     let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                     if (userChatId) {
-                        const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: currentUser, sender: t(userChatId, 'auto_timer')});
+                        const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: translateName(currentUser, userChatId), sender: t(userChatId, 'auto_timer')});
                         console.log(`🔔 Sending auto dishwasher alert to ${user} (${userChatId})`);
                         sendMessage(userChatId, alertMessage);
                     }
@@ -2316,9 +2356,9 @@ function handleCallback(chatId, userId, userName, data) {
         if (isAdmin) {
             const message = `🔧 **Authorize Users**\n\n` +
                 `📋 **Available queue members:**\n` +
-                `• Eden Aronov\n` +
-                `• Adele Aronov\n` +
-                `• Emma Aronov\n\n` +
+                `• ${translateName('Eden', userId)}\n` +
+                `• ${translateName('Adele', userId)}\n` +
+                `• ${translateName('Emma', userId)}\n\n` +
                 `💡 **Usage:** Type \`/authorize Eden\` to authorize Eden`;
             sendMessage(chatId, message);
         } else {
@@ -2329,7 +2369,7 @@ function handleCallback(chatId, userId, userName, data) {
         if (isAdmin) {
             const message = `➕ **Add Admin**\n\n` +
                 `💡 **Usage:** Type \`/addadmin <username>\`\n\n` +
-                `**Example:** \`/addadmin Marianna\``;
+                `**Example:** \`/addadmin ${translateName('Marianna', userId)}\``;
             sendMessage(chatId, message);
         } else {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -2340,9 +2380,9 @@ function handleCallback(chatId, userId, userName, data) {
             `💡 **Ask an admin to authorize you:**\n` +
             `\`/authorize ${userName}\`\n\n` +
             `📋 **Available queue positions:**\n` +
-            `• Eden Aronov\n` +
-            `• Adele Aronov\n` +
-            `• Emma Aronov`;
+            `• ${translateName('Eden', userId)}\n` +
+            `• ${translateName('Adele', userId)}\n` +
+            `• ${translateName('Emma', userId)}`;
         sendMessage(chatId, message);
         
         // Notify all admins about the authorization request
