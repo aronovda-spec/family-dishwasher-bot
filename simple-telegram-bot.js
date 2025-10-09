@@ -3861,19 +3861,19 @@ function checkAndSendMonthlyReport() {
     const now = new Date();
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const isLastDayOfMonth = now.getDate() === lastDayOfMonth;
-    const isEndOfDay = now.getHours() === 23 && now.getMinutes() >= 55; // Between 23:55-23:59
+    const isMorningTime = now.getHours() === 10 && now.getMinutes() >= 0 && now.getMinutes() < 5; // Between 10:00-10:04
     
-    console.log(`📅 Monthly report check: ${now.toISOString()} - Last day: ${isLastDayOfMonth}, End of day: ${isEndOfDay}`);
+    console.log(`📅 Monthly report check: ${now.toISOString()} - Last day: ${isLastDayOfMonth}, Morning time: ${isMorningTime}`);
     
-    if (isLastDayOfMonth && isEndOfDay) {
+    if (isLastDayOfMonth && isMorningTime) {
         console.log('📊 Sending automatic monthly report...');
         const currentMonthKey = getCurrentMonthKey();
         broadcastMonthlyReport(currentMonthKey, true);
     }
 }
 
-// Check for monthly reports every hour
-setInterval(checkAndSendMonthlyReport, 60 * 60 * 1000); // 1 hour
+// Check for monthly reports once daily at 10:00 AM
+setInterval(checkAndSendMonthlyReport, 24 * 60 * 60 * 1000); // 24 hours
 
 // Note: Cleanup timer removed - no time limitations on requests
 
@@ -3881,13 +3881,26 @@ setInterval(checkAndSendMonthlyReport, 60 * 60 * 1000); // 1 hour
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
     console.error('Stack trace:', error.stack);
+    console.log('🔄 Attempting to continue running...');
     // Don't exit - try to continue running
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Promise Rejection at:', promise);
     console.error('Reason:', reason);
+    console.log('🔄 Attempting to continue running...');
     // Don't exit - try to continue running
+});
+
+// Graceful shutdown handler
+process.on('SIGTERM', () => {
+    console.log('🛑 Received SIGTERM, shutting down gracefully...');
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('🛑 Received SIGINT, shutting down gracefully...');
+    process.exit(0);
 });
 
 // Memory monitoring
