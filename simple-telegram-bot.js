@@ -810,6 +810,26 @@ const translations = {
         'user_removed': '❌ {user} removed from queue permanently',
         'permanently_removed': 'Permanently removed',
         
+        // Reset Scores
+        'reset_scores': '🔄 Reset Scores',
+        'reset_all_scores': '🔄 Reset All Scores (All → 0)',
+        'reset_individual': '👤 Reset Individual',
+        'normalize_scores': '📊 Normalize Scores',
+        'reset_system': '🔄 Reset System (All)',
+        'confirm_reset_all': '✅ Confirm Reset All',
+        'cancel': '❌ Cancel',
+        'confirm_reset_all_scores': '⚠️ Confirm Reset All Scores\n\nThis will reset all user scores to 0. Continue?',
+        'all_scores_reset': '✅ All Scores Reset!\n\n📊 New Scores:\n{newScores}\n\n🎯 Next turn will be based on original queue order.',
+        'select_user_reset_score': 'Select user to reset their score to 0:',
+        'confirm_reset_score': '⚠️ Confirm Reset Score\n\n{user} current score: {score}\n\nReset to 0?',
+        'score_reset': '✅ Score Reset!\n\n{user}: {oldScore} → 0\n\n🎯 This may affect turn order.',
+        'confirm_full_system_reset': '⚠️ Confirm Full System Reset\n\nThis will:\n• Reset all scores to 0\n• Clear all turn assignments\n• Clear all suspensions\n• Reset queue order\n\nThis is irreversible!',
+        'reset_everything': '⚠️ Reset Everything',
+        'full_system_reset_complete': '✅ Full System Reset Complete!\n\n📊 All scores reset to 0\n🔄 All assignments cleared\n✈️ All suspensions cleared\n📋 Queue order reset to default\n\n🎯 System is now in default state.',
+        'normalize_scores_title': '📊 Normalize Scores\n\nCurrent Scores:\n{currentScores}\n\nThis will subtract {minScore} from all scores to keep numbers manageable.\n\nContinue?',
+        'normalize_now': '✅ Normalize Now',
+        'scores_normalized': '✅ Scores Normalized!\n\n📊 New Scores:\n{newScores}\n\n🎯 Relative positions preserved, numbers reduced.',
+        
         // Monthly Reports
         'monthly_report': '📊 Monthly Report',
         'share_monthly_report': '📤 Share Monthly Report',
