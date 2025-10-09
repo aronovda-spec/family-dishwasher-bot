@@ -1341,7 +1341,7 @@ function sendMessageWithButtons(chatId, text, buttons) {
     const data = JSON.stringify({
         chat_id: chatId,
         text: text,
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         reply_markup: {
             inline_keyboard: buttons
         }
