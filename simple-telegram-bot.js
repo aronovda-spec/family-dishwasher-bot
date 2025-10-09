@@ -856,7 +856,7 @@ const translations = {
         'help_tip': '💡 **Tip:** Use buttons for easier navigation!',
         
         // Queue Statistics (missing in English)
-        'current_scores': '📊 **Current Scores:**\n'
+        'current_scores': '📊 Current Scores:\n'
     },
     he: {
         // Menu titles
@@ -1105,9 +1105,9 @@ const translations = {
         'select_user_reset_score': 'בחר משתמש לאפס את הניקוד שלו ל-0:',
         'confirm_reset_score': '⚠️ אשר אפס ניקוד\n\n{user} ניקוד נוכחי: {score}\n\nלאפס ל-0?',
         'score_reset': '✅ ניקוד אופס!\n\n{user}: {oldScore} → 0\n\n🎯 זה עשוי להשפיע על סדר התורות.',
-        'confirm_full_system_reset': '⚠️ **אשר אפס מערכת מלא**\n\nזה יעשה:\n• אפס כל הניקודים ל-0\n• נקה כל הקצאות תורות\n• נקה כל השעיות\n• אפס סדר קביעות\n\n**זה בלתי הפיך!**',
+        'confirm_full_system_reset': '⚠️ אשר אפס מערכת מלא\n\nזה יעשה:\n• אפס כל הניקודים ל-0\n• נקה כל הקצאות תורות\n• נקה כל השעיות\n• אפס סדר קביעות\n\nזה בלתי הפיך!',
         'reset_everything': '⚠️ אפס הכל',
-        'full_system_reset_complete': '✅ **אפס מערכת מלא הושלם!**\n\n📊 **כל הניקודים אופסו ל-0**\n🔄 **כל ההקצאות נוקו**\n✈️ **כל ההשעיות נוקו**\n📋 **סדר הקביעות אופס לברירת מחדל**\n\n🎯 **המערכת כעת במצב ברירת מחדל.**',
+        'full_system_reset_complete': '✅ אפס מערכת מלא הושלם!\n\n📊 כל הניקודים אופסו ל-0\n🔄 כל ההקצאות נוקו\n✈️ כל ההשעיות נוקו\n📋 סדר הקביעות אופס לברירת מחדל\n\n🎯 המערכת כעת במצב ברירת מחדל.',
         'normalize_scores_title': '📊 נמל ניקודים\n\nניקוד נוכחי:\n{currentScores}\n\nזה יפחית {minScore} מכל הניקודים כדי לשמור על מספרים ניתנים לניהול.\n\nלהמשיך?',
         'normalize_now': '✅ נמל עכשיו',
         'scores_normalized': '✅ ניקודים נומלו!\n\n📊 ניקודים חדשים:\n{newScores}\n\n🎯 מיקומים יחסיים נשמרו, מספרים הופחתו.',
@@ -1126,7 +1126,7 @@ const translations = {
         // Queue Statistics
         'queue_statistics_title': '📊 **סטטיסטיקות תור**\n\n',
         'tie_breaker_priority_order': '📋 **סדר עדיפות קביעות:**\n',
-        'current_scores': '📊 **ניקוד נוכחי:**\n',
+        'current_scores': '📊 ניקוד נוכחי:\n',
         'current_turn': '🎯 **תור נוכחי:**',
         'next_3_turns': '📅 **3 התורות הבאים:**',
         'suspended_users': '✈️ **משתמשים מושעים:**\n',
@@ -2763,7 +2763,7 @@ function handleCallback(chatId, userId, userName, data) {
             return `${addRoyalEmojiTranslated(user, userId)}: ${score}`;
         }).join('\n');
         
-        const message = `${t(userId, 'reset_scores')} Menu\n\n📊 **${t(userId, 'current_scores')}**\n${currentScores}\n\n**Options:**`;
+        const message = `${t(userId, 'reset_scores')} Menu\n\n📊 ${t(userId, 'current_scores')}\n${currentScores}\n\nOptions:`;
         
         const buttons = [
             [
