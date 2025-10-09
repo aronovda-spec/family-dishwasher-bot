@@ -3595,15 +3595,30 @@ function keepAlive() {
         const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`;
         console.log('🔄 Sending keep-alive ping to:', keepAliveUrl);
         
-        https.get(keepAliveUrl, (res) => {
+        const request = https.get(keepAliveUrl, {
+            timeout: 10000, // 10 second timeout
+            headers: {
+                'User-Agent': 'DishwasherBot-KeepAlive/1.0'
+            }
+        }, (res) => {
             let data = '';
             res.on('data', (chunk) => data += chunk);
             res.on('end', () => {
-                console.log('✅ Keep-alive ping successful:', data);
+                console.log('✅ Keep-alive ping successful:', res.statusCode, data.substring(0, 100));
             });
-        }).on('error', (err) => {
+        });
+        
+        request.on('error', (err) => {
             console.log('❌ Keep-alive ping failed:', err.message);
         });
+        
+        request.on('timeout', () => {
+            console.log('⏰ Keep-alive ping timed out');
+            request.destroy();
+        });
+        
+        // Ensure request is cleaned up
+        request.setTimeout(10000);
     } else {
         console.log('🏠 Keep-alive skipped - running locally');
     }
@@ -3861,3 +3876,83 @@ function checkAndSendMonthlyReport() {
 setInterval(checkAndSendMonthlyReport, 60 * 60 * 1000); // 1 hour
 
 // Note: Cleanup timer removed - no time limitations on requests
+
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    console.error('Stack trace:', error.stack);
+    // Don't exit - try to continue running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Promise Rejection at:', promise);
+    console.error('Reason:', reason);
+    // Don't exit - try to continue running
+});
+
+// Memory monitoring
+function logMemoryUsage() {
+    const used = process.memoryUsage();
+    console.log('📊 Memory Usage:', {
+        rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(used.heapTotal / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`,
+        external: `${Math.round(used.external / 1024 / 1024)}MB`
+    });
+}
+
+// Log memory usage every 30 minutes
+setInterval(logMemoryUsage, 30 * 60 * 1000);
+
+// Memory cleanup function
+function cleanupOldData() {
+    const now = Date.now();
+    const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000); // 1 week ago
+    
+    console.log('🧹 Starting memory cleanup...');
+    
+    // Clean up old swap requests (older than 1 week)
+    let cleanedSwaps = 0;
+    for (const [requestId, request] of pendingSwaps.entries()) {
+        if (request.timestamp < oneWeekAgo) {
+            pendingSwaps.delete(requestId);
+            cleanedSwaps++;
+        }
+    }
+    
+    // Clean up old punishment requests (older than 1 week)
+    let cleanedPunishments = 0;
+    for (const [requestId, request] of pendingPunishments.entries()) {
+        if (request.timestamp < oneWeekAgo) {
+            pendingPunishments.delete(requestId);
+            cleanedPunishments++;
+        }
+    }
+    
+    // Clean up old done timestamps (older than 1 day)
+    const oneDayAgo = now - (24 * 60 * 60 * 1000);
+    let cleanedDoneTimestamps = 0;
+    for (const [userKey, timestamp] of global.doneTimestamps.entries()) {
+        if (timestamp < oneDayAgo) {
+            global.doneTimestamps.delete(userKey);
+            cleanedDoneTimestamps++;
+        }
+    }
+    
+    // Clean up old swap timestamps (older than 1 day)
+    let cleanedSwapTimestamps = 0;
+    for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
+        if (timestamp < oneDayAgo) {
+            global.swapTimestamps.delete(userKey);
+            cleanedSwapTimestamps++;
+        }
+    }
+    
+    console.log(`🧹 Cleanup completed: ${cleanedSwaps} old swaps, ${cleanedPunishments} old punishments, ${cleanedDoneTimestamps} done timestamps, ${cleanedSwapTimestamps} swap timestamps`);
+    
+    // Log memory usage after cleanup
+    logMemoryUsage();
+}
+
+// Run cleanup every 6 hours
+setInterval(cleanupOldData, 6 * 60 * 60 * 1000);
