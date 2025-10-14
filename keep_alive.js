@@ -95,17 +95,25 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-// Error handling - keep-alive should be resilient
+// Error handling - restart on critical errors to maintain keep-alive functionality
 process.on('uncaughtException', (error) => {
     console.error('❌ Keep-alive uncaught exception:', error);
-    console.log('🔄 Attempting to continue keep-alive...');
-    // Don't exit - try to continue
+    console.log('🔄 Critical error in keep-alive - restarting process...');
+    
+    // Give time for logs to be written
+    setTimeout(() => {
+        process.exit(1); // Exit with error code to trigger restart
+    }, 1000);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Keep-alive unhandled rejection:', reason);
-    console.log('🔄 Attempting to continue keep-alive...');
-    // Don't exit - try to continue
+    console.log('🔄 Critical promise rejection in keep-alive - restarting process...');
+    
+    // Give time for logs to be written
+    setTimeout(() => {
+        process.exit(1); // Exit with error code to trigger restart
+    }, 1000);
 });
 
 console.log(`🔄 Keep-alive process ready! (PID: ${process.pid})`);

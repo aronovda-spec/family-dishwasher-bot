@@ -3803,19 +3803,21 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
         });
         res.on('end', () => {
             console.log('🔗 Webhook response:', responseData);
+            console.log('✅ Bot ready with webhook mode');
         });
     });
     
     webhookReq.write(webhookData);
     webhookReq.end();
 } else {
-    // Use polling for local development
-console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
-console.log('📱 Bot is now listening for commands...');
-console.log('🔍 Search for: @aronov_dishwasher_bot');
-
-// Start polling for updates
-getUpdates();
+    // Use polling for local development only
+    console.log('🏠 Running in LOCAL MODE - Using polling only');
+    console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
+    console.log('📱 Bot is now listening for commands...');
+    console.log('🔍 Search for: @aronov_dishwasher_bot');
+    
+    // Start polling for updates (only in local mode)
+    getUpdates();
 }
 
 // Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
@@ -3841,19 +3843,27 @@ setInterval(checkAndSendMonthlyReport, 24 * 60 * 60 * 1000); // 24 hours
 
 // Note: Cleanup timer removed - no time limitations on requests
 
-// Global error handlers to prevent crashes
+// Global error handlers - restart on critical errors to prevent zombie processes
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
     console.error('Stack trace:', error.stack);
-    console.log('🔄 Attempting to continue running...');
-    // Don't exit - try to continue running
+    console.log('🔄 Critical error detected - restarting process...');
+    
+    // Give time for logs to be written
+    setTimeout(() => {
+        process.exit(1); // Exit with error code to trigger restart
+    }, 1000);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Promise Rejection at:', promise);
     console.error('Reason:', reason);
-    console.log('🔄 Attempting to continue running...');
-    // Don't exit - try to continue running
+    console.log('🔄 Critical promise rejection - restarting process...');
+    
+    // Give time for logs to be written
+    setTimeout(() => {
+        process.exit(1); // Exit with error code to trigger restart
+    }, 1000);
 });
 
 // Graceful shutdown handler

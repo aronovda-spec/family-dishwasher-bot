@@ -84,14 +84,18 @@ server.on('error', (error) => {
     console.error('❌ Health server error:', error);
 });
 
+// Error handling - health server should stay running but log errors properly
 process.on('uncaughtException', (error) => {
     console.error('❌ Health server uncaught exception:', error);
-    // Don't exit - health server should stay running
+    console.error('Stack trace:', error.stack);
+    console.log('🔄 Health server continuing to run despite error...');
+    // Health server stays running - it's critical for Render
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Health server unhandled rejection:', reason);
-    // Don't exit - health server should stay running
+    console.log('🔄 Health server continuing to run despite promise rejection...');
+    // Health server stays running - it's critical for Render
 });
 
 console.log(`🏥 Health server ready! (PID: ${process.pid})`);
