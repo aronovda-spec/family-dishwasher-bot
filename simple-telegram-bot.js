@@ -2343,13 +2343,15 @@ function handleCallback(chatId, userId, userName, data) {
         const autoAlertTimeout = setTimeout(() => {
             // Check if we should still send the auto-alert
             if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
-                console.log(`⏰ Auto-alert triggered after 3 hours for ${currentUser}`);
+                // Get the CURRENT turn user (in case there was a swap)
+                const currentTurnUser = getCurrentTurnUser();
+                console.log(`⏰ Auto-alert triggered after 3 hours for ${currentTurnUser}`);
                 
                 // Send dishwasher alert to all authorized users and admins
                 [...authorizedUsers, ...admins].forEach(user => {
                     let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                     if (userChatId) {
-                        const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: translateName(currentUser, userChatId), sender: t(userChatId, 'auto_timer')});
+                        const alertMessage = t(userChatId, 'dishwasher_alert_message', {user: translateName(currentTurnUser, userChatId), sender: t(userChatId, 'auto_timer')});
                         console.log(`🔔 Sending auto dishwasher alert to ${user} (${userChatId})`);
                         sendMessage(userChatId, alertMessage);
                     }
