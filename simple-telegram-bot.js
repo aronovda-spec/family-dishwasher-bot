@@ -3611,9 +3611,37 @@ const url = require('url');
 
 // Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
 
-// HTTP server for webhook only (health check now handled by dedicated health_server.js)
+// HTTP server for webhook and health check (Render expects health on main port)
 const server = http.createServer((req, res) => {
     const parsedUrl = url.parse(req.url, true);
+    
+    // Health check endpoint (Render expects this on main port)
+    if (parsedUrl.pathname === '/health') {
+        res.writeHead(200, { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-cache'
+        });
+        
+        const healthData = {
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            instance: instanceId,
+            service: 'dishwasher-bot-main',
+            uptime: process.uptime(),
+            memory: {
+                rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`,
+                heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+                heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+            },
+            queue: queue.length,
+            currentTurnUser: getCurrentTurnUser()
+        };
+        
+        res.end(JSON.stringify(healthData, null, 2));
+        console.log(`✅ Health check responded: ${new Date().toISOString()}`);
+        return;
+    }
     
     // Webhook endpoint for Telegram
     if (parsedUrl.pathname === '/webhook' && req.method === 'POST') {
@@ -3773,6 +3801,7 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     // Always start server on Render
 server.listen(PORT, () => {
     console.log(`🚀 Bot webhook server running on port ${PORT}`);
+    console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
     console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
 });
 } else {
