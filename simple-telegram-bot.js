@@ -3940,7 +3940,46 @@ function cleanupOldData() {
         }
     }
     
-    console.log(`🧹 Cleanup completed: ${cleanedSwaps} old swaps, ${cleanedPunishments} old punishments, ${cleanedDoneTimestamps} done timestamps, ${cleanedSwapTimestamps} swap timestamps`);
+    // Clean up old user states (older than 1 hour) - remove stale typing states
+    const oneHourAgo = now - (60 * 60 * 1000);
+    let cleanedStates = 0;
+    for (const [userId, state] of userStates.entries()) {
+        if (state === 'typing_announcement' || state === 'typing_message') {
+            userStates.delete(userId);
+            cleanedStates++;
+        }
+    }
+    
+    // Clean up old user actions (older than 1 hour)
+    let cleanedActions = 0;
+    for (const [userId, action] of lastUserAction.entries()) {
+        if (action.timestamp < oneHourAgo) {
+            lastUserAction.delete(userId);
+            cleanedActions++;
+        }
+    }
+    
+    // Clean up old pending announcements (older than 1 hour)
+    let cleanedAnnouncements = 0;
+    for (const [userId, announcement] of pendingAnnouncements.entries()) {
+        if (announcement.timestamp < oneHourAgo) {
+            pendingAnnouncements.delete(userId);
+            cleanedAnnouncements++;
+        }
+    }
+    
+    // Clean up global temp swaps (older than 1 hour)
+    let cleanedTempSwaps = 0;
+    if (global.tempSwaps) {
+        for (const [swapId, swap] of global.tempSwaps.entries()) {
+            if (swap.timestamp < oneHourAgo) {
+                global.tempSwaps.delete(swapId);
+                cleanedTempSwaps++;
+            }
+        }
+    }
+    
+    console.log(`🧹 Comprehensive cleanup completed: ${cleanedSwaps} swaps, ${cleanedPunishments} punishments, ${cleanedDoneTimestamps} done timestamps, ${cleanedSwapTimestamps} swap timestamps, ${cleanedStates} states, ${cleanedActions} actions, ${cleanedAnnouncements} announcements, ${cleanedTempSwaps} temp swaps`);
 }
 
 // Cleanup timer removed - now combined with maintenance timer above
