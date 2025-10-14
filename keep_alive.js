@@ -4,7 +4,7 @@
 const https = require('https');
 const http = require('http');
 
-const KEEP_ALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const KEEP_ALIVE_INTERVAL = 3 * 60 * 1000; // 3 minutes (more aggressive)
 const INITIAL_DELAY = 30 * 1000; // 30 seconds initial delay
 const TIMEOUT = 10000; // 10 second timeout
 

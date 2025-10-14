@@ -3908,17 +3908,28 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-// Optimized timer management - reduced frequency to prevent resource competition
-// Combined memory logging and cleanup into a single timer
+// Enhanced maintenance with memory monitoring and alerts
 function performMaintenance() {
     // Log memory usage
     const used = process.memoryUsage();
+    const rssMB = Math.round(used.rss / 1024 / 1024);
+    const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
+    
     console.log('📊 Memory Usage:', {
-        rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
+        rss: `${rssMB}MB`,
         heapTotal: `${Math.round(used.heapTotal / 1024 / 1024)}MB`,
-        heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`,
+        heapUsed: `${heapUsedMB}MB`,
         external: `${Math.round(used.external / 1024 / 1024)}MB`
     });
+    
+    // Alert if memory usage is getting high (Render free tier limit is ~512MB)
+    if (rssMB > 400) {
+        console.log(`⚠️ HIGH MEMORY USAGE WARNING: ${rssMB}MB (approaching Render free tier limit)`);
+    }
+    
+    if (rssMB > 450) {
+        console.log(`🚨 CRITICAL MEMORY USAGE: ${rssMB}MB (very close to Render free tier limit)`);
+    }
     
     // Perform cleanup
     cleanupOldData();
@@ -3926,6 +3937,25 @@ function performMaintenance() {
 
 // Run maintenance every hour (reduced from multiple separate timers)
 setInterval(performMaintenance, 60 * 60 * 1000); // 1 hour
+
+// Additional safeguards for Render free tier
+// Force garbage collection every 30 minutes to prevent memory buildup
+setInterval(() => {
+    if (global.gc) {
+        console.log('🧹 Running garbage collection...');
+        global.gc();
+        const used = process.memoryUsage();
+        console.log('📊 Memory after GC:', {
+            rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
+            heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`
+        });
+    }
+}, 30 * 60 * 1000); // 30 minutes
+
+// Additional heartbeat to keep main bot active (prevent Render from killing it)
+setInterval(() => {
+    console.log(`💓 Main bot heartbeat: ${new Date().toISOString()}`);
+}, 2 * 60 * 1000); // Every 2 minutes
 
 // Memory cleanup function
 function cleanupOldData() {
