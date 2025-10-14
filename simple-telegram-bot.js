@@ -3952,16 +3952,18 @@ function performMaintenance() {
 setInterval(performMaintenance, 60 * 60 * 1000); // 1 hour
 
 // Additional safeguards for Render free tier
-// Force garbage collection every 30 minutes to prevent memory buildup
+// Memory monitoring without forced GC (GC can cause freezes on free tier)
 setInterval(() => {
-    if (global.gc) {
-        console.log('🧹 Running garbage collection...');
-        global.gc();
-        const used = process.memoryUsage();
-        console.log('📊 Memory after GC:', {
-            rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
-            heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`
-        });
+    const used = process.memoryUsage();
+    console.log('📊 Memory usage:', {
+        rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(used.heapTotal / 1024 / 1024)}MB`
+    });
+    
+    // Alert if memory usage is high (but don't force GC)
+    if (used.rss > 400 * 1024 * 1024) { // 400MB threshold
+        console.log('⚠️ High memory usage detected - consider restart');
     }
 }, 30 * 60 * 1000); // 30 minutes
 
