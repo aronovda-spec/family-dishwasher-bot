@@ -3970,6 +3970,44 @@ setInterval(() => {
     console.log(`💓 Main bot heartbeat: ${new Date().toISOString()}`);
 }, 2 * 60 * 1000); // Every 2 minutes
 
+// Integrated keep-alive mechanism (no separate process needed)
+if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    console.log('🔄 Starting integrated keep-alive mechanism...');
+    
+    const keepAlive = () => {
+        const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`;
+        console.log(`🔄 Sending keep-alive ping to: ${keepAliveUrl}`);
+        
+        const request = https.get(keepAliveUrl, {
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'DishwasherBot-Integrated-KeepAlive/1.0'
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+                console.log(`✅ Keep-alive ping successful: ${res.statusCode}`);
+            });
+        });
+        
+        request.on('error', (err) => {
+            console.log(`❌ Keep-alive ping failed: ${err.message}`);
+        });
+        
+        request.on('timeout', () => {
+            console.log(`⏰ Keep-alive ping timed out`);
+            request.destroy();
+        });
+    };
+    
+    // Initial keep-alive after 30 seconds
+    setTimeout(keepAlive, 30 * 1000);
+    
+    // Then every 3 minutes
+    setInterval(keepAlive, 3 * 60 * 1000);
+}
+
 // Memory cleanup function
 function cleanupOldData() {
     const now = Date.now();

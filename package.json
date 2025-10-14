@@ -4,7 +4,8 @@
   "description": "A Telegram bot for managing family dishwasher queue",
   "main": "simple-telegram-bot.js",
   "scripts": {
-    "start": "node start_render.js",
+    "start": "node start_simple.js",
+    "start-multi": "node start_render.js",
     "dev": "node simple-telegram-bot.js",
     "health": "node health_server.js",
     "keepalive": "node keep_alive.js"

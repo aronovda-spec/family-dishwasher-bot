@@ -16,3 +16,5 @@ services:
           property: host
       - key: HEALTH_PORT
         value: "8000"
+      - key: NODE_ENV
+        value: "production"
