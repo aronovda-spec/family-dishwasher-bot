@@ -14,3 +14,5 @@ services:
           type: web
           name: dishwasher-bot
           property: host
+      - key: HEALTH_PORT
+        value: "8000"

@@ -3609,11 +3609,57 @@ function getUpdates(offset = 0) {
 const http = require('http');
 const url = require('url');
 
-// Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
+// Keep-alive mechanism to prevent Render from sleeping
+function keepAlive() {
+    if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+        const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`;
+        console.log('🔄 Sending keep-alive ping to:', keepAliveUrl);
+        
+        const request = https.get(keepAliveUrl, {
+            timeout: 10000, // 10 second timeout
+            headers: {
+                'User-Agent': 'DishwasherBot-KeepAlive/1.0'
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+                console.log('✅ Keep-alive ping successful:', res.statusCode, data.substring(0, 100));
+            });
+        });
+        
+        request.on('error', (err) => {
+            console.log('❌ Keep-alive ping failed:', err.message);
+        });
+        
+        request.on('timeout', () => {
+            console.log('⏰ Keep-alive ping timed out');
+            request.destroy();
+        });
+        
+        // Ensure request is cleaned up
+        request.setTimeout(10000);
+    } else {
+        console.log('🏠 Keep-alive skipped - running locally');
+    }
+}
 
-// HTTP server for webhook only (health check now handled by dedicated health_server.js)
+// HTTP server for webhook and health check
 const server = http.createServer((req, res) => {
     const parsedUrl = url.parse(req.url, true);
+    
+    // Health check endpoint
+    if (parsedUrl.pathname === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            status: 'healthy', 
+            timestamp: new Date().toISOString(),
+            instance: instanceId,
+            queue: queue.length,
+            currentTurnUser: getCurrentTurnUser()
+        }));
+        return;
+    }
     
     // Webhook endpoint for Telegram
     if (parsedUrl.pathname === '/webhook' && req.method === 'POST') {
@@ -3772,8 +3818,9 @@ const PORT = process.env.PORT || 3000;
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     // Always start server on Render
 server.listen(PORT, () => {
-    console.log(`🚀 Bot webhook server running on port ${PORT}`);
-    console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
+    console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
+        console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
 });
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
@@ -3818,7 +3865,16 @@ console.log('🔍 Search for: @aronov_dishwasher_bot');
 getUpdates();
 }
 
-// Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
+// Keep-alive mechanism (every 5 minutes) - Render free tier sleeps after 15 minutes of inactivity
+if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    console.log('🔄 Starting aggressive keep-alive mechanism (every 5 minutes)');
+    
+    // Initial keep-alive after 30 seconds to ensure server is ready
+    setTimeout(keepAlive, 30 * 1000);
+    
+    // Then every 5 minutes (more aggressive)
+    setInterval(keepAlive, 5 * 60 * 1000); // 5 minutes
+}
 
 // Automatic monthly report system
 function checkAndSendMonthlyReport() {
@@ -3867,10 +3923,8 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-// Optimized timer management - reduced frequency to prevent resource competition
-// Combined memory logging and cleanup into a single timer
-function performMaintenance() {
-    // Log memory usage
+// Memory monitoring
+function logMemoryUsage() {
     const used = process.memoryUsage();
     console.log('📊 Memory Usage:', {
         rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
@@ -3878,13 +3932,10 @@ function performMaintenance() {
         heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`,
         external: `${Math.round(used.external / 1024 / 1024)}MB`
     });
-    
-    // Perform cleanup
-    cleanupOldData();
 }
 
-// Run maintenance every hour (reduced from multiple separate timers)
-setInterval(performMaintenance, 60 * 60 * 1000); // 1 hour
+// Log memory usage every 30 minutes
+setInterval(logMemoryUsage, 30 * 60 * 1000);
 
 // Memory cleanup function
 function cleanupOldData() {
@@ -3931,6 +3982,10 @@ function cleanupOldData() {
     }
     
     console.log(`🧹 Cleanup completed: ${cleanedSwaps} old swaps, ${cleanedPunishments} old punishments, ${cleanedDoneTimestamps} done timestamps, ${cleanedSwapTimestamps} swap timestamps`);
+    
+    // Log memory usage after cleanup
+    logMemoryUsage();
 }
 
-// Cleanup timer removed - now combined with maintenance timer above
+// Run cleanup every 6 hours
+setInterval(cleanupOldData, 6 * 60 * 60 * 1000);
