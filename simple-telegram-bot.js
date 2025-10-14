@@ -3645,6 +3645,19 @@ const server = http.createServer((req, res) => {
         return;
     }
     
+    // Simple test endpoint for debugging
+    if (parsedUrl.pathname === '/test') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            status: 'ok', 
+            message: 'Server is running',
+            timestamp: new Date().toISOString(),
+            port: PORT,
+            host: '0.0.0.0'
+        }));
+        return;
+    }
+    
     // Webhook endpoint for Telegram
     if (parsedUrl.pathname === '/webhook' && req.method === 'POST') {
         let body = '';
@@ -3800,12 +3813,12 @@ function broadcastMessage(messageText, fromUser, isAnnouncement = false) {
 
 const PORT = process.env.PORT || 3000;
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
-    // Always start server on Render
-server.listen(PORT, () => {
-    console.log(`🚀 Bot webhook server running on port ${PORT}`);
-    console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
-    console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
-});
+    // Always start server on Render - bind to 0.0.0.0 for external access
+    server.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Bot webhook server running on port ${PORT} (0.0.0.0)`);
+        console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
+        console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
+    });
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
 }

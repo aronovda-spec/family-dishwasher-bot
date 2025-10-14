@@ -55,9 +55,9 @@ const server = http.createServer((req, res) => {
     }
 });
 
-// Start the health server
-server.listen(PORT, () => {
-    console.log(`🏥 Health server running on port ${PORT}`);
+// Start the health server - bind to 0.0.0.0 for external access
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🏥 Health server running on port ${PORT} (0.0.0.0)`);
     console.log(`🌐 Health check: http://localhost:${PORT}/health`);
     console.log(`📊 Status check: http://localhost:${PORT}/status`);
 });
