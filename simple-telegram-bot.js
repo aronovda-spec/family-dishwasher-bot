@@ -262,6 +262,7 @@ const adminChatIds = new Set(); // Set of admin chat IDs for notifications
 const authorizedUsers = new Set(); // Set of authorized user IDs (max 3)
 const turnOrder = new Set(); // Set of users in turn order
 const userChatIds = new Map(); // Map: userName -> chatId for notifications
+let currentTurnIndex = 0; // Current turn index for queue management
 
 // Link Telegram users to queue names
 const userQueueMapping = new Map(); // Map: Telegram user ID -> Queue name
@@ -4569,7 +4570,7 @@ function cleanupOldData() {
         cleanedSwapTimestamps = originalLength - global.swapTimestamps.length;
     } else if (global.swapTimestamps && typeof global.swapTimestamps.delete === 'function' && typeof global.swapTimestamps.entries === 'function') {
         // swapTimestamps is a Map, use delete method
-        for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
+    for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
         if (timestamp < oneDayAgo) {
             global.swapTimestamps.delete(userKey);
             cleanedSwapTimestamps++;
