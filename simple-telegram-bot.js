@@ -260,6 +260,7 @@ function getRelativeScores() {
 const admins = new Set(); // Set of admin user IDs
 const adminChatIds = new Set(); // Set of admin chat IDs for notifications
 const authorizedUsers = new Set(); // Set of authorized user IDs (max 3)
+const turnOrder = new Set(); // Set of users in turn order
 const userChatIds = new Map(); // Map: userName -> chatId for notifications
 
 // Link Telegram users to queue names
