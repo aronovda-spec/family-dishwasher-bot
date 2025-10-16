@@ -1020,7 +1020,7 @@ const translations = {
         'reset_bot_button': '🔄 Reset Bot',
         'leave_bot_button': '👋 Leave Bot',
         'hard_reset_section': '⚠️ HARD RESET',
-        'danger_zone_warning': '🚨 **DANGER ZONE** - These actions are irreversible!\n\n• **Remove User** - Remove users from bot\n• **Reset Bot** - Complete bot data reset\n\n⚠️ **Use with extreme caution!**',
+        'danger_zone_warning': '🚨 **DANGER ZONE** - These actions are irreversible!\n\n• **Remove User** - Remove users from bot\n• **Reset Bot** - Complete bot data reset\n• **Leave Bot** - Remove yourself with grace period\n\n⚠️ **Use with extreme caution!**',
         'back_to_admin_menu': '🔙 Back to Admin Menu',
         'last_admin_cannot_leave': '❌ **Cannot leave - You are the last admin!**\n\n🚨 **Bot management requires at least one admin**\n\n💡 **Options:**\n• Add another admin first\n• Use admin controls to remove yourself\n• Transfer admin privileges to another user',
         
@@ -1410,7 +1410,7 @@ const translations = {
         'reset_bot_button': '🔄 אפס בוט',
         'leave_bot_button': '👋 עזוב בוט',
         'hard_reset_section': '⚠️ איפוס כללי',
-        'danger_zone_warning': '🚨 **אזור סכנה** - פעולות אלה אינן הפיכות!\n\n• **הסר משתמש** - הסר משתמשים מהבוט\n• **אפס בוט** - איפוס מלא של נתוני הבוט\n\n⚠️ **השתמש בזהירות רבה!**',
+        'danger_zone_warning': '🚨 **אזור סכנה** - פעולות אלה אינן הפיכות!\n\n• **הסר משתמש** - הסר משתמשים מהבוט\n• **אפס בוט** - איפוס מלא של נתוני הבוט\n• **עזוב בוט** - הסר את עצמך עם תקופת חסד\n\n⚠️ **השתמש בזהירות רבה!**',
         'back_to_admin_menu': '🔙 חזור לתפריט מנהל',
         'last_admin_cannot_leave': '❌ **לא ניתן לעזוב - אתה המנהל האחרון!**\n\n🚨 **ניהול הבוט דורש לפחות מנהל אחד**\n\n💡 **אפשרויות:**\n• הוסף מנהל נוסף קודם\n• השתמש בפקדי מנהל להסרת עצמך\n• העבר הרשאות מנהל למשתמש אחר',
     }
@@ -3002,6 +3002,9 @@ async function handleCallback(chatId, userId, userName, data) {
             [
                 { text: t(userId, 'remove_user'), callback_data: "remove_user_menu" },
                 { text: t(userId, 'reset_bot_button'), callback_data: "reset_bot_menu" }
+            ],
+            [
+                { text: t(userId, 'leave_bot_button'), callback_data: "leave_bot" }
             ],
             [
                 { text: t(userId, 'back_to_admin_menu'), callback_data: "admin_menu" }
