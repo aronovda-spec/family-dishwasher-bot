@@ -1622,6 +1622,10 @@ async function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
                 [
+                    { text: '🗑️ Remove User', callback_data: "remove_user_menu" },
+                    { text: '🔄 Reset Bot', callback_data: "reset_bot_menu" }
+                ],
+                [
                     { text: t(userId, 'help'), callback_data: "help" }
                 ],
                 [
@@ -1638,6 +1642,9 @@ async function handleCommand(chatId, userId, userName, text) {
                 [
                     { text: t(userId, 'swap'), callback_data: "swap_menu" },
                     { text: t(userId, 'request_punishment'), callback_data: "request_punishment_menu" }
+                ],
+                [
+                    { text: '👋 Leave Bot', callback_data: "leave_bot" }
                 ],
                 [
                     { text: t(userId, 'help'), callback_data: "help" }
@@ -2473,6 +2480,114 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'cancel_reset') {
         sendMessage(chatId, '❌ Reset cancelled. Bot data remains unchanged.');
+        
+    } else if (data === 'remove_user_menu') {
+        // Check if user is admin
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        
+        if (!isAdmin) {
+            sendMessage(chatId, '❌ Admin access required for this action');
+            return;
+        }
+        
+        // Show user list for removal
+        const userList = Array.from(authorizedUsers);
+        if (userList.length === 0) {
+            sendMessage(chatId, '❌ No users to remove');
+            return;
+        }
+        
+        const keyboard = userList.map(user => [{
+            text: `❌ Remove ${user}`,
+            callback_data: `remove_user_${user}`
+        }]);
+        
+        const replyMarkup = { inline_keyboard: keyboard };
+        sendMessage(chatId, '👥 **User Management**\nClick to remove users:', replyMarkup);
+        
+    } else if (data.startsWith('remove_user_')) {
+        // Check if user is admin
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        
+        if (!isAdmin) {
+            sendMessage(chatId, '❌ Admin access required for this action');
+            return;
+        }
+        
+        const targetUser = data.replace('remove_user_', '');
+        
+        // Remove user from all data structures
+        authorizedUsers.delete(targetUser);
+        authorizedUsers.delete(targetUser.toLowerCase());
+        userChatIds.delete(targetUser);
+        userChatIds.delete(targetUser.toLowerCase());
+        turnOrder.delete(targetUser);
+        turnOrder.delete(targetUser.toLowerCase());
+        userScores.delete(targetUser);
+        userScores.delete(targetUser.toLowerCase());
+        
+        // Save bot data after removing user
+        await saveBotData();
+        
+        // Update the message
+        sendMessage(chatId, `✅ User **${targetUser}** has been removed from the bot`);
+        
+    } else if (data === 'reset_bot_menu') {
+        // Check if user is admin
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        
+        if (!isAdmin) {
+            sendMessage(chatId, '❌ Admin access required for this action');
+            return;
+        }
+        
+        // Create confirmation keyboard
+        const keyboard = [
+            [{ text: '✅ Yes, Reset Everything', callback_data: 'confirm_reset' }],
+            [{ text: '❌ Cancel', callback_data: 'cancel_reset' }]
+        ];
+        
+        const replyMarkup = { inline_keyboard: keyboard };
+        sendMessage(chatId, `⚠️ **WARNING: This will reset ALL bot data!**\n\nThis includes:\n• All users and admins\n• Turn order\n• Scores\n• Settings\n\nAre you sure?`, replyMarkup);
+        
+    } else if (data === 'leave_bot') {
+        // Allow users to remove themselves
+        const userName = getUserName(userId);
+        
+        if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
+            // Create confirmation keyboard
+            const keyboard = [
+                [{ text: '✅ Yes, Leave Bot', callback_data: 'confirm_leave' }],
+                [{ text: '❌ Cancel', callback_data: 'cancel_leave' }]
+            ];
+            
+            const replyMarkup = { inline_keyboard: keyboard };
+            sendMessage(chatId, `⚠️ **Are you sure you want to leave the bot?**\n\nThis will:\n• Remove you from all queues\n• Clear your scores\n• You'll need to reauthorize to rejoin\n\nAre you sure?`, replyMarkup);
+        } else {
+            sendMessage(chatId, `❌ You are not currently authorized. Use /start to join the bot.`);
+        }
+        
+    } else if (data === 'confirm_leave') {
+        // Confirm self-removal
+        const userName = getUserName(userId);
+        
+        // Remove user from all data structures
+        authorizedUsers.delete(userName);
+        authorizedUsers.delete(userName.toLowerCase());
+        userChatIds.delete(userName);
+        userChatIds.delete(userName.toLowerCase());
+        turnOrder.delete(userName);
+        turnOrder.delete(userName.toLowerCase());
+        userScores.delete(userName);
+        userScores.delete(userName.toLowerCase());
+        
+        // Save bot data after self-removal
+        await saveBotData();
+        
+        sendMessage(chatId, `👋 You have been removed from the dishwasher bot. Use /start to rejoin anytime.`);
+        
+    } else if (data === 'cancel_leave') {
+        sendMessage(chatId, '❌ Leave cancelled. You remain in the bot.');
         
     } else if (data === 'dishwasher_alert') {
         // Check if this is an admin
