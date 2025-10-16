@@ -47,6 +47,9 @@ async function saveBotData() {
             // Grace period tracking
             gracePeriods: global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {},
             
+            // Monthly statistics tracking
+            monthlyStats: Object.fromEntries(monthlyStats),
+            
             // Timestamps
             lastSave: Date.now(),
             version: '1.0.0'
@@ -110,6 +113,12 @@ async function loadBotData() {
         global.swapTimestamps = botData.swapTimestamps || [];
         global.doneTimestamps = new Map(Object.entries(botData.doneTimestamps || {}));
         global.gracePeriods = new Map(Object.entries(botData.gracePeriods || {}));
+        
+        // Restore monthly statistics (backward compatible)
+        monthlyStats.clear();
+        Object.entries(botData.monthlyStats || {}).forEach(([key, value]) => {
+            monthlyStats.set(key, value);
+        });
         
         console.log('📂 Bot data loaded successfully');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Turn Index: ${currentTurnIndex}`);
