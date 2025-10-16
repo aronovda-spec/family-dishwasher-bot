@@ -2581,10 +2581,15 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const keyboard = userList.map(user => [{
-            text: addRoyalEmojiTranslated(user, userId),
-            callback_data: `remove_user_${user}`
-        }]);
+        const keyboard = userList.map(user => {
+            // Extract first name and normalize to match royalEmojis keys
+            const firstName = user.split(' ')[0]; // Get first name only
+            const normalizedUser = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+            return [{
+                text: addRoyalEmojiTranslated(normalizedUser, userId),
+                callback_data: `remove_user_${user}`
+            }];
+        });
         
         const replyMarkup = { inline_keyboard: keyboard };
         sendMessageWithButtons(chatId, t(userId, 'user_management_title'), keyboard);
