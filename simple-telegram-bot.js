@@ -1009,6 +1009,7 @@ const translations = {
         'bot_reset_success': '🔄 **Bot data has been completely reset!**\n\nAll users need to reauthorize with /start',
         'reset_cancelled': '❌ Reset cancelled. Bot data remains unchanged.',
         'no_users_to_remove': '❌ No users to remove',
+        'no_authorized_users_to_remove': '❌ **No users to remove**\n\n💡 **First authorize users with:**\n`/authorize Eden`\n`/authorize Adele`\n`/authorize Emma`\n\n📋 **Available queue positions:**\n• {Eden}\n• {Adele}\n• {Emma}',
         'user_management_title': '👥 **User Management**\nClick to remove users:',
         'you_removed_from_bot': '👋 You have been removed from the dishwasher bot. Use /start to rejoin anytime.',
         'yes_reset_everything': '✅ Yes, Reset Everything',
@@ -1394,6 +1395,7 @@ const translations = {
         'bot_reset_success': '🔄 **נתוני הבוט אופסו לחלוטין!**\n\nכל המשתמשים צריכים להתיר מחדש עם /start',
         'reset_cancelled': '❌ האיפוס בוטל. נתוני הבוט נשארים ללא שינוי.',
         'no_users_to_remove': '❌ אין משתמשים להסרה',
+        'no_authorized_users_to_remove': '❌ **אין משתמשים להסרה**\n\n💡 **תחילה הרשא משתמשים עם:**\n`/authorize Eden`\n`/authorize Adele`\n`/authorize Emma`\n\n📋 **מיקומי תור זמינים:**\n• {Eden}\n• {Adele}\n• {Emma}',
         'user_management_title': '👥 **ניהול משתמשים**\nלחץ להסרת משתמשים:',
         'you_removed_from_bot': '👋 הוסרת מהבוט לניהול מדיח הכלים. השתמש ב-/start כדי להצטרף מחדש בכל עת.',
         'yes_reset_everything': '✅ כן, אפס הכל',
@@ -2547,7 +2549,11 @@ async function handleCallback(chatId, userId, userName, data) {
         // Show user list for removal
         const userList = Array.from(authorizedUsers);
         if (userList.length === 0) {
-            sendMessage(chatId, t(userId, 'no_users_to_remove'));
+            sendMessage(chatId, t(userId, 'no_authorized_users_to_remove', {
+                Eden: translateName('Eden', userId),
+                Adele: translateName('Adele', userId),
+                Emma: translateName('Emma', userId)
+            }));
             return;
         }
         
