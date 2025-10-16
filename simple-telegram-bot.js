@@ -1688,13 +1688,6 @@ async function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
                 [
-                    { text: t(userId, 'hard_reset_section'), callback_data: "hard_reset_section" }
-                ],
-                [
-                    { text: t(userId, 'remove_user'), callback_data: "remove_user_menu" },
-                    { text: t(userId, 'reset_bot_button'), callback_data: "reset_bot_menu" }
-                ],
-                [
                     { text: t(userId, 'help'), callback_data: "help" }
                 ],
                 [
@@ -2984,6 +2977,9 @@ async function handleCallback(chatId, userId, userName, data) {
             ],
             [
                 { text: t(userId, 'add_admin'), callback_data: "addadmin_menu" }
+            ],
+            [
+                { text: t(userId, 'hard_reset_section'), callback_data: "hard_reset_section" }
             ]
         ];
         
