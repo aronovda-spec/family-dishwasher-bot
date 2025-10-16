@@ -708,7 +708,7 @@ const translations = {
         'sent_to_all': '📢 **Sent to:** All authorized users and admins',
         'auto_timer': 'Auto-Timer',
         'cheating_detected': '🚨 **CHEATING SUSPECTED!** 🚨',
-        'rapid_done_alert': '⚠️ **Rapid DONE Activity Detected**\n\n👤 **User:** {user} ({userId})\n⏰ **Time:** {time}\n🕐 **Last DONE:** {lastDone}\n\n📊 **Dishwasher cannot be ready in less than 30 minutes!**',
+        'rapid_done_alert': '⚠️ **Rapid DONE Activity Detected**\n\n👤 **User:** {user} ({userId})\n⏰ **Time:** {time}\n🕐 **Last Dishwasher Done:** {lastDone}\n\n📊 **Dishwasher cannot be ready in less than 30 minutes!**\n🚨 **ANY user pressing /done within 30 minutes is suspicious!**',
         'rapid_swap_alert': '⚠️ **Rapid Swap Activity Detected**\n\n👤 **User:** {user} ({userId})\n⏰ **Time:** {time}\n🔄 **Swaps in 10 minutes:** {swapCount}\n\n📊 **Suspicious activity pattern detected!**',
         'swap_request_sent': '✅ **Swap request sent to admins!**',
         'punishment_request_sent': '✅ **Punishment request sent to admins!**',
@@ -1080,7 +1080,7 @@ const translations = {
         'sent_to_all': '📢 **נשלח אל:** כל המשתמשים והמנהלים',
         'auto_timer': 'טיימר אוטומטי',
         'cheating_detected': '🚨 **חשד לרמיה!** 🚨',
-        'rapid_done_alert': '⚠️ **פעילות DONE מהירה זוהתה**\n\n👤 **משתמש:** {user} ({userId})\n⏰ **זמן:** {time}\n🕐 **DONE אחרון:** {lastDone}\n\n📊 **מדיח הכלים לא יכול להיות מוכן תוך פחות מ-30 דקות!**',
+        'rapid_done_alert': '⚠️ **פעילות DONE מהירה זוהתה**\n\n👤 **משתמש:** {user} ({userId})\n⏰ **זמן:** {time}\n🕐 **מדיח הכלים האחרון הושלם:** {lastDone}\n\n📊 **מדיח הכלים לא יכול להיות מוכן תוך פחות מ-30 דקות!**\n🚨 **כל משתמש שלוחץ /done תוך 30 דקות חשוד!**',
         'rapid_swap_alert': '⚠️ **פעילות החלפה מהירה זוהתה**\n\n👤 **משתמש:** {user} ({userId})\n⏰ **זמן:** {time}\n🔄 **החלפות ב-10 דקות:** {swapCount}\n\n📊 **זוהה דפוס פעילות חשוד!**',
         'swap_request_sent': '✅ **בקשת החלפה נשלחה למנהלים!**',
         'punishment_request_sent': '✅ **בקשת עונש נשלחה למנהלים!**',
@@ -1884,22 +1884,19 @@ async function handleCommand(chatId, userId, userName, text) {
         
         if (isAdmin) {
             // Initialize anti-cheating tracking for admin
-        if (!global.doneTimestamps) global.doneTimestamps = new Map();
-        
-            // Check for rapid DONE activity (30 minutes) - per user tracking
+        // Check for rapid DONE activity (30 minutes) - global tracking
         const now = Date.now();
-            const userKey = `${userId}_${userName}`;
-            const lastDone = global.doneTimestamps.get(userKey);
+        const lastGlobalDone = global.lastDishwasherDone;
         
-        if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
-            const lastDoneTime = new Date(lastDone).toLocaleString();
-                // Send alert for each DONE within 30 minutes (per user)
+        if (lastGlobalDone && (now - lastGlobalDone) < 30 * 60 * 1000) { // 30 minutes
+            const lastDoneTime = new Date(lastGlobalDone).toLocaleString();
+            // Send alert for ANY DONE within 30 minutes of last dishwasher completion
             alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
-            console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+            console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last dishwasher done: ${lastDoneTime}`);
         }
         
-            // Update last DONE timestamp for this specific user
-            global.doneTimestamps.set(userKey, now);
+        // Update global dishwasher completion timestamp
+        global.lastDishwasherDone = now;
         
             // Admin "Done" - Admin takes over dishwasher duty
             const currentUser = getCurrentTurnUser();
@@ -1995,23 +1992,19 @@ async function handleCommand(chatId, userId, userName, text) {
                 return;
             }
             
-            // Initialize anti-cheating tracking for regular user (only after turn validation)
-            if (!global.doneTimestamps) global.doneTimestamps = new Map();
-            
-            // Check for rapid DONE activity (30 minutes) - per user tracking
+            // Check for rapid DONE activity (30 minutes) - global tracking
             const now = Date.now();
-            const userKey = `${userId}_${userName}`;
-            const lastDone = global.doneTimestamps.get(userKey);
+            const lastGlobalDone = global.lastDishwasherDone;
             
-            if (lastDone && (now - lastDone) < 30 * 60 * 1000) { // 30 minutes
-                const lastDoneTime = new Date(lastDone).toLocaleString();
-                // Send alert for each DONE within 30 minutes (per user)
+            if (lastGlobalDone && (now - lastGlobalDone) < 30 * 60 * 1000) { // 30 minutes
+                const lastDoneTime = new Date(lastGlobalDone).toLocaleString();
+                // Send alert for ANY DONE within 30 minutes of last dishwasher completion
                 alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
-                console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last DONE: ${lastDoneTime}`);
+                console.log(`🚨 RAPID DONE DETECTED: ${userName} (${userId}) - Last dishwasher done: ${lastDoneTime}`);
             }
             
-            // Update last DONE timestamp for this specific user
-            global.doneTimestamps.set(userKey, now);
+            // Update global dishwasher completion timestamp
+            global.lastDishwasherDone = now;
             
             // Find the original user whose turn this was (in case of assignment)
             let originalUser = currentUser;
