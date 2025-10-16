@@ -996,6 +996,7 @@ const translations = {
         // Debt protection messages
         'debt_warning': '🚨 **WARNING: You have {debtAmount} turns to complete before leaving!**\n\n📊 **Your score:** {userScore}\n📊 **Highest score:** {maxScore}\n\n❌ **Cannot leave with outstanding debts**\n\n💡 **Complete your turns or ask an admin to remove you**',
         'leave_confirmation': '⚠️ **Are you sure you want to leave the bot?**\n\n📊 **Your current score:** {userScore}\n\nThis will:\n• Remove you from all queues\n• Start 24-hour grace period\n• You can rejoin within 24 hours with same score\n• After 24 hours, score resets to 0\n\nAre you sure?',
+        'admin_leave_confirmation': '⚠️ **Are you sure you want to leave as admin?**\n\n👑 **Admin privileges will be removed**\n\nThis will:\n• Remove your admin privileges\n• Remove you from all queues\n• Start 24-hour grace period\n• You can rejoin within 24 hours\n\nAre you sure?',
         'yes_leave_bot': '✅ Yes, Leave Bot',
         'cancel_leave': '❌ Cancel',
         'leave_cancelled': '❌ Leave cancelled. You remain in the bot.',
@@ -1386,6 +1387,7 @@ const translations = {
         // Debt protection messages
         'debt_warning': '🚨 **אזהרה: יש לך {debtAmount} תורות להשלים לפני העזיבה!**\n\n📊 **הניקוד שלך:** {userScore}\n📊 **הניקוד הגבוה ביותר:** {maxScore}\n\n❌ **לא ניתן לעזוב עם חובות פתוחים**\n\n💡 **השלם את התורות שלך או בקש ממנהל להסיר אותך**',
         'leave_confirmation': '⚠️ **האם אתה בטוח שברצונך לעזוב את הבוט?**\n\n📊 **הניקוד הנוכחי שלך:** {userScore}\n\nזה יגרום ל:\n• הסרה מכל התורים\n• התחלת תקופת חסד של 24 שעות\n• תוכל להצטרף מחדש תוך 24 שעות עם אותו ניקוד\n• אחרי 24 שעות, הניקוד יתאפס ל-0\n\nהאם אתה בטוח?',
+        'admin_leave_confirmation': '⚠️ **האם אתה בטוח שברצונך לעזוב כמנהל?**\n\n👑 **הרשאות המנהל יוסרו**\n\nזה יגרום ל:\n• הסרת הרשאות המנהל שלך\n• הסרה מכל התורים\n• התחלת תקופת חסד של 24 שעות\n• תוכל להצטרף מחדש תוך 24 שעות\n\nהאם אתה בטוח?',
         'yes_leave_bot': '✅ כן, עזוב את הבוט',
         'cancel_leave': '❌ ביטול',
         'leave_cancelled': '❌ העזיבה בוטלה. אתה נשאר בבוט.',
@@ -2657,9 +2659,18 @@ async function handleCallback(chatId, userId, userName, data) {
                     sendMessage(chatId, t(userId, 'last_admin_cannot_leave'));
                     return;
                 }
+                
+                // Admins can leave without debt check - show confirmation directly
+                const keyboard = [
+                    [{ text: t(userId, 'yes_leave_bot'), callback_data: 'confirm_leave' }],
+                    [{ text: t(userId, 'cancel_leave'), callback_data: 'cancel_leave' }]
+                ];
+                
+                sendMessageWithButtons(chatId, t(userId, 'admin_leave_confirmation'), keyboard);
+                return;
             }
             
-            // Check if user has debts (lower score than others)
+            // For regular users: Check if user has debts (lower score than others)
             const userScore = userScores.get(userName) || 0;
             const allScores = Array.from(userScores.values());
             const maxScore = Math.max(...allScores);
