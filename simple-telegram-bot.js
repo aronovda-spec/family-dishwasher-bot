@@ -39,7 +39,7 @@ async function saveBotData() {
             currentTurnIndex: currentTurnIndex,
             
             // Additional state
-            suspendedUsers: Array.from(suspendedUsers),
+            suspendedUsers: Object.fromEntries(suspendedUsers),
             turnAssignments: Object.fromEntries(turnAssignments),
             swapTimestamps: global.swapTimestamps || [],
             doneTimestamps: global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {},
@@ -97,7 +97,9 @@ async function loadBotData() {
         
         // Restore additional state
         suspendedUsers.clear();
-        botData.suspendedUsers?.forEach(user => suspendedUsers.add(user));
+        Object.entries(botData.suspendedUsers || {}).forEach(([key, value]) => {
+            suspendedUsers.set(key, value);
+        });
         
         turnAssignments.clear();
         Object.entries(botData.turnAssignments || {}).forEach(([key, value]) => {
