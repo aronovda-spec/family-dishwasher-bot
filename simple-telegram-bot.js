@@ -1,6 +1,7 @@
 // Simple Telegram Dishwasher Bot (no external dependencies)
 const https = require('https');
 const fs = require('fs');
+const path = require('path');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -10,6 +11,117 @@ if (!token) {
     process.exit(1);
 }
 const botUrl = `https://api.telegram.org/bot${token}`;
+
+// ============================================================================
+// FILE-BASED PERSISTENCE SYSTEM
+// ============================================================================
+
+const DATA_DIR = path.join(__dirname, 'data');
+const BOT_DATA_FILE = path.join(DATA_DIR, 'bot_state.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    console.log('📁 Created data directory for persistence');
+}
+
+// Persistence functions
+async function saveBotData() {
+    try {
+        const botData = {
+            // Core bot state
+            authorizedUsers: Array.from(authorizedUsers),
+            admins: Array.from(admins),
+            userChatIds: Object.fromEntries(userChatIds),
+            adminChatIds: Object.fromEntries(adminChatIds),
+            turnOrder: Array.from(turnOrder),
+            userScores: Object.fromEntries(userScores),
+            currentTurnIndex: currentTurnIndex,
+            
+            // Additional state
+            suspendedUsers: Array.from(suspendedUsers),
+            turnAssignments: Object.fromEntries(turnAssignments),
+            swapTimestamps: global.swapTimestamps || [],
+            doneTimestamps: global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {},
+            
+            // Timestamps
+            lastSave: Date.now(),
+            version: '1.0.0'
+        };
+        
+        const jsonData = JSON.stringify(botData, null, 2);
+        fs.writeFileSync(BOT_DATA_FILE, jsonData, 'utf8');
+        console.log('💾 Bot data saved successfully');
+    } catch (error) {
+        console.error('❌ Error saving bot data:', error);
+    }
+}
+
+async function loadBotData() {
+    try {
+        if (!fs.existsSync(BOT_DATA_FILE)) {
+            console.log('📄 No existing bot data found, starting fresh');
+            return false;
+        }
+        
+        const jsonData = fs.readFileSync(BOT_DATA_FILE, 'utf8');
+        const botData = JSON.parse(jsonData);
+        
+        // Restore core bot state
+        authorizedUsers.clear();
+        botData.authorizedUsers?.forEach(user => authorizedUsers.add(user));
+        
+        admins.clear();
+        botData.admins?.forEach(admin => admins.add(admin));
+        
+        userChatIds.clear();
+        Object.entries(botData.userChatIds || {}).forEach(([key, value]) => {
+            userChatIds.set(key, value);
+        });
+        
+        adminChatIds.clear();
+        Object.entries(botData.adminChatIds || {}).forEach(([key, value]) => {
+            adminChatIds.set(key, value);
+        });
+        
+        turnOrder.clear();
+        botData.turnOrder?.forEach(user => turnOrder.add(user));
+        
+        userScores.clear();
+        Object.entries(botData.userScores || {}).forEach(([key, value]) => {
+            userScores.set(key, value);
+        });
+        
+        currentTurnIndex = botData.currentTurnIndex || 0;
+        
+        // Restore additional state
+        suspendedUsers.clear();
+        botData.suspendedUsers?.forEach(user => suspendedUsers.add(user));
+        
+        turnAssignments.clear();
+        Object.entries(botData.turnAssignments || {}).forEach(([key, value]) => {
+            turnAssignments.set(key, value);
+        });
+        
+        // Restore global variables
+        global.swapTimestamps = botData.swapTimestamps || [];
+        global.doneTimestamps = new Map(Object.entries(botData.doneTimestamps || {}));
+        
+        console.log('📂 Bot data loaded successfully');
+        console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Turn Index: ${currentTurnIndex}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Error loading bot data:', error);
+        return false;
+    }
+}
+
+// Auto-save every 5 minutes
+setInterval(async () => {
+    await saveBotData();
+}, 5 * 60 * 1000);
+
+console.log('💾 File-based persistence system initialized');
 
 // Score-based queue management
 const originalQueue = ['Eden', 'Adele', 'Emma']; // Original order for tie-breaking
@@ -1403,7 +1515,7 @@ function sendMessageWithButtons(chatId, text, buttons) {
 }
 
 // Handle commands
-function handleCommand(chatId, userId, userName, text) {
+async function handleCommand(chatId, userId, userName, text) {
     const command = text.toLowerCase().trim();
     
     console.log(`🔍 Processing: "${command}" from ${userName}`);
@@ -1728,6 +1840,9 @@ function handleCommand(chatId, userId, userName, text) {
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
             
+            // Save bot data after score changes
+            await saveBotData();
+            
             // Track admin completion for monthly report
             trackMonthlyAction('admin_completion', currentUser, userName);
             
@@ -1828,6 +1943,9 @@ function handleCommand(chatId, userId, userName, text) {
             
             // Update statistics for the user who completed their turn
             updateUserStatistics(currentUser);
+            
+            // Save bot data after score changes
+            await saveBotData();
             
             // Get next user for display
             const nextUser = getCurrentTurnUser();
@@ -1952,6 +2070,9 @@ function handleCommand(chatId, userId, userName, text) {
         admins.add(userToAdd);
         admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
         
+        // Save bot data after adding admin
+        await saveBotData();
+        
         // Note: We don't add chatId here because we don't know the new admin's chat ID yet
         // The new admin's chat ID will be stored when they send /start or interact with the bot
         sendMessage(chatId, t(userId, 'admin_added', {user: translateName(userToAdd, userId)}));
@@ -1974,6 +2095,11 @@ function handleCommand(chatId, userId, userName, text) {
             // Check if user exists in admins
             if (admins.has(userToRemove)) {
                 admins.delete(userToRemove);
+                admins.delete(userToRemove.toLowerCase()); // Remove lowercase version too
+                
+                // Save bot data after removing admin
+                await saveBotData();
+                
                 sendMessage(chatId, t(userId, 'admin_removed', {user: translateName(userToRemove, userId)}));
             } else {
                 sendMessage(chatId, t(userId, 'user_not_found_admin', {user: translateName(userToRemove, userId)}));
@@ -1981,6 +2107,78 @@ function handleCommand(chatId, userId, userName, text) {
         } else {
             sendMessage(chatId, t(userId, 'usage_removeadmin'));
         }
+        
+    } else if (command.startsWith('/removeuser ')) {
+        // Check if user is admin
+        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+            sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
+            return;
+        }
+        
+        const userToRemove = command.replace('/removeuser ', '').trim();
+        if (!userToRemove) {
+            sendMessage(chatId, '❌ **Usage:** `/removeuser <username>`\n\nExample: `/removeuser Dani`');
+            return;
+        }
+        
+        // Check if user exists in authorized users
+        if (authorizedUsers.has(userToRemove) || authorizedUsers.has(userToRemove.toLowerCase())) {
+            // Remove from all data structures
+            authorizedUsers.delete(userToRemove);
+            authorizedUsers.delete(userToRemove.toLowerCase());
+            userChatIds.delete(userToRemove);
+            userChatIds.delete(userToRemove.toLowerCase());
+            turnOrder.delete(userToRemove);
+            turnOrder.delete(userToRemove.toLowerCase());
+            userScores.delete(userToRemove);
+            userScores.delete(userToRemove.toLowerCase());
+            
+            // Save bot data after removing user
+            await saveBotData();
+            
+            sendMessage(chatId, `✅ User **${userToRemove}** has been removed from the bot`);
+        } else {
+            sendMessage(chatId, `❌ User **${userToRemove}** not found in authorized users`);
+        }
+        
+    } else if (command === '/leave' || command === '/quit') {
+        // Allow users to remove themselves
+        const userName = getUserName(userId);
+        
+        if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
+            // Remove user from all data structures
+            authorizedUsers.delete(userName);
+            authorizedUsers.delete(userName.toLowerCase());
+            userChatIds.delete(userName);
+            userChatIds.delete(userName.toLowerCase());
+            turnOrder.delete(userName);
+            turnOrder.delete(userName.toLowerCase());
+            userScores.delete(userName);
+            userScores.delete(userName.toLowerCase());
+            
+            // Save bot data after self-removal
+            await saveBotData();
+            
+            sendMessage(chatId, `👋 You have been removed from the dishwasher bot. Use /start to rejoin anytime.`);
+        } else {
+            sendMessage(chatId, `❌ You are not currently authorized. Use /start to join the bot.`);
+        }
+        
+    } else if (command === '/resetbot') {
+        // Check if user is admin
+        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+            sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
+            return;
+        }
+        
+        // Create confirmation keyboard
+        const keyboard = [
+            [{ text: '✅ Yes, Reset Everything', callback_data: 'confirm_reset' }],
+            [{ text: '❌ Cancel', callback_data: 'cancel_reset' }]
+        ];
+        
+        const replyMarkup = { inline_keyboard: keyboard };
+        sendMessage(chatId, `⚠️ **WARNING: This will reset ALL bot data!**\n\nThis includes:\n• All users and admins\n• Turn order\n• Scores\n• Settings\n\nAre you sure?`, replyMarkup);
         
     } else if (command.startsWith('admin_punishment_reason_')) {
         // Handle admin punishment reason input
@@ -2031,6 +2229,9 @@ function handleCommand(chatId, userId, userName, text) {
                     userQueueMapping.set(userToAuth, queueMember);
                     userQueueMapping.set(userToAuth.toLowerCase(), queueMember); // Add lowercase mapping
                     queueUserMapping.set(queueMember, userToAuth);
+                    
+                    // Save bot data after authorization
+                    await saveBotData();
                     
                     // Store chat ID for notifications (we'll need to get this from the user when they interact)
                     // For now, we'll store it when they send /start
@@ -2226,21 +2427,53 @@ function executeSwap(swapRequest, requestId, status) {
 }
 
 // Handle callback queries (button presses)
-function handleCallback(chatId, userId, userName, data) {
+async function handleCallback(chatId, userId, userName, data) {
     console.log(`🔘 Button pressed: "${data}" by ${userName}`);
     
     if (data === 'test') {
         sendMessage(chatId, t(userId, 'test_button_works', {user: userName, userId: userId, data: data}));
     } else if (data === 'status') {
-        handleCommand(chatId, userId, userName, 'status');
+        await handleCommand(chatId, userId, userName, 'status');
     } else if (data === 'done') {
-        handleCommand(chatId, userId, userName, 'done');
+        await handleCommand(chatId, userId, userName, 'done');
     } else if (data === 'users') {
-        handleCommand(chatId, userId, userName, 'users');
+        await handleCommand(chatId, userId, userName, 'users');
     } else if (data === 'admins') {
-        handleCommand(chatId, userId, userName, 'admins');
+        await handleCommand(chatId, userId, userName, 'admins');
     } else if (data === 'help') {
-        handleCommand(chatId, userId, userName, 'help');
+        await handleCommand(chatId, userId, userName, 'help');
+    } else if (data === 'confirm_reset') {
+        // Check if user is admin
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        
+        if (!isAdmin) {
+            sendMessage(chatId, '❌ Admin access required for this action');
+            return;
+        }
+        
+        // Clear all data
+        authorizedUsers.clear();
+        admins.clear();
+        userChatIds.clear();
+        adminChatIds.clear();
+        turnOrder.clear();
+        userScores.clear();
+        suspendedUsers.clear();
+        turnAssignments.clear();
+        currentTurnIndex = 0;
+        
+        // Clear global variables
+        global.swapTimestamps = [];
+        global.doneTimestamps = new Map();
+        
+        // Save empty state
+        await saveBotData();
+        
+        sendMessage(chatId, '🔄 **Bot data has been completely reset!**\n\nAll users need to reauthorize with /start');
+        
+    } else if (data === 'cancel_reset') {
+        sendMessage(chatId, '❌ Reset cancelled. Bot data remains unchanged.');
+        
     } else if (data === 'dishwasher_alert') {
         // Check if this is an admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
@@ -3502,30 +3735,30 @@ function handleCallback(chatId, userId, userName, data) {
 }
 
 // Get updates from Telegram
-function getUpdates(offset = 0) {
+async function getUpdates(offset = 0) {
     const url = `${botUrl}/getUpdates?offset=${offset}&timeout=30`;
     
-    https.get(url, (res) => {
+    https.get(url, async (res) => {
         let data = '';
         
         res.on('data', (chunk) => {
             data += chunk;
         });
         
-        res.on('end', () => {
+        res.on('end', async () => {
             try {
                 const response = JSON.parse(data);
                 
                 if (response.ok && response.result.length > 0) {
                     let lastUpdateId = 0;
                     
-                    response.result.forEach(update => {
+                    for (const update of response.result) {
                         lastUpdateId = update.update_id;
                         
                         // Deduplication: Skip if this update was already processed
                         if (processedUpdates.has(update.update_id)) {
                             console.log(`🔄 Skipping duplicate update ${update.update_id} (instance: ${instanceId})`);
-                            return;
+                            continue;
                         }
                         
                         // Mark this update as processed
@@ -3544,7 +3777,7 @@ function getUpdates(offset = 0) {
                                 (update.message.from.last_name ? ' ' + update.message.from.last_name : '');
                             const text = update.message.text;
                             
-                            handleCommand(chatId, userId, userName, text);
+                            await handleCommand(chatId, userId, userName, text);
                         }
                         
                         if (update.callback_query) {
@@ -3560,13 +3793,13 @@ function getUpdates(offset = 0) {
                             
                             if (lastAction && lastAction.action === data && (now - lastAction.timestamp) < ACTION_COOLDOWN) {
                                 console.log(`🔄 Skipping rapid button click: ${data} by ${userName} (cooldown: ${ACTION_COOLDOWN}ms)`);
-                                return;
+                                continue;
                             }
                             
                             // Update last action
                             lastUserAction.set(userId, { action: data, timestamp: now });
                             
-                            handleCallback(chatId, userId, userName, data);
+                            await handleCallback(chatId, userId, userName, data);
                             
                             // Answer callback query
                             const answerUrl = `${botUrl}/answerCallbackQuery`;
@@ -3586,7 +3819,7 @@ function getUpdates(offset = 0) {
                             answerReq.write(answerData);
                             answerReq.end();
                         }
-                    });
+                    }
                     
                     // Continue polling
                     setTimeout(() => getUpdates(lastUpdateId + 1), 1000);
@@ -3614,7 +3847,7 @@ const url = require('url');
 // Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
 
 // HTTP server for webhook and health check (Render expects health on main port)
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     
     // Health check endpoint (Render expects this on main port)
@@ -3666,7 +3899,7 @@ const server = http.createServer((req, res) => {
             body += chunk.toString();
         });
         
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const update = JSON.parse(body);
                 
@@ -3695,7 +3928,7 @@ const server = http.createServer((req, res) => {
                         (update.message.from.last_name ? ' ' + update.message.from.last_name : '');
                     const text = update.message.text;
                     
-                    handleCommand(chatId, userId, userName, text);
+                    await handleCommand(chatId, userId, userName, text);
                 }
                 
                 if (update.callback_query) {
@@ -3814,13 +4047,21 @@ function broadcastMessage(messageText, fromUser, isAnnouncement = false) {
 const PORT = process.env.PORT || 3000;
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     // Always start server on Render - bind to 0.0.0.0 for external access
-    server.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, '0.0.0.0', async () => {
         console.log(`🚀 Bot webhook server running on port ${PORT} (0.0.0.0)`);
         console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
         console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
+        
+        // Load persisted bot data
+        console.log('📂 Loading persisted bot data...');
+        await loadBotData();
     });
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
+    
+    // Load persisted bot data for local mode too
+    console.log('📂 Loading persisted bot data...');
+    await loadBotData();
 }
 
 // Set webhook if deploying to Render
