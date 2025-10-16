@@ -4216,7 +4216,7 @@ const server = http.createServer(async (req, res) => {
                     // Update last action
                     lastUserAction.set(userId, { action: data, timestamp: now });
                     
-                    handleCallback(chatId, userId, userName, data);
+                    await handleCallback(chatId, userId, userName, data);
                     
                     // Answer callback query
                     const answerUrl = `${botUrl}/answerCallbackQuery`;
