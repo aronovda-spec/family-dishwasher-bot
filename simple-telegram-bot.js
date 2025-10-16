@@ -991,6 +991,19 @@ const translations = {
         'help_tie_breaker': '🎯 **Tie-breaker Order:** {Eden} → {Adele} → {Emma}\n\n',
         'help_tip': '💡 **Tip:** Use buttons for easier navigation!\n\n🔧 **New Admin Commands:**\n• `/removeuser @username` - Remove user from bot\n• `/resetbot` - Reset all bot data\n• `/leave` or `/quit` - Remove yourself from bot\n\n🚨 **Debt Protection:**\n• Users with low scores cannot leave to prevent debt reset\n• 24-hour grace period for legitimate leaves\n• Score preserved during grace period',
         
+        // Debt protection messages
+        'debt_warning': '🚨 **WARNING: You have {debtAmount} turns to complete before leaving!**\n\n📊 **Your score:** {userScore}\n📊 **Highest score:** {maxScore}\n\n❌ **Cannot leave with outstanding debts**\n\n💡 **Complete your turns or ask an admin to remove you**',
+        'leave_confirmation': '⚠️ **Are you sure you want to leave the bot?**\n\n📊 **Your current score:** {userScore}\n\nThis will:\n• Remove you from all queues\n• Start 24-hour grace period\n• You can rejoin within 24 hours with same score\n• After 24 hours, score resets to 0\n\nAre you sure?',
+        'yes_leave_bot': '✅ Yes, Leave Bot',
+        'cancel_leave': '❌ Cancel',
+        'leave_cancelled': '❌ Leave cancelled. You remain in the bot.',
+        'grace_period_message': '👋 You have been removed from the dishwasher bot.\n\n⏰ **24-hour grace period active until:** {graceEndTime}\n📊 **Your score preserved:** {userScore}\n\n💡 **Rejoin within 24 hours to keep your score, or it will reset to 0**',
+        
+        // Button texts
+        'remove_user_button': '🗑️ Remove User',
+        'reset_bot_button': '🔄 Reset Bot',
+        'leave_bot_button': '👋 Leave Bot',
+        
         // Queue Statistics (missing in English)
         'current_scores': '📊 Current Scores:\n'
     },
@@ -1350,7 +1363,18 @@ const translations = {
         'help_admin_features': '👨‍💼 **תכונות מנהל:**\n',
         'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n• **ניהול משתמשים** - הסרת משתמשים מהבוט\n• **איפוס נתונים** - איפוס כל נתוני הבוט עם אישור\n\n',
         'help_tie_breaker': '🎯 **סדר קביעות:** {Eden} → {Adele} → {Emma}\n\n',
-        'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!\n\n🔧 **פקודות מנהל חדשות:**\n• `/removeuser @username` - הסרת משתמש מהבוט\n• `/resetbot` - איפוס כל נתוני הבוט\n• `/leave` או `/quit` - הסרת עצמך מהבוט\n\n🚨 **הגנת חובות:**\n• משתמשים עם ניקוד נמוך לא יכולים לעזוב למניעת איפוס חובות\n• תקופת חסד של 24 שעות לעזיבה לגיטימית\n• ניקוד נשמר במהלך תקופת החסד'
+        // Debt protection messages
+        'debt_warning': '🚨 **אזהרה: יש לך {debtAmount} תורות להשלים לפני העזיבה!**\n\n📊 **הניקוד שלך:** {userScore}\n📊 **הניקוד הגבוה ביותר:** {maxScore}\n\n❌ **לא ניתן לעזוב עם חובות פתוחים**\n\n💡 **השלם את התורות שלך או בקש ממנהל להסיר אותך**',
+        'leave_confirmation': '⚠️ **האם אתה בטוח שברצונך לעזוב את הבוט?**\n\n📊 **הניקוד הנוכחי שלך:** {userScore}\n\nזה יגרום ל:\n• הסרה מכל התורים\n• התחלת תקופת חסד של 24 שעות\n• תוכל להצטרף מחדש תוך 24 שעות עם אותו ניקוד\n• אחרי 24 שעות, הניקוד יתאפס ל-0\n\nהאם אתה בטוח?',
+        'yes_leave_bot': '✅ כן, עזוב את הבוט',
+        'cancel_leave': '❌ ביטול',
+        'leave_cancelled': '❌ העזיבה בוטלה. אתה נשאר בבוט.',
+        'grace_period_message': '👋 הוסרת מהבוט לניהול מדיח הכלים.\n\n⏰ **תקופת חסד של 24 שעות פעילה עד:** {graceEndTime}\n📊 **הניקוד שלך נשמר:** {userScore}\n\n💡 **הצטרף מחדש תוך 24 שעות כדי לשמור על הניקוד שלך, או שהוא יתאפס ל-0**',
+        
+        // Button texts
+        'remove_user_button': '🗑️ הסר משתמש',
+        'reset_bot_button': '🔄 אפס בוט',
+        'leave_bot_button': '👋 עזוב בוט',
     }
 };
 
@@ -1626,8 +1650,8 @@ async function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
                 [
-                    { text: '🗑️ Remove User', callback_data: "remove_user_menu" },
-                    { text: '🔄 Reset Bot', callback_data: "reset_bot_menu" }
+                    { text: t(userId, 'remove_user_button'), callback_data: "remove_user_menu" },
+                    { text: t(userId, 'reset_bot_button'), callback_data: "reset_bot_menu" }
                 ],
                 [
                     { text: t(userId, 'help'), callback_data: "help" }
@@ -1648,7 +1672,7 @@ async function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'request_punishment'), callback_data: "request_punishment_menu" }
                 ],
                 [
-                    { text: '👋 Leave Bot', callback_data: "leave_bot" }
+                    { text: t(userId, 'leave_bot_button'), callback_data: "leave_bot" }
                 ],
                 [
                     { text: t(userId, 'help'), callback_data: "help" }
@@ -2568,18 +2592,24 @@ async function handleCallback(chatId, userId, userName, data) {
             // If user has significantly lower score (debt), block leaving
             if (userScore < minScore + 2) { // Allow some tolerance
                 const debtAmount = maxScore - userScore;
-                sendMessage(chatId, `🚨 **WARNING: You have ${debtAmount} turns to complete before leaving!**\n\n📊 **Your score:** ${userScore}\n📊 **Highest score:** ${maxScore}\n\n❌ **Cannot leave with outstanding debts**\n\n💡 **Complete your turns or ask an admin to remove you**`);
+                sendMessage(chatId, t(userId, 'debt_warning', {
+                    debtAmount: debtAmount,
+                    userScore: userScore,
+                    maxScore: maxScore
+                }));
                 return;
             }
             
             // User has no significant debts, allow leaving with grace period
             const keyboard = [
-                [{ text: '✅ Yes, Leave Bot', callback_data: 'confirm_leave' }],
-                [{ text: '❌ Cancel', callback_data: 'cancel_leave' }]
+                [{ text: t(userId, 'yes_leave_bot'), callback_data: 'confirm_leave' }],
+                [{ text: t(userId, 'cancel_leave'), callback_data: 'cancel_leave' }]
             ];
             
             const replyMarkup = { inline_keyboard: keyboard };
-            sendMessage(chatId, `⚠️ **Are you sure you want to leave the bot?**\n\n📊 **Your current score:** ${userScore}\n\nThis will:\n• Remove you from all queues\n• Start 24-hour grace period\n• You can rejoin within 24 hours with same score\n• After 24 hours, score resets to 0\n\nAre you sure?`, replyMarkup);
+            sendMessage(chatId, t(userId, 'leave_confirmation', {
+                userScore: userScore
+            }), replyMarkup);
         } else {
             sendMessage(chatId, `❌ You are not currently authorized. Use /start to join the bot.`);
         }
@@ -2616,10 +2646,13 @@ async function handleCallback(chatId, userId, userName, data) {
         await saveBotData();
         
         const graceEndTime = new Date(gracePeriodEnd).toLocaleString();
-        sendMessage(chatId, `👋 You have been removed from the dishwasher bot.\n\n⏰ **24-hour grace period active until:** ${graceEndTime}\n📊 **Your score preserved:** ${userScore}\n\n💡 **Rejoin within 24 hours to keep your score, or it will reset to 0**`);
+        sendMessage(chatId, t(userId, 'grace_period_message', {
+            graceEndTime: graceEndTime,
+            userScore: userScore
+        }));
         
     } else if (data === 'cancel_leave') {
-        sendMessage(chatId, '❌ Leave cancelled. You remain in the bot.');
+        sendMessage(chatId, t(userId, 'leave_cancelled'));
         
     } else if (data === 'dishwasher_alert') {
         // Check if this is an admin
