@@ -43,8 +43,9 @@ async function saveBotData() {
             turnAssignments: Object.fromEntries(turnAssignments),
             swapTimestamps: global.swapTimestamps || [],
             doneTimestamps: global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {},
-            userLeaveTimestamps: global.userLeaveTimestamps ? Object.fromEntries(global.userLeaveTimestamps) : {},
-            preservedScores: global.preservedScores ? Object.fromEntries(global.preservedScores) : {},
+            
+            // Grace period tracking
+            gracePeriods: global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {},
             
             // Timestamps
             lastSave: Date.now(),
@@ -108,8 +109,7 @@ async function loadBotData() {
         // Restore global variables
         global.swapTimestamps = botData.swapTimestamps || [];
         global.doneTimestamps = new Map(Object.entries(botData.doneTimestamps || {}));
-        global.userLeaveTimestamps = new Map(Object.entries(botData.userLeaveTimestamps || {}));
-        global.preservedScores = new Map(Object.entries(botData.preservedScores || {}));
+        global.gracePeriods = new Map(Object.entries(botData.gracePeriods || {}));
         
         console.log('📂 Bot data loaded successfully');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Turn Index: ${currentTurnIndex}`);
@@ -2235,41 +2235,11 @@ async function handleCommand(chatId, userId, userName, text) {
                 );
                 
                 if (queueMember) {
-                    // Check for rapid rejoin after leaving (debt reset protection)
-                    if (global.userLeaveTimestamps && global.userLeaveTimestamps.has(userToAuth)) {
-                        const leaveTime = global.userLeaveTimestamps.get(userToAuth);
-                        const timeSinceLeave = Date.now() - leaveTime;
-                        const cooldownPeriod = 24 * 60 * 60 * 1000; // 24 hours
-                        
-                        if (timeSinceLeave < cooldownPeriod) {
-                            const hoursLeft = Math.ceil((cooldownPeriod - timeSinceLeave) / (60 * 60 * 1000));
-                            sendMessage(chatId, `⏰ **Rejoin cooldown active!**\n\nYou left the bot recently. Please wait ${hoursLeft} more hours before rejoining.\n\nThis prevents debt reset exploitation.`);
-                            return;
-                        }
-                    }
-                    
                     authorizedUsers.add(userToAuth);
                     authorizedUsers.add(userToAuth.toLowerCase()); // Add lowercase version for case-insensitive matching
                     userQueueMapping.set(userToAuth, queueMember);
                     userQueueMapping.set(userToAuth.toLowerCase(), queueMember); // Add lowercase mapping
                     queueUserMapping.set(queueMember, userToAuth);
-                    
-                    // Preserve user's previous score if they had good standing when leaving
-                    if (!userScores.has(userToAuth)) {
-                        // Check if user had a preserved score from previous good standing
-                        if (global.preservedScores && global.preservedScores.has(userToAuth)) {
-                            const preservedScore = global.preservedScores.get(userToAuth);
-                            userScores.set(userToAuth, preservedScore);
-                            console.log(`📊 Restored preserved score for ${userToAuth}: ${preservedScore}`);
-                        } else {
-                            userScores.set(userToAuth, 0); // Default for new users
-                        }
-                    }
-                    
-                    // Clear leave timestamp if user successfully rejoins
-                    if (global.userLeaveTimestamps) {
-                        global.userLeaveTimestamps.delete(userToAuth);
-                    }
                     
                     // Save bot data after authorization
                     await saveBotData();
@@ -2585,63 +2555,52 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, `⚠️ **WARNING: This will reset ALL bot data!**\n\nThis includes:\n• All users and admins\n• Turn order\n• Scores\n• Settings\n\nAre you sure?`, replyMarkup);
         
     } else if (data === 'leave_bot') {
-        // Allow users to remove themselves
+        // Allow users to remove themselves with debt protection
         const userName = getUserName(userId);
         
         if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
-            // Check if user has low score (debt - behind other users)
+            // Check if user has debts (lower score than others)
             const userScore = userScores.get(userName) || 0;
             const allScores = Array.from(userScores.values());
+            const maxScore = Math.max(...allScores);
             const minScore = Math.min(...allScores);
-            const hasDebt = userScore < minScore; // User is behind others
             
-            if (hasDebt) {
-                // Block user from leaving if they have debt (low score)
-                sendMessage(chatId, `🚨 **Cannot leave with outstanding turns!**\n\nYou have ${userScore} turns completed, but others have ${minScore}.\n\nYou need to complete your turns before leaving.\n\nIf you must leave, ask an admin to remove you instead.`);
+            // If user has significantly lower score (debt), block leaving
+            if (userScore < minScore + 2) { // Allow some tolerance
+                const debtAmount = maxScore - userScore;
+                sendMessage(chatId, `🚨 **WARNING: You have ${debtAmount} turns to complete before leaving!**\n\n📊 **Your score:** ${userScore}\n📊 **Highest score:** ${maxScore}\n\n❌ **Cannot leave with outstanding debts**\n\n💡 **Complete your turns or ask an admin to remove you**`);
                 return;
             }
             
-            // User has good standing (high score), allow leaving with warning
-            let warningMessage = `⚠️ **Are you sure you want to leave the bot?**\n\nThis will:\n• Remove you from all queues\n• Clear your scores\n• You'll need to reauthorize to rejoin\n\n`;
-            
-            if (userScore > 0) {
-                warningMessage += `📊 **You have ${userScore} turns completed (good standing).**\nLeaving will reset your progress to 0.\n\n`;
-            }
-            
-            warningMessage += `Are you sure?`;
-            
-            // Create confirmation keyboard
+            // User has no significant debts, allow leaving with grace period
             const keyboard = [
                 [{ text: '✅ Yes, Leave Bot', callback_data: 'confirm_leave' }],
                 [{ text: '❌ Cancel', callback_data: 'cancel_leave' }]
             ];
             
             const replyMarkup = { inline_keyboard: keyboard };
-            sendMessage(chatId, warningMessage, replyMarkup);
+            sendMessage(chatId, `⚠️ **Are you sure you want to leave the bot?**\n\n📊 **Your current score:** ${userScore}\n\nThis will:\n• Remove you from all queues\n• Start 24-hour grace period\n• You can rejoin within 24 hours with same score\n• After 24 hours, score resets to 0\n\nAre you sure?`, replyMarkup);
         } else {
             sendMessage(chatId, `❌ You are not currently authorized. Use /start to join the bot.`);
         }
         
     } else if (data === 'confirm_leave') {
-        // Confirm self-removal
+        // Confirm self-removal with grace period
         const userName = getUserName(userId);
-        
-        // Preserve score for users with good standing (high score)
         const userScore = userScores.get(userName) || 0;
-        const allScores = Array.from(userScores.values());
-        const minScore = Math.min(...allScores);
-        const hasGoodStanding = userScore >= minScore; // User is not behind others
         
-        if (hasGoodStanding && userScore > 0) {
-            // Preserve score for users with good standing
-            if (!global.preservedScores) global.preservedScores = new Map();
-            global.preservedScores.set(userName, userScore);
-            console.log(`📊 Preserved score for ${userName}: ${userScore}`);
+        // Initialize grace periods if not exists
+        if (!global.gracePeriods) {
+            global.gracePeriods = new Map();
         }
         
-        // Track when user left to prevent rapid rejoin (debt reset protection)
-        if (!global.userLeaveTimestamps) global.userLeaveTimestamps = new Map();
-        global.userLeaveTimestamps.set(userName, Date.now());
+        // Set grace period (24 hours)
+        const gracePeriodEnd = Date.now() + (24 * 60 * 60 * 1000);
+        global.gracePeriods.set(userName, {
+            score: userScore,
+            endTime: gracePeriodEnd,
+            originalScore: userScore
+        });
         
         // Remove user from all data structures
         authorizedUsers.delete(userName);
@@ -2656,7 +2615,8 @@ async function handleCallback(chatId, userId, userName, data) {
         // Save bot data after self-removal
         await saveBotData();
         
-        sendMessage(chatId, `👋 You have been removed from the dishwasher bot. Use /start to rejoin anytime.`);
+        const graceEndTime = new Date(gracePeriodEnd).toLocaleString();
+        sendMessage(chatId, `👋 You have been removed from the dishwasher bot.\n\n⏰ **24-hour grace period active until:** ${graceEndTime}\n📊 **Your score preserved:** ${userScore}\n\n💡 **Rejoin within 24 hours to keep your score, or it will reset to 0**`);
         
     } else if (data === 'cancel_leave') {
         sendMessage(chatId, '❌ Leave cancelled. You remain in the bot.');
@@ -4534,18 +4494,29 @@ function cleanupOldData() {
         }
     }
     
-    // Clean up global temp swaps (older than 1 hour)
-    let cleanedTempSwaps = 0;
-    if (global.tempSwaps) {
-        for (const [swapId, swap] of global.tempSwaps.entries()) {
-            if (swap.timestamp < oneHourAgo) {
-                global.tempSwaps.delete(swapId);
-                cleanedTempSwaps++;
+        // Clean up global temp swaps (older than 1 hour)
+        let cleanedTempSwaps = 0;
+        if (global.tempSwaps) {
+            for (const [swapId, swap] of global.tempSwaps.entries()) {
+                if (swap.timestamp < oneHourAgo) {
+                    global.tempSwaps.delete(swapId);
+                    cleanedTempSwaps++;
+                }
             }
         }
-    }
-    
-    console.log(`🧹 Comprehensive cleanup completed: ${cleanedSwaps} swaps, ${cleanedPunishments} punishments, ${cleanedDoneTimestamps} done timestamps, ${cleanedSwapTimestamps} swap timestamps, ${cleanedStates} states, ${cleanedActions} actions, ${cleanedAnnouncements} announcements, ${cleanedTempSwaps} temp swaps`);
+
+        // Clean up expired grace periods (older than 24 hours)
+        let cleanedGracePeriods = 0;
+        if (global.gracePeriods) {
+            for (const [userName, graceData] of global.gracePeriods.entries()) {
+                if (graceData.endTime < now) {
+                    global.gracePeriods.delete(userName);
+                    cleanedGracePeriods++;
+                }
+            }
+        }
+
+        console.log(`🧹 Comprehensive cleanup completed: ${cleanedSwaps} swaps, ${cleanedPunishments} punishments, ${cleanedDoneTimestamps} done timestamps, ${cleanedSwapTimestamps} swap timestamps, ${cleanedStates} states, ${cleanedActions} actions, ${cleanedAnnouncements} announcements, ${cleanedTempSwaps} temp swaps, ${cleanedGracePeriods} expired grace periods`);
 }
 
 // Cleanup timer removed - now combined with maintenance timer above
