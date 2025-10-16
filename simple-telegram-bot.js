@@ -2676,8 +2676,10 @@ async function handleCallback(chatId, userId, userName, data) {
             const maxScore = Math.max(...allScores);
             const minScore = Math.min(...allScores);
             
-            // If user has significantly lower score (debt), block leaving
-            if (userScore < minScore + 2) { // Allow some tolerance
+            // Skip debt check if all scores are equal (no actual debt)
+            if (maxScore === minScore) {
+                // All users have same score, no debt - allow leaving
+            } else if (userScore < minScore + 2) { // Allow some tolerance
                 const debtAmount = maxScore - userScore;
                 sendMessage(chatId, t(userId, 'debt_warning', {
                     debtAmount: debtAmount,
