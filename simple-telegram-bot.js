@@ -2247,7 +2247,7 @@ async function handleCommand(chatId, userId, userName, text) {
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
-            sendMessage(chatId, t(userId, 'reset_warning'), replyMarkup);
+        sendMessageWithButtons(chatId, t(userId, 'reset_warning'), keyboard);
         
     } else if (command.startsWith('admin_punishment_reason_')) {
         // Handle admin punishment reason input
@@ -2569,7 +2569,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }]);
         
         const replyMarkup = { inline_keyboard: keyboard };
-        sendMessage(chatId, t(userId, 'user_management_title'), replyMarkup);
+        sendMessageWithButtons(chatId, t(userId, 'user_management_title'), keyboard);
         
     } else if (data.startsWith('remove_user_')) {
         // Check if user is admin
@@ -2617,7 +2617,7 @@ async function handleCallback(chatId, userId, userName, data) {
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
-        sendMessage(chatId, t(userId, 'reset_warning'), replyMarkup);
+        sendMessageWithButtons(chatId, t(userId, 'reset_warning'), keyboard);
         
     } else if (data === 'leave_bot') {
         // Allow users to remove themselves with debt protection
@@ -2659,9 +2659,9 @@ async function handleCallback(chatId, userId, userName, data) {
             ];
             
             const replyMarkup = { inline_keyboard: keyboard };
-            sendMessage(chatId, t(userId, 'leave_confirmation', {
+            sendMessageWithButtons(chatId, t(userId, 'leave_confirmation', {
                 userScore: userScore
-            }), replyMarkup);
+            }), keyboard);
         } else {
             sendMessage(chatId, t(userId, 'not_authorized'));
         }
