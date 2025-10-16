@@ -1020,6 +1020,7 @@ const translations = {
         'hard_reset_section': '⚠️ HARD RESET',
         'danger_zone_warning': '🚨 **DANGER ZONE** - These actions are irreversible!\n\n• **Remove User** - Remove users from bot\n• **Reset Bot** - Complete bot data reset\n\n⚠️ **Use with extreme caution!**',
         'back_to_admin_menu': '🔙 Back to Admin Menu',
+        'last_admin_cannot_leave': '❌ **Cannot leave - You are the last admin!**\n\n🚨 **Bot management requires at least one admin**\n\n💡 **Options:**\n• Add another admin first\n• Use admin controls to remove yourself\n• Transfer admin privileges to another user',
         
         // Queue Statistics (missing in English)
         'current_scores': '📊 Current Scores:\n'
@@ -1409,6 +1410,7 @@ const translations = {
         'hard_reset_section': '⚠️ איפוס כללי',
         'danger_zone_warning': '🚨 **אזור סכנה** - פעולות אלה אינן הפיכות!\n\n• **הסר משתמש** - הסר משתמשים מהבוט\n• **אפס בוט** - איפוס מלא של נתוני הבוט\n\n⚠️ **השתמש בזהירות רבה!**',
         'back_to_admin_menu': '🔙 חזור לתפריט מנהל',
+        'last_admin_cannot_leave': '❌ **לא ניתן לעזוב - אתה המנהל האחרון!**\n\n🚨 **ניהול הבוט דורש לפחות מנהל אחד**\n\n💡 **אפשרויות:**\n• הוסף מנהל נוסף קודם\n• השתמש בפקדי מנהל להסרת עצמך\n• העבר הרשאות מנהל למשתמש אחר',
     }
 };
 
@@ -2624,6 +2626,17 @@ async function handleCallback(chatId, userId, userName, data) {
         const userName = getUserName(userId);
         
         if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
+            // Check if user is admin
+            const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+            
+            if (isAdmin) {
+                // Admin trying to leave - check if they're the last admin
+                if (admins.size <= 1) {
+                    sendMessage(chatId, t(userId, 'last_admin_cannot_leave'));
+                    return;
+                }
+            }
+            
             // Check if user has debts (lower score than others)
             const userScore = userScores.get(userName) || 0;
             const allScores = Array.from(userScores.values());
@@ -2682,6 +2695,15 @@ async function handleCallback(chatId, userId, userName, data) {
         turnOrder.delete(userName.toLowerCase());
         userScores.delete(userName);
         userScores.delete(userName.toLowerCase());
+        
+        // If user is admin, remove admin privileges
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        if (isAdmin) {
+            admins.delete(userName);
+            admins.delete(userName.toLowerCase());
+            admins.delete(userId.toString());
+            adminChatIds.delete(chatId);
+        }
         
         // Save bot data after self-removal
         await saveBotData();
