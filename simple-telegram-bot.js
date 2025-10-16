@@ -1508,6 +1508,24 @@ function addRoyalEmojiTranslated(userName, userId) {
     return translatedName;
 }
 
+// Get user name from user ID (helper function)
+function getUserName(userId) {
+    // Try to find userName from userChatIds mapping (userName -> chatId)
+    for (const [name, chatId] of userChatIds.entries()) {
+        if (chatId === userId) {
+            return name;
+        }
+    }
+    
+    // Try to find userName from admins set (check if userId is in admins)
+    if (admins.has(userId.toString())) {
+        return userId.toString();
+    }
+    
+    // Fallback: return userId as string
+    return userId.toString();
+}
+
 // Send message to Telegram
 function sendMessage(chatId, text) {
     const url = `${botUrl}/sendMessage`;
