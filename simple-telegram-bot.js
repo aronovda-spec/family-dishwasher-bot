@@ -989,7 +989,7 @@ const translations = {
         'help_admin_features': '👨‍💼 **Admin Features:**\n',
         'help_admin_explanation': '• **Force Swap** - Force swap turns\n• **Apply Punishment** - Apply direct punishment\n• **Suspend/Reactivate** - Suspend and reactivate users\n• **Reset Scores** - Reset scores (all, individual, or normalize)\n• **Reorder Queue** - Change tie-breaker order\n• **Queue Statistics** - Detailed statistics\n• **Monthly Report** - Detailed monthly report\n• **User Management** - Remove users from bot\n• **Data Reset** - Reset all bot data with confirmation\n\n',
         'help_tie_breaker': '🎯 **Tie-breaker Order:** {Eden} → {Adele} → {Emma}\n\n',
-        'help_tip': '💡 **Tip:** Use buttons for easier navigation!\n\n🔧 **New Admin Commands:**\n• `/removeuser @username` - Remove user from bot\n• `/resetbot` - Reset all bot data\n• `/leave` or `/quit` - Remove yourself from bot',
+        'help_tip': '💡 **Tip:** Use buttons for easier navigation!\n\n🔧 **New Admin Commands:**\n• `/removeuser @username` - Remove user from bot\n• `/resetbot` - Reset all bot data\n• `/leave` or `/quit` - Remove yourself from bot\n\n🚨 **Debt Protection:**\n• Users with low scores cannot leave to prevent debt reset\n• 24-hour grace period for legitimate leaves\n• Score preserved during grace period',
         
         // Queue Statistics (missing in English)
         'current_scores': '📊 Current Scores:\n'
@@ -1350,7 +1350,7 @@ const translations = {
         'help_admin_features': '👨‍💼 **תכונות מנהל:**\n',
         'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n• **ניהול משתמשים** - הסרת משתמשים מהבוט\n• **איפוס נתונים** - איפוס כל נתוני הבוט עם אישור\n\n',
         'help_tie_breaker': '🎯 **סדר קביעות:** {Eden} → {Adele} → {Emma}\n\n',
-        'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!\n\n🔧 **פקודות מנהל חדשות:**\n• `/removeuser @username` - הסרת משתמש מהבוט\n• `/resetbot` - איפוס כל נתוני הבוט\n• `/leave` או `/quit` - הסרת עצמך מהבוט'
+        'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!\n\n🔧 **פקודות מנהל חדשות:**\n• `/removeuser @username` - הסרת משתמש מהבוט\n• `/resetbot` - איפוס כל נתוני הבוט\n• `/leave` או `/quit` - הסרת עצמך מהבוט\n\n🚨 **הגנת חובות:**\n• משתמשים עם ניקוד נמוך לא יכולים לעזוב למניעת איפוס חובות\n• תקופת חסד של 24 שעות לעזיבה לגיטימית\n• ניקוד נשמר במהלך תקופת החסד'
     }
 };
 

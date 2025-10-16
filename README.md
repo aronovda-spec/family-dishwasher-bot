@@ -41,6 +41,13 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - **No Reauthorization**: Users and admins remain authorized after restarts
 - **Turn Order Preservation**: Queue order and scores maintained across restarts
 
+### 🚨 Debt Protection System
+- **Debt Detection**: Users with significantly lower scores cannot leave the bot
+- **Prevents Score Reset**: Blocks users from escaping their dishwasher responsibilities
+- **Grace Period**: Legitimate users get 24-hour grace period for rejoining
+- **Score Preservation**: Users can rejoin within 24 hours with their original score
+- **Admin Override**: Admins can still remove users if needed
+
 ## Installation
 
 1. **Clone or download** this repository to your local machine
@@ -99,6 +106,8 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 #### Data Management
 - `resetbot` - Reset all bot data with confirmation (admin only)
 - `leave` or `quit` - Remove yourself from the bot (any user)
+  - **Debt Protection**: Users with low scores cannot leave to prevent debt reset
+  - **Grace Period**: 24-hour grace period for rejoining with preserved score
 
 #### Request Processing
 - `approve punishment <id>` - Approve a punishment request
