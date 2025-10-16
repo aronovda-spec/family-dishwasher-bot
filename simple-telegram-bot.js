@@ -43,6 +43,8 @@ async function saveBotData() {
             turnAssignments: Object.fromEntries(turnAssignments),
             swapTimestamps: global.swapTimestamps || [],
             doneTimestamps: global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {},
+            userLeaveTimestamps: global.userLeaveTimestamps ? Object.fromEntries(global.userLeaveTimestamps) : {},
+            preservedScores: global.preservedScores ? Object.fromEntries(global.preservedScores) : {},
             
             // Timestamps
             lastSave: Date.now(),
@@ -106,6 +108,8 @@ async function loadBotData() {
         // Restore global variables
         global.swapTimestamps = botData.swapTimestamps || [];
         global.doneTimestamps = new Map(Object.entries(botData.doneTimestamps || {}));
+        global.userLeaveTimestamps = new Map(Object.entries(botData.userLeaveTimestamps || {}));
+        global.preservedScores = new Map(Object.entries(botData.preservedScores || {}));
         
         console.log('📂 Bot data loaded successfully');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Turn Index: ${currentTurnIndex}`);
@@ -2250,6 +2254,18 @@ async function handleCommand(chatId, userId, userName, text) {
                     userQueueMapping.set(userToAuth.toLowerCase(), queueMember); // Add lowercase mapping
                     queueUserMapping.set(queueMember, userToAuth);
                     
+                    // Preserve user's previous score if they had good standing when leaving
+                    if (!userScores.has(userToAuth)) {
+                        // Check if user had a preserved score from previous good standing
+                        if (global.preservedScores && global.preservedScores.has(userToAuth)) {
+                            const preservedScore = global.preservedScores.get(userToAuth);
+                            userScores.set(userToAuth, preservedScore);
+                            console.log(`📊 Restored preserved score for ${userToAuth}: ${preservedScore}`);
+                        } else {
+                            userScores.set(userToAuth, 0); // Default for new users
+                        }
+                    }
+                    
                     // Clear leave timestamp if user successfully rejoins
                     if (global.userLeaveTimestamps) {
                         global.userLeaveTimestamps.delete(userToAuth);
@@ -2609,6 +2625,19 @@ async function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'confirm_leave') {
         // Confirm self-removal
         const userName = getUserName(userId);
+        
+        // Preserve score for users with good standing (high score)
+        const userScore = userScores.get(userName) || 0;
+        const allScores = Array.from(userScores.values());
+        const minScore = Math.min(...allScores);
+        const hasGoodStanding = userScore >= minScore; // User is not behind others
+        
+        if (hasGoodStanding && userScore > 0) {
+            // Preserve score for users with good standing
+            if (!global.preservedScores) global.preservedScores = new Map();
+            global.preservedScores.set(userName, userScore);
+            console.log(`📊 Preserved score for ${userName}: ${userScore}`);
+        }
         
         // Track when user left to prevent rapid rejoin (debt reset protection)
         if (!global.userLeaveTimestamps) global.userLeaveTimestamps = new Map();
