@@ -983,9 +983,9 @@ const translations = {
         'help_punishment': '⚡ **User Reporting:**\n',
         'help_punishment_explanation': '• **Request Punishment** - Report another user\n• **Process:** Select user → Choose reason → Admins get notification\n• **Punishment:** Admin approves punishment (reduces score by 3)\n\n',
         'help_admin_features': '👨‍💼 **Admin Features:**\n',
-        'help_admin_explanation': '• **Force Swap** - Force swap turns\n• **Apply Punishment** - Apply direct punishment\n• **Suspend/Reactivate** - Suspend and reactivate users\n• **Reset Scores** - Reset scores (all, individual, or normalize)\n• **Reorder Queue** - Change tie-breaker order\n• **Queue Statistics** - Detailed statistics\n• **Monthly Report** - Detailed monthly report\n\n',
+        'help_admin_explanation': '• **Force Swap** - Force swap turns\n• **Apply Punishment** - Apply direct punishment\n• **Suspend/Reactivate** - Suspend and reactivate users\n• **Reset Scores** - Reset scores (all, individual, or normalize)\n• **Reorder Queue** - Change tie-breaker order\n• **Queue Statistics** - Detailed statistics\n• **Monthly Report** - Detailed monthly report\n• **User Management** - Remove users from bot\n• **Data Reset** - Reset all bot data with confirmation\n\n',
         'help_tie_breaker': '🎯 **Tie-breaker Order:** {Eden} → {Adele} → {Emma}\n\n',
-        'help_tip': '💡 **Tip:** Use buttons for easier navigation!',
+        'help_tip': '💡 **Tip:** Use buttons for easier navigation!\n\n🔧 **New Admin Commands:**\n• `/removeuser @username` - Remove user from bot\n• `/resetbot` - Reset all bot data\n• `/leave` or `/quit` - Remove yourself from bot',
         
         // Queue Statistics (missing in English)
         'current_scores': '📊 Current Scores:\n'
@@ -1344,9 +1344,9 @@ const translations = {
         'help_punishment': '⚡ **דיווח על משתמש:**\n',
         'help_punishment_explanation': '• **בקשת ענישה** - דיווח על משתמש אחר\n• **תהליך:** בחר משתמש → בחר סיבה → מנהלים מקבלים הודעה\n• **ענישה:** מנהל מאשר ענישה (מפחית 3 נקודות מהניקוד)\n\n',
         'help_admin_features': '👨‍💼 **תכונות מנהל:**\n',
-        'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n\n',
+        'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n• **ניהול משתמשים** - הסרת משתמשים מהבוט\n• **איפוס נתונים** - איפוס כל נתוני הבוט עם אישור\n\n',
         'help_tie_breaker': '🎯 **סדר קביעות:** {Eden} → {Adele} → {Emma}\n\n',
-        'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!'
+        'help_tip': '💡 **טיפ:** השתמש בכפתורים לניווט קל יותר!\n\n🔧 **פקודות מנהל חדשות:**\n• `/removeuser @username` - הסרת משתמש מהבוט\n• `/resetbot` - איפוס כל נתוני הבוט\n• `/leave` או `/quit` - הסרת עצמך מהבוט'
     }
 };
 
@@ -4061,7 +4061,11 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     
     // Load persisted bot data for local mode too
     console.log('📂 Loading persisted bot data...');
-    await loadBotData();
+    loadBotData().then(() => {
+        console.log('✅ Local mode data loaded');
+    }).catch(error => {
+        console.error('❌ Error loading local mode data:', error);
+    });
 }
 
 // Set webhook if deploying to Render
