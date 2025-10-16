@@ -33,7 +33,7 @@ async function saveBotData() {
             authorizedUsers: Array.from(authorizedUsers),
             admins: Array.from(admins),
             userChatIds: Object.fromEntries(userChatIds),
-            adminChatIds: Object.fromEntries(adminChatIds),
+            adminChatIds: Array.from(adminChatIds),
             turnOrder: Array.from(turnOrder),
             userScores: Object.fromEntries(userScores),
             currentTurnIndex: currentTurnIndex,
@@ -83,9 +83,7 @@ async function loadBotData() {
         });
         
         adminChatIds.clear();
-        Object.entries(botData.adminChatIds || {}).forEach(([key, value]) => {
-            adminChatIds.set(key, value);
-        });
+        botData.adminChatIds?.forEach(chatId => adminChatIds.add(chatId));
         
         turnOrder.clear();
         botData.turnOrder?.forEach(user => turnOrder.add(user));
