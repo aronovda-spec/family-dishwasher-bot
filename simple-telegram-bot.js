@@ -2231,11 +2231,29 @@ async function handleCommand(chatId, userId, userName, text) {
                 );
                 
                 if (queueMember) {
+                    // Check for rapid rejoin after leaving (debt reset protection)
+                    if (global.userLeaveTimestamps && global.userLeaveTimestamps.has(userToAuth)) {
+                        const leaveTime = global.userLeaveTimestamps.get(userToAuth);
+                        const timeSinceLeave = Date.now() - leaveTime;
+                        const cooldownPeriod = 24 * 60 * 60 * 1000; // 24 hours
+                        
+                        if (timeSinceLeave < cooldownPeriod) {
+                            const hoursLeft = Math.ceil((cooldownPeriod - timeSinceLeave) / (60 * 60 * 1000));
+                            sendMessage(chatId, `⏰ **Rejoin cooldown active!**\n\nYou left the bot recently. Please wait ${hoursLeft} more hours before rejoining.\n\nThis prevents debt reset exploitation.`);
+                            return;
+                        }
+                    }
+                    
                     authorizedUsers.add(userToAuth);
                     authorizedUsers.add(userToAuth.toLowerCase()); // Add lowercase version for case-insensitive matching
                     userQueueMapping.set(userToAuth, queueMember);
                     userQueueMapping.set(userToAuth.toLowerCase(), queueMember); // Add lowercase mapping
                     queueUserMapping.set(queueMember, userToAuth);
+                    
+                    // Clear leave timestamp if user successfully rejoins
+                    if (global.userLeaveTimestamps) {
+                        global.userLeaveTimestamps.delete(userToAuth);
+                    }
                     
                     // Save bot data after authorization
                     await saveBotData();
@@ -2555,6 +2573,18 @@ async function handleCallback(chatId, userId, userName, data) {
         const userName = getUserName(userId);
         
         if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
+            // Check if user has high score (potential debt reset exploit)
+            const userScore = userScores.get(userName) || 0;
+            const isHighScore = userScore > 2; // More than 2 turns behind
+            
+            let warningMessage = `⚠️ **Are you sure you want to leave the bot?**\n\nThis will:\n• Remove you from all queues\n• Clear your scores\n• You'll need to reauthorize to rejoin\n\n`;
+            
+            if (isHighScore) {
+                warningMessage += `🚨 **WARNING: You have ${userScore} turns completed.**\nLeaving will reset your progress to 0.\n\n`;
+            }
+            
+            warningMessage += `Are you sure?`;
+            
             // Create confirmation keyboard
             const keyboard = [
                 [{ text: '✅ Yes, Leave Bot', callback_data: 'confirm_leave' }],
@@ -2562,7 +2592,7 @@ async function handleCallback(chatId, userId, userName, data) {
             ];
             
             const replyMarkup = { inline_keyboard: keyboard };
-            sendMessage(chatId, `⚠️ **Are you sure you want to leave the bot?**\n\nThis will:\n• Remove you from all queues\n• Clear your scores\n• You'll need to reauthorize to rejoin\n\nAre you sure?`, replyMarkup);
+            sendMessage(chatId, warningMessage, replyMarkup);
         } else {
             sendMessage(chatId, `❌ You are not currently authorized. Use /start to join the bot.`);
         }
@@ -2570,6 +2600,10 @@ async function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'confirm_leave') {
         // Confirm self-removal
         const userName = getUserName(userId);
+        
+        // Track when user left to prevent rapid rejoin (debt reset protection)
+        if (!global.userLeaveTimestamps) global.userLeaveTimestamps = new Map();
+        global.userLeaveTimestamps.set(userName, Date.now());
         
         // Remove user from all data structures
         authorizedUsers.delete(userName);
@@ -4170,7 +4204,7 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
         // Load persisted bot data
         console.log('📂 Loading persisted bot data...');
         await loadBotData();
-    });
+});
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
     
@@ -4216,12 +4250,12 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
 } else {
     // Use polling for local development only
     console.log('🏠 Running in LOCAL MODE - Using polling only');
-    console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
-    console.log('📱 Bot is now listening for commands...');
-    console.log('🔍 Search for: @aronov_dishwasher_bot');
-    
+console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
+console.log('📱 Bot is now listening for commands...');
+console.log('🔍 Search for: @aronov_dishwasher_bot');
+
     // Start polling for updates (only in local mode)
-    getUpdates();
+getUpdates();
 }
 
 // Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
@@ -4380,10 +4414,10 @@ function cleanupOldData() {
     // Clean up old swap requests (older than 1 week)
     let cleanedSwaps = 0;
     if (pendingSwaps && typeof pendingSwaps.entries === 'function') {
-        for (const [requestId, request] of pendingSwaps.entries()) {
-            if (request.timestamp < oneWeekAgo) {
-                pendingSwaps.delete(requestId);
-                cleanedSwaps++;
+    for (const [requestId, request] of pendingSwaps.entries()) {
+        if (request.timestamp < oneWeekAgo) {
+            pendingSwaps.delete(requestId);
+            cleanedSwaps++;
             }
         }
     }
@@ -4391,10 +4425,10 @@ function cleanupOldData() {
     // Clean up old punishment requests (older than 1 week)
     let cleanedPunishments = 0;
     if (pendingPunishments && typeof pendingPunishments.entries === 'function') {
-        for (const [requestId, request] of pendingPunishments.entries()) {
-            if (request.timestamp < oneWeekAgo) {
-                pendingPunishments.delete(requestId);
-                cleanedPunishments++;
+    for (const [requestId, request] of pendingPunishments.entries()) {
+        if (request.timestamp < oneWeekAgo) {
+            pendingPunishments.delete(requestId);
+            cleanedPunishments++;
             }
         }
     }
@@ -4403,10 +4437,10 @@ function cleanupOldData() {
     const oneDayAgo = now - (24 * 60 * 60 * 1000);
     let cleanedDoneTimestamps = 0;
     if (global.doneTimestamps && typeof global.doneTimestamps.entries === 'function') {
-        for (const [userKey, timestamp] of global.doneTimestamps.entries()) {
-            if (timestamp < oneDayAgo) {
-                global.doneTimestamps.delete(userKey);
-                cleanedDoneTimestamps++;
+    for (const [userKey, timestamp] of global.doneTimestamps.entries()) {
+        if (timestamp < oneDayAgo) {
+            global.doneTimestamps.delete(userKey);
+            cleanedDoneTimestamps++;
             }
         }
     }
@@ -4420,10 +4454,10 @@ function cleanupOldData() {
         cleanedSwapTimestamps = originalLength - global.swapTimestamps.length;
     } else if (global.swapTimestamps && typeof global.swapTimestamps.delete === 'function') {
         // swapTimestamps is a Map, use delete method
-        for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
-            if (timestamp < oneDayAgo) {
-                global.swapTimestamps.delete(userKey);
-                cleanedSwapTimestamps++;
+    for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
+        if (timestamp < oneDayAgo) {
+            global.swapTimestamps.delete(userKey);
+            cleanedSwapTimestamps++;
             }
         }
     }
