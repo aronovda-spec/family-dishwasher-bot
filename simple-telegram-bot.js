@@ -2607,6 +2607,9 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
+        // DEBUG: Add version info
+        sendMessage(chatId, "🔧 DEBUG: Reset bot handler v2.0 - Latest version running!");
+        
         // Create confirmation keyboard
         const keyboard = [
             [{ text: t(userId, 'yes_reset_everything'), callback_data: 'confirm_bot_reset' }],
