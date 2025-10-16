@@ -4038,10 +4038,12 @@ function cleanupOldData() {
     // Clean up old done timestamps (older than 1 day)
     const oneDayAgo = now - (24 * 60 * 60 * 1000);
     let cleanedDoneTimestamps = 0;
-    for (const [userKey, timestamp] of global.doneTimestamps.entries()) {
-        if (timestamp < oneDayAgo) {
-            global.doneTimestamps.delete(userKey);
-            cleanedDoneTimestamps++;
+    if (global.doneTimestamps && typeof global.doneTimestamps.entries === 'function') {
+        for (const [userKey, timestamp] of global.doneTimestamps.entries()) {
+            if (timestamp < oneDayAgo) {
+                global.doneTimestamps.delete(userKey);
+                cleanedDoneTimestamps++;
+            }
         }
     }
     
@@ -4065,28 +4067,34 @@ function cleanupOldData() {
     // Clean up old user states (older than 1 hour) - remove stale typing states
     const oneHourAgo = now - (60 * 60 * 1000);
     let cleanedStates = 0;
-    for (const [userId, state] of userStates.entries()) {
-        if (state === 'typing_announcement' || state === 'typing_message') {
-            userStates.delete(userId);
-            cleanedStates++;
+    if (userStates && typeof userStates.entries === 'function') {
+        for (const [userId, state] of userStates.entries()) {
+            if (state === 'typing_announcement' || state === 'typing_message') {
+                userStates.delete(userId);
+                cleanedStates++;
+            }
         }
     }
     
     // Clean up old user actions (older than 1 hour)
     let cleanedActions = 0;
-    for (const [userId, action] of lastUserAction.entries()) {
-        if (action.timestamp < oneHourAgo) {
-            lastUserAction.delete(userId);
-            cleanedActions++;
+    if (lastUserAction && typeof lastUserAction.entries === 'function') {
+        for (const [userId, action] of lastUserAction.entries()) {
+            if (action.timestamp < oneHourAgo) {
+                lastUserAction.delete(userId);
+                cleanedActions++;
+            }
         }
     }
     
     // Clean up old pending announcements (older than 1 hour)
     let cleanedAnnouncements = 0;
-    for (const [userId, announcement] of pendingAnnouncements.entries()) {
-        if (announcement.timestamp < oneHourAgo) {
-            pendingAnnouncements.delete(userId);
-            cleanedAnnouncements++;
+    if (pendingAnnouncements && typeof pendingAnnouncements.entries === 'function') {
+        for (const [userId, announcement] of pendingAnnouncements.entries()) {
+            if (announcement.timestamp < oneHourAgo) {
+                pendingAnnouncements.delete(userId);
+                cleanedAnnouncements++;
+            }
         }
     }
     
