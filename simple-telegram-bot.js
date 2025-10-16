@@ -4047,10 +4047,18 @@ function cleanupOldData() {
     
     // Clean up old swap timestamps (older than 1 day)
     let cleanedSwapTimestamps = 0;
-    for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
-        if (timestamp < oneDayAgo) {
-            global.swapTimestamps.delete(userKey);
-            cleanedSwapTimestamps++;
+    if (global.swapTimestamps && Array.isArray(global.swapTimestamps)) {
+        // swapTimestamps is an array, filter out old entries
+        const originalLength = global.swapTimestamps.length;
+        global.swapTimestamps = global.swapTimestamps.filter(timestamp => timestamp > oneDayAgo);
+        cleanedSwapTimestamps = originalLength - global.swapTimestamps.length;
+    } else if (global.swapTimestamps && typeof global.swapTimestamps.delete === 'function') {
+        // swapTimestamps is a Map, use delete method
+        for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
+            if (timestamp < oneDayAgo) {
+                global.swapTimestamps.delete(userKey);
+                cleanedSwapTimestamps++;
+            }
         }
     }
     
