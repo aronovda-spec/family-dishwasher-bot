@@ -999,10 +999,18 @@ const translations = {
         'leave_cancelled': '❌ Leave cancelled. You remain in the bot.',
         'grace_period_message': '👋 You have been removed from the dishwasher bot.\n\n⏰ **24-hour grace period active until:** {graceEndTime}\n📊 **Your score preserved:** {userScore}\n\n💡 **Rejoin within 24 hours to keep your score, or it will reset to 0**',
         
-        // Button texts
-        'remove_user_button': '🗑️ Remove User',
-        'reset_bot_button': '🔄 Reset Bot',
-        'leave_bot_button': '👋 Leave Bot',
+        // Additional messages
+        'reset_warning': '⚠️ **WARNING: This will reset ALL bot data!**\n\nThis includes:\n• All users and admins\n• Turn order\n• Scores\n• Settings\n\nAre you sure?',
+        'not_authorized': '❌ You are not currently authorized. Use /start to join the bot.',
+        'admin_access_required': '❌ Admin access required for this action',
+        'usage_removeuser': '❌ **Usage:** `/removeuser <username>`\n\nExample: `/removeuser Dani`',
+        'user_removed_success': '✅ User **{user}** has been removed from the bot',
+        'user_not_found': '❌ User **{user}** not found in authorized users',
+        'bot_reset_success': '🔄 **Bot data has been completely reset!**\n\nAll users need to reauthorize with /start',
+        'reset_cancelled': '❌ Reset cancelled. Bot data remains unchanged.',
+        'no_users_to_remove': '❌ No users to remove',
+        'user_management_title': '👥 **User Management**\nClick to remove users:',
+        'you_removed_from_bot': '👋 You have been removed from the dishwasher bot. Use /start to rejoin anytime.',
         
         // Queue Statistics (missing in English)
         'current_scores': '📊 Current Scores:\n'
@@ -1371,10 +1379,18 @@ const translations = {
         'leave_cancelled': '❌ העזיבה בוטלה. אתה נשאר בבוט.',
         'grace_period_message': '👋 הוסרת מהבוט לניהול מדיח הכלים.\n\n⏰ **תקופת חסד של 24 שעות פעילה עד:** {graceEndTime}\n📊 **הניקוד שלך נשמר:** {userScore}\n\n💡 **הצטרף מחדש תוך 24 שעות כדי לשמור על הניקוד שלך, או שהוא יתאפס ל-0**',
         
-        // Button texts
-        'remove_user_button': '🗑️ הסר משתמש',
-        'reset_bot_button': '🔄 אפס בוט',
-        'leave_bot_button': '👋 עזוב בוט',
+        // Additional messages
+        'reset_warning': '⚠️ **אזהרה: זה יאפס את כל נתוני הבוט!**\n\nזה כולל:\n• כל המשתמשים והמנהלים\n• סדר התור\n• ניקודים\n• הגדרות\n\nהאם אתה בטוח?',
+        'not_authorized': '❌ אתה לא מורשה כרגע. השתמש ב-/start כדי להצטרף לבוט.',
+        'admin_access_required': '❌ נדרש גישת מנהל לפעולה זו',
+        'usage_removeuser': '❌ **שימוש:** `/removeuser <username>`\n\nדוגמה: `/removeuser Dani`',
+        'user_removed_success': '✅ המשתמש **{user}** הוסר מהבוט',
+        'user_not_found': '❌ המשתמש **{user}** לא נמצא במשתמשים מורשים',
+        'bot_reset_success': '🔄 **נתוני הבוט אופסו לחלוטין!**\n\nכל המשתמשים צריכים להתיר מחדש עם /start',
+        'reset_cancelled': '❌ האיפוס בוטל. נתוני הבוט נשארים ללא שינוי.',
+        'no_users_to_remove': '❌ אין משתמשים להסרה',
+        'user_management_title': '👥 **ניהול משתמשים**\nלחץ להסרת משתמשים:',
+        'you_removed_from_bot': '👋 הוסרת מהבוט לניהול מדיח הכלים. השתמש ב-/start כדי להצטרף מחדש בכל עת.',
     }
 };
 
@@ -2152,7 +2168,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
         const userToRemove = command.replace('/removeuser ', '').trim();
         if (!userToRemove) {
-            sendMessage(chatId, '❌ **Usage:** `/removeuser <username>`\n\nExample: `/removeuser Dani`');
+            sendMessage(chatId, t(userId, 'usage_removeuser'));
             return;
         }
         
@@ -2171,9 +2187,9 @@ async function handleCommand(chatId, userId, userName, text) {
             // Save bot data after removing user
             await saveBotData();
             
-            sendMessage(chatId, `✅ User **${userToRemove}** has been removed from the bot`);
+            sendMessage(chatId, t(userId, 'user_removed_success', {user: userToRemove}));
         } else {
-            sendMessage(chatId, `❌ User **${userToRemove}** not found in authorized users`);
+            sendMessage(chatId, t(userId, 'user_not_found', {user: userToRemove}));
         }
         
     } else if (command === '/leave' || command === '/quit') {
@@ -2194,9 +2210,9 @@ async function handleCommand(chatId, userId, userName, text) {
             // Save bot data after self-removal
             await saveBotData();
             
-            sendMessage(chatId, `👋 You have been removed from the dishwasher bot. Use /start to rejoin anytime.`);
+            sendMessage(chatId, t(userId, 'you_removed_from_bot'));
         } else {
-            sendMessage(chatId, `❌ You are not currently authorized. Use /start to join the bot.`);
+            sendMessage(chatId, t(userId, 'not_authorized'));
         }
         
     } else if (command === '/resetbot') {
@@ -2213,7 +2229,7 @@ async function handleCommand(chatId, userId, userName, text) {
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
-        sendMessage(chatId, `⚠️ **WARNING: This will reset ALL bot data!**\n\nThis includes:\n• All users and admins\n• Turn order\n• Scores\n• Settings\n\nAre you sure?`, replyMarkup);
+            sendMessage(chatId, t(userId, 'reset_warning'), replyMarkup);
         
     } else if (command.startsWith('admin_punishment_reason_')) {
         // Handle admin punishment reason input
@@ -2482,7 +2498,7 @@ async function handleCallback(chatId, userId, userName, data) {
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
         if (!isAdmin) {
-            sendMessage(chatId, '❌ Admin access required for this action');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
@@ -2504,24 +2520,24 @@ async function handleCallback(chatId, userId, userName, data) {
         // Save empty state
         await saveBotData();
         
-        sendMessage(chatId, '🔄 **Bot data has been completely reset!**\n\nAll users need to reauthorize with /start');
+        sendMessage(chatId, t(userId, 'bot_reset_success'));
         
     } else if (data === 'cancel_reset') {
-        sendMessage(chatId, '❌ Reset cancelled. Bot data remains unchanged.');
+        sendMessage(chatId, t(userId, 'reset_cancelled'));
         
     } else if (data === 'remove_user_menu') {
         // Check if user is admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
         if (!isAdmin) {
-            sendMessage(chatId, '❌ Admin access required for this action');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
         // Show user list for removal
         const userList = Array.from(authorizedUsers);
         if (userList.length === 0) {
-            sendMessage(chatId, '❌ No users to remove');
+            sendMessage(chatId, t(userId, 'no_users_to_remove'));
             return;
         }
         
@@ -2531,14 +2547,14 @@ async function handleCallback(chatId, userId, userName, data) {
         }]);
         
         const replyMarkup = { inline_keyboard: keyboard };
-        sendMessage(chatId, '👥 **User Management**\nClick to remove users:', replyMarkup);
+        sendMessage(chatId, t(userId, 'user_management_title'), replyMarkup);
         
     } else if (data.startsWith('remove_user_')) {
         // Check if user is admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
         if (!isAdmin) {
-            sendMessage(chatId, '❌ Admin access required for this action');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
@@ -2558,14 +2574,14 @@ async function handleCallback(chatId, userId, userName, data) {
         await saveBotData();
         
         // Update the message
-        sendMessage(chatId, `✅ User **${targetUser}** has been removed from the bot`);
+        sendMessage(chatId, t(userId, 'user_removed_success', {user: targetUser}));
         
     } else if (data === 'reset_bot_menu') {
         // Check if user is admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
         if (!isAdmin) {
-            sendMessage(chatId, '❌ Admin access required for this action');
+            sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
@@ -2576,7 +2592,7 @@ async function handleCallback(chatId, userId, userName, data) {
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
-        sendMessage(chatId, `⚠️ **WARNING: This will reset ALL bot data!**\n\nThis includes:\n• All users and admins\n• Turn order\n• Scores\n• Settings\n\nAre you sure?`, replyMarkup);
+            sendMessage(chatId, t(userId, 'reset_warning'), replyMarkup);
         
     } else if (data === 'leave_bot') {
         // Allow users to remove themselves with debt protection
@@ -2611,7 +2627,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 userScore: userScore
             }), replyMarkup);
         } else {
-            sendMessage(chatId, `❌ You are not currently authorized. Use /start to join the bot.`);
+            sendMessage(chatId, t(userId, 'not_authorized'));
         }
         
     } else if (data === 'confirm_leave') {
