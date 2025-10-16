@@ -2617,7 +2617,7 @@ async function handleCallback(chatId, userId, userName, data) {
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
-            sendMessage(chatId, t(userId, 'reset_warning'), replyMarkup);
+        sendMessage(chatId, t(userId, 'reset_warning'), replyMarkup);
         
     } else if (data === 'leave_bot') {
         // Allow users to remove themselves with debt protection
