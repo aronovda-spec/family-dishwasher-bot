@@ -2623,10 +2623,11 @@ async function handleCallback(chatId, userId, userName, data) {
         // Allow users to remove themselves with debt protection
         const userName = getUserName(userId);
         
-        if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
-            // Check if user is admin
-            const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
-            
+        // Check if user is authorized OR admin
+        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
+        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        
+        if (isAuthorized || isAdmin) {
             if (isAdmin) {
                 // Admin trying to leave - check if they're the last admin
                 if (admins.size <= 1) {
