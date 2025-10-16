@@ -4019,19 +4019,23 @@ function cleanupOldData() {
     
     // Clean up old swap requests (older than 1 week)
     let cleanedSwaps = 0;
-    for (const [requestId, request] of pendingSwaps.entries()) {
-        if (request.timestamp < oneWeekAgo) {
-            pendingSwaps.delete(requestId);
-            cleanedSwaps++;
+    if (pendingSwaps && typeof pendingSwaps.entries === 'function') {
+        for (const [requestId, request] of pendingSwaps.entries()) {
+            if (request.timestamp < oneWeekAgo) {
+                pendingSwaps.delete(requestId);
+                cleanedSwaps++;
+            }
         }
     }
     
     // Clean up old punishment requests (older than 1 week)
     let cleanedPunishments = 0;
-    for (const [requestId, request] of pendingPunishments.entries()) {
-        if (request.timestamp < oneWeekAgo) {
-            pendingPunishments.delete(requestId);
-            cleanedPunishments++;
+    if (pendingPunishments && typeof pendingPunishments.entries === 'function') {
+        for (const [requestId, request] of pendingPunishments.entries()) {
+            if (request.timestamp < oneWeekAgo) {
+                pendingPunishments.delete(requestId);
+                cleanedPunishments++;
+            }
         }
     }
     
