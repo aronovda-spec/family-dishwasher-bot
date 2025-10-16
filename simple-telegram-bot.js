@@ -2234,8 +2234,8 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Create confirmation keyboard
         const keyboard = [
-            [{ text: t(userId, 'yes_reset_everything'), callback_data: 'confirm_reset' }],
-            [{ text: t(userId, 'cancel_reset_button'), callback_data: 'cancel_reset' }]
+            [{ text: t(userId, 'yes_reset_everything'), callback_data: 'confirm_bot_reset' }],
+            [{ text: t(userId, 'cancel_reset_button'), callback_data: 'cancel_bot_reset' }]
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
@@ -2503,7 +2503,7 @@ async function handleCallback(chatId, userId, userName, data) {
         await handleCommand(chatId, userId, userName, 'admins');
     } else if (data === 'help') {
         await handleCommand(chatId, userId, userName, 'help');
-    } else if (data === 'confirm_reset') {
+    } else if (data === 'confirm_bot_reset') {
         // Check if user is admin
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
@@ -2532,7 +2532,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         sendMessage(chatId, t(userId, 'bot_reset_success'));
         
-    } else if (data === 'cancel_reset') {
+    } else if (data === 'cancel_bot_reset') {
         sendMessage(chatId, t(userId, 'reset_cancelled'));
         
     } else if (data === 'remove_user_menu') {
@@ -2597,8 +2597,8 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Create confirmation keyboard
         const keyboard = [
-            [{ text: t(userId, 'yes_reset_everything'), callback_data: 'confirm_reset' }],
-            [{ text: t(userId, 'cancel_reset_button'), callback_data: 'cancel_reset' }]
+            [{ text: t(userId, 'yes_reset_everything'), callback_data: 'confirm_bot_reset' }],
+            [{ text: t(userId, 'cancel_reset_button'), callback_data: 'cancel_bot_reset' }]
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
