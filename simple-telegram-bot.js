@@ -4508,9 +4508,9 @@ function cleanupOldData() {
         const originalLength = global.swapTimestamps.length;
         global.swapTimestamps = global.swapTimestamps.filter(timestamp => timestamp > oneDayAgo);
         cleanedSwapTimestamps = originalLength - global.swapTimestamps.length;
-    } else if (global.swapTimestamps && typeof global.swapTimestamps.delete === 'function') {
+    } else if (global.swapTimestamps && typeof global.swapTimestamps.delete === 'function' && typeof global.swapTimestamps.entries === 'function') {
         // swapTimestamps is a Map, use delete method
-    for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
+        for (const [userKey, timestamp] of global.swapTimestamps.entries()) {
         if (timestamp < oneDayAgo) {
             global.swapTimestamps.delete(userKey);
             cleanedSwapTimestamps++;
@@ -4554,7 +4554,7 @@ function cleanupOldData() {
     
         // Clean up global temp swaps (older than 1 hour)
         let cleanedTempSwaps = 0;
-        if (global.tempSwaps) {
+        if (global.tempSwaps && typeof global.tempSwaps.entries === 'function') {
             for (const [swapId, swap] of global.tempSwaps.entries()) {
                 if (swap.timestamp < oneHourAgo) {
                     global.tempSwaps.delete(swapId);
@@ -4565,7 +4565,7 @@ function cleanupOldData() {
 
         // Clean up expired grace periods (older than 24 hours)
         let cleanedGracePeriods = 0;
-        if (global.gracePeriods) {
+        if (global.gracePeriods && typeof global.gracePeriods.entries === 'function') {
             for (const [userName, graceData] of global.gracePeriods.entries()) {
                 if (graceData.endTime < now) {
                     global.gracePeriods.delete(userName);
