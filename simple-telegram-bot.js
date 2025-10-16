@@ -1011,6 +1011,11 @@ const translations = {
         'no_users_to_remove': '❌ No users to remove',
         'user_management_title': '👥 **User Management**\nClick to remove users:',
         'you_removed_from_bot': '👋 You have been removed from the dishwasher bot. Use /start to rejoin anytime.',
+        'yes_reset_everything': '✅ Yes, Reset Everything',
+        'cancel_reset_button': '❌ Cancel',
+        'remove_user_prefix': '❌ Remove',
+        'reset_bot_button': '🔄 Reset Bot',
+        'leave_bot_button': '👋 Leave Bot',
         
         // Queue Statistics (missing in English)
         'current_scores': '📊 Current Scores:\n'
@@ -1391,6 +1396,11 @@ const translations = {
         'no_users_to_remove': '❌ אין משתמשים להסרה',
         'user_management_title': '👥 **ניהול משתמשים**\nלחץ להסרת משתמשים:',
         'you_removed_from_bot': '👋 הוסרת מהבוט לניהול מדיח הכלים. השתמש ב-/start כדי להצטרף מחדש בכל עת.',
+        'yes_reset_everything': '✅ כן, אפס הכל',
+        'cancel_reset_button': '❌ ביטול',
+        'remove_user_prefix': '❌ הסר',
+        'reset_bot_button': '🔄 אפס בוט',
+        'leave_bot_button': '👋 עזוב בוט',
     }
 };
 
@@ -1666,7 +1676,7 @@ async function handleCommand(chatId, userId, userName, text) {
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
                 [
-                    { text: t(userId, 'remove_user_button'), callback_data: "remove_user_menu" },
+                    { text: t(userId, 'remove_user'), callback_data: "remove_user_menu" },
                     { text: t(userId, 'reset_bot_button'), callback_data: "reset_bot_menu" }
                 ],
                 [
@@ -2224,8 +2234,8 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Create confirmation keyboard
         const keyboard = [
-            [{ text: '✅ Yes, Reset Everything', callback_data: 'confirm_reset' }],
-            [{ text: '❌ Cancel', callback_data: 'cancel_reset' }]
+            [{ text: t(userId, 'yes_reset_everything'), callback_data: 'confirm_reset' }],
+            [{ text: t(userId, 'cancel_reset_button'), callback_data: 'cancel_reset' }]
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
@@ -2542,7 +2552,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         const keyboard = userList.map(user => [{
-            text: `❌ Remove ${user}`,
+            text: `${t(userId, 'remove_user_prefix')} ${user}`,
             callback_data: `remove_user_${user}`
         }]);
         
@@ -2587,8 +2597,8 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Create confirmation keyboard
         const keyboard = [
-            [{ text: '✅ Yes, Reset Everything', callback_data: 'confirm_reset' }],
-            [{ text: '❌ Cancel', callback_data: 'cancel_reset' }]
+            [{ text: t(userId, 'yes_reset_everything'), callback_data: 'confirm_reset' }],
+            [{ text: t(userId, 'cancel_reset_button'), callback_data: 'cancel_reset' }]
         ];
         
         const replyMarkup = { inline_keyboard: keyboard };
@@ -2983,7 +2993,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 { text: t(userId, 'reactivate_user'), callback_data: "reactivate_user_menu" }
             ],
             [
-                { text: t(userId, 'remove_user'), callback_data: "remove_user_menu" }
+                { text: t(userId, 'remove_user'), callback_data: "remove_queue_user_menu" }
             ],
             [
                 { text: t(userId, 'reset_scores'), callback_data: "reset_scores_menu" }
@@ -3188,8 +3198,7 @@ async function handleCallback(chatId, userId, userName, data) {
             sendMessage(chatId, `❌ Failed to reactivate ${addRoyalEmoji(selectedUser)}`);
         }
         
-    } else if (data === 'remove_user_menu') {
-        // Select user to remove permanently (only show users currently in queue)
+    } else if (data === 'remove_queue_user_menu') {
         if (queue.length === 0) {
             sendMessage(chatId, t(userId, 'no_users_to_remove'));
             return;
