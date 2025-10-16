@@ -2573,14 +2573,23 @@ async function handleCallback(chatId, userId, userName, data) {
         const userName = getUserName(userId);
         
         if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
-            // Check if user has high score (potential debt reset exploit)
+            // Check if user has low score (debt - behind other users)
             const userScore = userScores.get(userName) || 0;
-            const isHighScore = userScore > 2; // More than 2 turns behind
+            const allScores = Array.from(userScores.values());
+            const minScore = Math.min(...allScores);
+            const hasDebt = userScore < minScore; // User is behind others
             
+            if (hasDebt) {
+                // Block user from leaving if they have debt (low score)
+                sendMessage(chatId, `🚨 **Cannot leave with outstanding turns!**\n\nYou have ${userScore} turns completed, but others have ${minScore}.\n\nYou need to complete your turns before leaving.\n\nIf you must leave, ask an admin to remove you instead.`);
+                return;
+            }
+            
+            // User has good standing (high score), allow leaving with warning
             let warningMessage = `⚠️ **Are you sure you want to leave the bot?**\n\nThis will:\n• Remove you from all queues\n• Clear your scores\n• You'll need to reauthorize to rejoin\n\n`;
             
-            if (isHighScore) {
-                warningMessage += `🚨 **WARNING: You have ${userScore} turns completed.**\nLeaving will reset your progress to 0.\n\n`;
+            if (userScore > 0) {
+                warningMessage += `📊 **You have ${userScore} turns completed (good standing).**\nLeaving will reset your progress to 0.\n\n`;
             }
             
             warningMessage += `Are you sure?`;
