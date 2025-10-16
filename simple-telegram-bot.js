@@ -2582,7 +2582,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         const keyboard = userList.map(user => [{
-            text: `${t(userId, 'remove_user_prefix')} ${user}`,
+            text: addRoyalEmojiTranslated(user, userId),
             callback_data: `remove_user_${user}`
         }]);
         
