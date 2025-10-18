@@ -38,6 +38,10 @@ async function saveBotData() {
             userScores: Object.fromEntries(userScores),
             currentTurnIndex: currentTurnIndex,
             
+            // Queue mappings (CRITICAL for authorization persistence)
+            userQueueMapping: Object.fromEntries(userQueueMapping),
+            queueUserMapping: Object.fromEntries(queueUserMapping),
+            
             // Additional state
             suspendedUsers: Object.fromEntries(suspendedUsers),
             turnAssignments: Object.fromEntries(turnAssignments),
@@ -57,7 +61,7 @@ async function saveBotData() {
         
         const jsonData = JSON.stringify(botData, null, 2);
         fs.writeFileSync(BOT_DATA_FILE, jsonData, 'utf8');
-        console.log(`💾 Bot data saved successfully - ${authorizedUsers.size} authorized users, ${admins.size} admins`);
+        console.log(`💾 Bot data saved successfully - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
     } catch (error) {
         console.error('❌ Error saving bot data:', error);
         console.error('❌ File path:', BOT_DATA_FILE);
@@ -77,7 +81,7 @@ async function loadBotData() {
         const botData = JSON.parse(jsonData);
         
         console.log(`📂 Loading bot data from ${BOT_DATA_FILE}`);
-        console.log(`📊 Found ${botData.authorizedUsers?.length || 0} authorized users, ${botData.admins?.length || 0} admins`);
+        console.log(`📊 Found ${botData.authorizedUsers?.length || 0} authorized users, ${botData.admins?.length || 0} admins, ${Object.keys(botData.queueUserMapping || {}).length} queue mappings`);
         
         // Restore core bot state
         authorizedUsers.clear();
@@ -104,6 +108,17 @@ async function loadBotData() {
         
         currentTurnIndex = botData.currentTurnIndex || 0;
         
+        // Restore queue mappings (CRITICAL for authorization persistence)
+        userQueueMapping.clear();
+        Object.entries(botData.userQueueMapping || {}).forEach(([key, value]) => {
+            userQueueMapping.set(key, value);
+        });
+        
+        queueUserMapping.clear();
+        Object.entries(botData.queueUserMapping || {}).forEach(([key, value]) => {
+            queueUserMapping.set(key, value);
+        });
+        
         // Restore additional state
         suspendedUsers.clear();
         Object.entries(botData.suspendedUsers || {}).forEach(([key, value]) => {
@@ -127,7 +142,7 @@ async function loadBotData() {
         });
         
         console.log('📂 Bot data loaded successfully');
-        console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Turn Index: ${currentTurnIndex}`);
+        console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
         return true;
     } catch (error) {
         console.error('❌ Error loading bot data:', error);
