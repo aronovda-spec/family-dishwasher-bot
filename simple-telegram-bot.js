@@ -3068,7 +3068,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 { text: t(userId, 'leave_bot_button'), callback_data: "leave_bot" }
             ],
             [
-                { text: t(userId, 'back_to_admin_menu'), callback_data: "admin_menu" }
+                { text: t(userId, 'back_to_admin_menu'), callback_data: "maintenance_menu" }
             ]
         ];
         
