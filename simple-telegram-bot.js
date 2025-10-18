@@ -57,9 +57,12 @@ async function saveBotData() {
         
         const jsonData = JSON.stringify(botData, null, 2);
         fs.writeFileSync(BOT_DATA_FILE, jsonData, 'utf8');
-        console.log('💾 Bot data saved successfully');
+        console.log(`💾 Bot data saved successfully - ${authorizedUsers.size} authorized users, ${admins.size} admins`);
     } catch (error) {
         console.error('❌ Error saving bot data:', error);
+        console.error('❌ File path:', BOT_DATA_FILE);
+        console.error('❌ Data directory exists:', fs.existsSync(DATA_DIR));
+        console.error('❌ Data directory writable:', fs.accessSync ? 'checking...' : 'unknown');
     }
 }
 
@@ -72,6 +75,9 @@ async function loadBotData() {
         
         const jsonData = fs.readFileSync(BOT_DATA_FILE, 'utf8');
         const botData = JSON.parse(jsonData);
+        
+        console.log(`📂 Loading bot data from ${BOT_DATA_FILE}`);
+        console.log(`📊 Found ${botData.authorizedUsers?.length || 0} authorized users, ${botData.admins?.length || 0} admins`);
         
         // Restore core bot state
         authorizedUsers.clear();
@@ -4091,8 +4097,8 @@ async function getUpdates(offset = 0) {
                         if (update.callback_query) {
                             const chatId = update.callback_query.message.chat.id;
                             const userId = update.callback_query.from.id;
-                            const userName = update.callback_query.from.first_name + 
-                                (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
+                            const userName = (update.callback_query.from.first_name || '') + 
+                                (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '') || 'Unknown User';
                             const data = update.callback_query.data;
                             
                             // Button click deduplication: prevent rapid multiple clicks on same button
@@ -4242,8 +4248,8 @@ const server = http.createServer(async (req, res) => {
                 if (update.callback_query) {
                     const chatId = update.callback_query.message.chat.id;
                     const userId = update.callback_query.from.id;
-                    const userName = update.callback_query.from.first_name + 
-                        (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
+                    const userName = (update.callback_query.from.first_name || '') + 
+                        (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '') || 'Unknown User';
                     const data = update.callback_query.data;
                     
                     // Button click deduplication: prevent rapid multiple clicks on same button
@@ -4363,14 +4369,21 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
         // Load persisted bot data
         console.log('📂 Loading persisted bot data...');
         await loadBotData();
+        
+        // Save immediately after loading to ensure persistence
+        console.log('💾 Ensuring data persistence...');
+        await saveBotData();
 });
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
     
     // Load persisted bot data for local mode too
     console.log('📂 Loading persisted bot data...');
-    loadBotData().then(() => {
+    loadBotData().then(async () => {
         console.log('✅ Local mode data loaded');
+        // Save immediately after loading to ensure persistence
+        console.log('💾 Ensuring data persistence...');
+        await saveBotData();
     }).catch(error => {
         console.error('❌ Error loading local mode data:', error);
     });
