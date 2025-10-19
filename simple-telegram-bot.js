@@ -2056,8 +2056,8 @@ async function handleCommand(chatId, userId, userName, text) {
             const turnText = isCurrentTurn ? ` ${t(userId, 'current_turn')}` : '';
             
             // Check if this queue member is authorized
-            const authorizedUser = queueUserMapping.get(name);
-            const authText = authorizedUser ? ` (${authorizedUser})` : ` ${t(userId, 'not_authorized_user')}`;
+            const isAuthorized = isUserAuthorized(name);
+            const authText = isAuthorized ? '' : ` ${t(userId, 'not_authorized_user')}`;
             
             statusMessage += `${turnIcon} ${i + 1}. ${royalName}${turnText}${authText}\n`;
         }
