@@ -272,8 +272,8 @@ function getCurrentTurnUser() {
             currentUser = user;
         } else if (score === lowestScore && currentUser) {
             // Tie-breaker: use originalQueue order
-            const userIndex = originalQueue.indexOf(user);
-            const currentUserIndex = originalQueue.indexOf(currentUser);
+            const userIndex = originalQueue ? originalQueue.indexOf(user) : -1;
+            const currentUserIndex = originalQueue ? originalQueue.indexOf(currentUser) : -1;
             
             if (userIndex !== -1 && currentUserIndex !== -1 && userIndex < currentUserIndex) {
                 currentUser = user; // User comes first in tie-breaker order
@@ -314,8 +314,8 @@ function getNextThreeTurns() {
                 nextUser = user;
             } else if (score === lowestScore && nextUser) {
                 // Tie-breaker: use originalQueue order
-                const userIndex = originalQueue.indexOf(user);
-                const nextUserIndex = originalQueue.indexOf(nextUser);
+                const userIndex = originalQueue ? originalQueue.indexOf(user) : -1;
+                const nextUserIndex = originalQueue ? originalQueue.indexOf(nextUser) : -1;
                 
                 if (userIndex !== -1 && nextUserIndex !== -1 && userIndex < nextUserIndex) {
                     nextUser = user; // User comes first in tie-breaker order
@@ -770,7 +770,7 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
         return t(userId, 'no_data_available');
     }
     
-    const [year, month] = monthKey.split('-');
+    const [year, month] = monthKey ? monthKey.split('-') : ['', ''];
     const monthNames = {
         'en': ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
         'he': ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
@@ -1682,13 +1682,13 @@ function getUserIdFromChatId(chatId) {
 
 // Extract first name only from full names (e.g., "Eden Aronov" -> "Eden")
 function getFirstName(fullName) {
-    if (!fullName) return '';
+    if (!fullName || typeof fullName !== 'string') return '';
     
     // Split by space and take first part
     const firstName = fullName.split(' ')[0];
     
     // Safety check for empty firstName
-    if (!firstName) return '';
+    if (!firstName || firstName.length === 0) return '';
     
     // Capitalize first letter, lowercase the rest
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
@@ -2450,7 +2450,7 @@ async function handleCommand(chatId, userId, userName, text) {
             sendMessage(chatId, userList);
         }
         
-    } else if (command.startsWith('/addadmin ')) {
+    } else if (command && command.startsWith('/addadmin ')) {
         const userToAdd = getFirstName(command.replace('/addadmin ', '').trim()); // Normalize to first name only
         
         if (!userToAdd) {
@@ -2494,14 +2494,14 @@ async function handleCommand(chatId, userId, userName, text) {
         // The new admin's chat ID will be stored when they send /start or interact with the bot
         sendMessage(chatId, t(userId, 'admin_added', {user: translateName(userToAdd, userId)}));
         
-    } else if (command.startsWith('/removeadmin ')) {
+    } else if (command && command.startsWith('/removeadmin ')) {
         // Check if user is already an admin
         if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
             return;
         }
         
-        const userToRemove = command.replace('/removeadmin ', '').trim();
+        const userToRemove = command ? command.replace('/removeadmin ', '').trim() : '';
         if (userToRemove) {
             // Prevent self-removal (security protection)
             if ((userToRemove && userName && userToRemove.toLowerCase() === userName.toLowerCase()) || userToRemove === userId.toString()) {
@@ -2530,14 +2530,14 @@ async function handleCommand(chatId, userId, userName, text) {
             sendMessage(chatId, t(userId, 'usage_removeadmin'));
         }
         
-    } else if (command.startsWith('/removeuser ')) {
+    } else if (command && command.startsWith('/removeuser ')) {
         // Check if user is admin
         if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
             return;
         }
         
-        const userToRemove = command.replace('/removeuser ', '').trim();
+        const userToRemove = command ? command.replace('/removeuser ', '').trim() : '';
         if (!userToRemove) {
             sendMessage(chatId, t(userId, 'usage_removeuser'));
             return;
@@ -2587,7 +2587,7 @@ async function handleCommand(chatId, userId, userName, text) {
         punishmentTurns.delete(actualUserName);
         
         // Remove from originalQueue array (CRITICAL FIX!)
-        const queueIndex = originalQueue.indexOf(actualUserName);
+        const queueIndex = originalQueue ? originalQueue.indexOf(actualUserName) : -1;
         if (queueIndex !== -1) {
             originalQueue.splice(queueIndex, 1);
             console.log(`🗑️ Removed ${actualUserName} from originalQueue at index ${queueIndex}`);
@@ -2643,7 +2643,7 @@ async function handleCommand(chatId, userId, userName, text) {
             punishmentTurns.delete(userName);
             
             // Remove from originalQueue array (CRITICAL FIX!)
-            const queueIndex = originalQueue.indexOf(userName);
+            const queueIndex = originalQueue ? originalQueue.indexOf(userName) : -1;
             if (queueIndex !== -1) {
                 originalQueue.splice(queueIndex, 1);
                 console.log(`🗑️ Removed ${userName} from originalQueue at index ${queueIndex} (self-removal)`);
@@ -2673,11 +2673,11 @@ async function handleCommand(chatId, userId, userName, text) {
         const replyMarkup = { inline_keyboard: keyboard };
         sendMessageWithButtons(chatId, t(userId, 'reset_warning'), keyboard);
         
-    } else if (command.startsWith('admin_punishment_reason_')) {
+    } else if (command && command.startsWith('admin_punishment_reason_')) {
         // Handle admin punishment reason input
-        const parts = command.split(' ');
-        const requestId = parseInt(parts[0].replace('admin_punishment_reason_', ''));
-        const reason = parts.slice(1).join(' ');
+        const parts = command ? command.split(' ') : [];
+        const requestId = parts.length > 0 ? parseInt(parts[0].replace('admin_punishment_reason_', '')) : 0;
+        const reason = parts.length > 1 ? parts.slice(1).join(' ') : '';
         
         const punishmentRequest = pendingPunishments.get(requestId);
         if (!punishmentRequest) {
@@ -2698,14 +2698,14 @@ async function handleCommand(chatId, userId, userName, text) {
         // Remove request
         pendingPunishments.delete(requestId);
         
-    } else if (command.startsWith('/authorize ')) {
+    } else if (command && command.startsWith('/authorize ')) {
         // Check if user is an admin
         if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'admin_access_required_authorize', {user: userName}));
             return;
         }
         
-        const userToAuth = getFirstName(command.replace('/authorize ', '').trim()); // Normalize to first name only
+        const userToAuth = getFirstName(command ? command.replace('/authorize ', '').trim() : ''); // Normalize to first name only
         if (userToAuth) {
             if (authorizedUsers.size >= 3) {
                 sendMessage(chatId, t(userId, 'max_authorized_users'));
@@ -3000,8 +3000,8 @@ async function handleCallback(chatId, userId, userName, data) {
         
         const keyboard = userList.map(user => {
             // Extract first name and normalize to match royalEmojis keys
-            const firstName = user.split(' ')[0]; // Get first name only
-            const normalizedUser = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+            const firstName = user ? user.split(' ')[0] : ''; // Get first name only
+            const normalizedUser = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : '';
             return [{
                 text: addRoyalEmojiTranslated(normalizedUser, userId),
                 callback_data: `remove_user_${user}`
@@ -3020,7 +3020,7 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const targetUser = data.replace('remove_user_', '');
+        const targetUser = data ? data.replace('remove_user_', '') : '';
         
         // Check if user exists in authorized users
         if (!isUserAuthorized(targetUser)) {
@@ -3066,7 +3066,7 @@ async function handleCallback(chatId, userId, userName, data) {
         punishmentTurns.delete(actualUserName);
         
         // Remove from originalQueue array (CRITICAL FIX!)
-        const queueIndex = originalQueue.indexOf(actualUserName);
+        const queueIndex = originalQueue ? originalQueue.indexOf(actualUserName) : -1;
         if (queueIndex !== -1) {
             originalQueue.splice(queueIndex, 1);
             console.log(`🗑️ Removed ${actualUserName} from originalQueue at index ${queueIndex}`);
@@ -3625,7 +3625,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('reorder_select_')) {
         // Step 2: Select new position for user
-        const selectedUser = data.replace('reorder_select_', '');
+        const selectedUser = data ? data.replace('reorder_select_', '') : '';
         const positionButtons = [
             [{ text: t(userId, 'position_1'), callback_data: `reorder_position_${selectedUser}_1` }],
             [{ text: t(userId, 'position_2'), callback_data: `reorder_position_${selectedUser}_2` }],
@@ -3635,7 +3635,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('reorder_position_')) {
         // Execute reorder (change tie-breaker priority order)
-        const parts = data.replace('reorder_position_', '').split('_');
+        const parts = data ? data.replace('reorder_position_', '').split('_') : [];
         const selectedUser = parts[0];
         const newPosition = parseInt(parts[1]) - 1; // Convert to 0-based index
         
@@ -4032,7 +4032,7 @@ async function handleCallback(chatId, userId, userName, data) {
         );
         
     } else if (data.startsWith('swap_request_')) {
-        const targetUser = data.replace('swap_request_', '');
+        const targetUser = data ? data.replace('swap_request_', '') : '';
         const currentUserQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
         
         if (!currentUserQueueName) {
@@ -4132,7 +4132,7 @@ async function handleCallback(chatId, userId, userName, data) {
         );
         
     } else if (data.startsWith('swap_approve_')) {
-        const requestId = parseInt(data.replace('swap_approve_', ''));
+        const requestId = data ? parseInt(data.replace('swap_approve_', '')) : 0;
         const swapRequest = pendingSwaps.get(requestId);
         
         console.log(`🔘 Button pressed: "${data}" by ${userName}`);
