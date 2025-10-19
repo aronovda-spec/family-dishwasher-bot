@@ -2450,6 +2450,12 @@ async function handleCommand(chatId, userId, userName, text) {
             let totalCount = admins.size;
             
             Array.from(admins).forEach((admin, index) => {
+                // Safety check: ensure admin exists
+                if (!admin) {
+                    console.log(`⚠️ Warning: Empty admin found in admins`);
+                    return;
+                }
+                
                 // Check if it's a numeric ID or username
                 if (/^\d+$/.test(admin)) {
                     // For numeric IDs, check if they're active by looking in adminNameToChatId
@@ -2491,6 +2497,12 @@ async function handleCommand(chatId, userId, userName, text) {
             authorizedUsers.forEach(user => {
                 // Check if user is active (has pressed /start)
                 const isActive = userChatIds.has(user) || (user ? userChatIds.has(user.toLowerCase()) : false);
+                
+                // Safety check: ensure user exists
+                if (!user) {
+                    console.log(`⚠️ Warning: Empty user found in authorizedUsers`);
+                    return;
+                }
                 
                 if (isActive) {
                     activeCount++;
