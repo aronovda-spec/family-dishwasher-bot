@@ -2860,6 +2860,9 @@ async function handleCallback(chatId, userId, userName, data) {
         global.swapTimestamps = [];
         global.doneTimestamps = new Map();
         
+        // Clear ALL database data (CRITICAL FIX!)
+        await db.clearAllData();
+        
         // Save empty state
         await saveBotData();
         
