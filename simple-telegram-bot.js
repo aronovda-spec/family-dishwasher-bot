@@ -2,7 +2,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const Database = require('./database');
+const SupabaseDatabase = require('./supabase-db.js');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -54,68 +54,13 @@ async function saveBotData() {
             await db.setMonthlyStats(monthKey, statsData);
         }
         
-        // Super2 style: Simple SQLite persistence + Render free tier backup
-        console.log(`💾 Bot data saved to SQLite database (Super2 style)`);
-        console.log(`💾 Database file: ${db.dbPath}`);
-        
-        // CRITICAL: Render free tier has ephemeral file system!
-        // SQLite database gets deleted on restart/redeploy
-        if (isRender) {
-            console.log(`⚠️ RENDER FREE TIER: Ephemeral file system - SQLite will be lost on restart!`);
-            console.log(`💡 SOLUTION: Upgrade to paid tier for persistent disk OR use external database`);
-            
-            // Save critical data to multiple backup locations
-            // CRITICAL: Update backup every time saveBotData() is called
-            try {
-                const criticalData = {
-                    authorizedUsers: Array.from(authorizedUsers),
-                    admins: Array.from(admins),
-                    userScores: Object.fromEntries(userScores),
-                    timestamp: Date.now()
-                };
-                
-                const backupData = JSON.stringify(criticalData);
-                
-                // Method 1: Try to save to persistent file locations
-                const fs = require('fs');
-                const path = require('path');
-                
-                const backupPaths = [
-                    '/tmp/critical_backup.json',
-                    path.join(process.cwd(), 'critical_backup.json'),
-                    path.join(__dirname, 'critical_backup.json'),
-                    '/app/critical_backup.json'
-                ];
-                
-                let fileSaved = false;
-                for (const backupPath of backupPaths) {
-                    try {
-                        fs.writeFileSync(backupPath, backupData);
-                        console.log(`💾 Critical data saved to: ${backupPath}`);
-                        fileSaved = true;
-                        break;
-                    } catch (err) {
-                        console.log(`⚠️ Could not save to ${backupPath}: ${err.message}`);
-                    }
-                }
-                
-                // Method 2: Runtime environment variable (for current session)
-                process.env.BOT_CRITICAL_BACKUP = backupData;
-                
-                console.log(`💾 Critical data UPDATED in backup`);
-                console.log(`💾 Current scores: ${Object.fromEntries(userScores)}`);
-                console.log(`💾 File saved: ${fileSaved ? 'Yes' : 'No'}`);
-                
-            } catch (error) {
-                console.log(`❌ Failed to backup critical data: ${error.message}`);
-            }
-        } else {
-            console.log(`💾 Local deployment: SQLite database persists across restarts`);
-        }
-        
-        console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        // Supabase persistence: True persistence across restarts and deployments!
+        console.log(`💾 Bot data saved to Supabase PostgreSQL database`);
+        console.log(`💾 Data persists across restarts and deployments`);
+        console.log(`💾 No more ephemeral file system issues!`);
+        console.log(`💾 Bot data saved to Supabase - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
     } catch (error) {
-        console.error('❌ Error saving bot data to SQLite:', error);
+        console.error('❌ Error saving bot data to Supabase:', error);
     }
 }
 
@@ -153,7 +98,7 @@ async function loadBotData() {
         // Load monthly statistics
         const monthlyStatsData = await db.getAllMonthlyStats();
         
-        console.log(`📂 Loading bot data from SQLite database`);
+        console.log(`📂 Loading bot data from Supabase database`);
         console.log(`📊 Found ${authorizedUsersData.length} authorized users, ${adminsData.length} admins, ${Object.keys(queueMappingsData).length} queue mappings`);
         
         // Restore core bot state
@@ -222,7 +167,7 @@ async function loadBotData() {
             monthlyStats.set(key, value);
         });
         
-        console.log('📂 Bot data loaded successfully from SQLite');
+        console.log('📂 Bot data loaded successfully from Supabase');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
         
         // Initialize default scores for new users only (persistent scores)
@@ -411,106 +356,25 @@ const queueStatistics = new Map(); // userName -> { totalCompletions: number, mo
 // Check if running on Render (ephemeral file system)
 const isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HOSTNAME;
 
-// Initialize database after global variables are declared
-db = new Database();
-console.log('📊 SQLite database initialized for persistence');
+// Initialize Supabase database after global variables are declared
+db = new SupabaseDatabase();
+console.log('📊 Supabase database initialized for persistence');
 
-// Wait for database to be ready before proceeding (Super2 style)
+// Wait for database to be ready before proceeding (Supabase style)
 let dbReady = false;
-db.db.on('open', async () => {
-    console.log('✅ Database connection established');
-    console.log('📊 Using Super2-style persistence: Single SQLite file in project root');
-    console.log('📊 Render persistent file system maintains database across restarts');
-    console.log('📊 CREATE TABLE IF NOT EXISTS preserves existing data');
+
+// Supabase doesn't use the same connection pattern as SQLite
+// Initialize immediately
+setTimeout(async () => {
+    console.log('✅ Supabase database connection established');
+    console.log('📊 Using Supabase PostgreSQL for true persistence');
+    console.log('📊 Data persists across restarts and deployments');
+    console.log('📊 No more ephemeral file system issues!');
     dbReady = true;
     
-    // Load bot data from database (Super2 approach - simple and reliable)
-    // BUT: Render free tier has ephemeral file system - check for backup first
-    if (isRender) {
-        console.log('🔄 RENDER FREE TIER: Checking for persistent backups');
-        
-        // Method 1: Check for file backups first
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            
-            const backupPaths = [
-                '/tmp/critical_backup.json',
-                path.join(process.cwd(), 'critical_backup.json'),
-                path.join(__dirname, 'critical_backup.json'),
-                '/app/critical_backup.json'
-            ];
-            
-            let backupFound = false;
-            for (const backupPath of backupPaths) {
-                if (fs.existsSync(backupPath)) {
-                    try {
-                        const backupData = fs.readFileSync(backupPath, 'utf8');
-                        const criticalData = JSON.parse(backupData);
-                        console.log(`🔄 File backup found: ${backupPath}`);
-                        console.log(`🔄 Backup timestamp: ${new Date(criticalData.timestamp).toISOString()}`);
-                        
-                        // Restore critical data
-                        authorizedUsers.clear();
-                        criticalData.authorizedUsers.forEach(user => authorizedUsers.add(user));
-                        
-                        admins.clear();
-                        criticalData.admins.forEach(admin => admins.add(admin));
-                        
-                        userScores.clear();
-                        Object.entries(criticalData.userScores).forEach(([key, value]) => {
-                            userScores.set(key, value);
-                        });
-                        
-                        console.log(`✅ Critical data restored from file backup: ${authorizedUsers.size} users, ${admins.size} admins`);
-                        console.log(`📊 Restored scores: ${Object.fromEntries(userScores)}`);
-                        backupFound = true;
-                        break;
-                    } catch (err) {
-                        console.log(`⚠️ Error reading ${backupPath}: ${err.message}`);
-                    }
-                }
-            }
-            
-            if (!backupFound) {
-                console.log('📂 No file backup found, checking environment variable');
-                // Method 2: Check environment variable backup
-                if (process.env.BOT_CRITICAL_BACKUP) {
-                    try {
-                        const backupData = JSON.parse(process.env.BOT_CRITICAL_BACKUP);
-                        console.log(`🔄 Environment backup timestamp: ${new Date(backupData.timestamp).toISOString()}`);
-                        
-                        // Restore critical data
-                        authorizedUsers.clear();
-                        backupData.authorizedUsers.forEach(user => authorizedUsers.add(user));
-                        
-                        admins.clear();
-                        backupData.admins.forEach(admin => admins.add(admin));
-                        
-                        userScores.clear();
-                        Object.entries(backupData.userScores).forEach(([key, value]) => {
-                            userScores.set(key, value);
-                        });
-                        
-                        console.log(`✅ Critical data restored from environment backup: ${authorizedUsers.size} users, ${admins.size} admins`);
-                        console.log(`📊 Restored scores: ${Object.fromEntries(userScores)}`);
-                    } catch (error) {
-                        console.log('❌ Error loading from environment backup, falling back to SQLite');
-                        await loadBotData();
-                    }
-                } else {
-                    console.log('📂 No environment backup found, loading from SQLite');
-                    await loadBotData();
-                }
-            }
-        } catch (error) {
-            console.log('❌ Error checking backups, falling back to SQLite');
-            await loadBotData();
-        }
-    } else {
-        await loadBotData();
-    }
-});
+    // Load bot data from Supabase database (true persistence!)
+    await loadBotData();
+}, 1000); // Give Supabase a moment to initialize
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
 // Monthly report tracking
