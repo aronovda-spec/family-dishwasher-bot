@@ -2064,11 +2064,12 @@ async function handleCommand(chatId, userId, userName, text) {
         
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
         
-        // Show current scores (only for authorized users)
+        // Show current scores (only for authorized users) - fetch from database for accuracy
         statusMessage += `\n\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
         for (const user of authorizedUsers) {
-            const score = userScores.get(user) || 0;
+            // Fetch score directly from database to ensure accuracy
+            const score = await db.getUserScore(user) || 0;
             const relativeScore = relativeScores.get(user) || 0;
             const royalName = addRoyalEmojiTranslated(user, userId);
             statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
@@ -3592,15 +3593,16 @@ async function handleCallback(chatId, userId, userName, data) {
             statsMessage += `${index + 1}. ${emoji}\n`;
         });
         
-        // Current scores (only for authorized users)
+        // Current scores (only for authorized users) - fetch from database for accuracy
         statsMessage += `\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
-        authorizedUsers.forEach(user => {
-            const score = userScores.get(user) || 0;
+        for (const user of authorizedUsers) {
+            // Fetch score directly from database to ensure accuracy
+            const score = await db.getUserScore(user) || 0;
             const relativeScore = relativeScores.get(user) || 0;
             const emoji = addRoyalEmoji(user);
             statsMessage += `${emoji}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
-        });
+        }
         
         // Current turn and next 3 turns
         const currentUser = getCurrentTurnUser();
