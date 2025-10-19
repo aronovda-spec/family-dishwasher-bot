@@ -471,21 +471,58 @@ class SupabaseDatabase {
         }
         
         try {
-            // Clear all tables
-            const tables = ['bot_state', 'user_scores', 'queue_mappings', 'monthly_stats'];
+            // Clear all tables - use proper delete syntax for each table
+            console.log(`🗑️ Clearing all Supabase tables...`);
             
-            for (const table of tables) {
-                const { error } = await this.supabase
-                    .from(table)
-                    .delete()
-                    .neq('id', 0); // Delete all rows
-                
-                if (error) {
-                    console.error(`❌ Error clearing table ${table}:`, error.message);
-                } else {
-                    console.log(`💾 Table cleared in Supabase: ${table}`);
-                }
+            // Clear bot_state table (key is primary key)
+            const { error: botStateError } = await this.supabase
+                .from('bot_state')
+                .delete()
+                .neq('key', ''); // Delete all rows where key is not empty
+            
+            if (botStateError) {
+                console.error(`❌ Error clearing bot_state table:`, botStateError.message);
+            } else {
+                console.log(`💾 Table cleared: bot_state`);
             }
+            
+            // Clear user_scores table (user_name is primary key)
+            const { error: userScoresError } = await this.supabase
+                .from('user_scores')
+                .delete()
+                .neq('user_name', ''); // Delete all rows where user_name is not empty
+            
+            if (userScoresError) {
+                console.error(`❌ Error clearing user_scores table:`, userScoresError.message);
+            } else {
+                console.log(`💾 Table cleared: user_scores`);
+            }
+            
+            // Clear queue_mappings table (user_name is primary key)
+            const { error: queueMappingsError } = await this.supabase
+                .from('queue_mappings')
+                .delete()
+                .neq('user_name', ''); // Delete all rows where user_name is not empty
+            
+            if (queueMappingsError) {
+                console.error(`❌ Error clearing queue_mappings table:`, queueMappingsError.message);
+            } else {
+                console.log(`💾 Table cleared: queue_mappings`);
+            }
+            
+            // Clear monthly_stats table (month_key is primary key)
+            const { error: monthlyStatsError } = await this.supabase
+                .from('monthly_stats')
+                .delete()
+                .neq('month_key', ''); // Delete all rows where month_key is not empty
+            
+            if (monthlyStatsError) {
+                console.error(`❌ Error clearing monthly_stats table:`, monthlyStatsError.message);
+            } else {
+                console.log(`💾 Table cleared: monthly_stats`);
+            }
+            
+            console.log(`✅ All Supabase tables cleared successfully!`);
             
         } catch (error) {
             console.error(`❌ Exception clearing all data:`, error.message);
