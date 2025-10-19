@@ -64,7 +64,7 @@ async function saveBotData() {
             console.log(`⚠️ RENDER FREE TIER: Ephemeral file system - SQLite will be lost on restart!`);
             console.log(`💡 SOLUTION: Upgrade to paid tier for persistent disk OR use external database`);
             
-            // Save critical data to environment variables as backup
+            // Save critical data to multiple backup locations
             // CRITICAL: Update backup every time saveBotData() is called
             try {
                 const criticalData = {
@@ -75,9 +75,37 @@ async function saveBotData() {
                 };
                 
                 const backupData = JSON.stringify(criticalData);
+                
+                // Method 1: Try to save to persistent file locations
+                const fs = require('fs');
+                const path = require('path');
+                
+                const backupPaths = [
+                    '/tmp/critical_backup.json',
+                    path.join(process.cwd(), 'critical_backup.json'),
+                    path.join(__dirname, 'critical_backup.json'),
+                    '/app/critical_backup.json'
+                ];
+                
+                let fileSaved = false;
+                for (const backupPath of backupPaths) {
+                    try {
+                        fs.writeFileSync(backupPath, backupData);
+                        console.log(`💾 Critical data saved to: ${backupPath}`);
+                        fileSaved = true;
+                        break;
+                    } catch (err) {
+                        console.log(`⚠️ Could not save to ${backupPath}: ${err.message}`);
+                    }
+                }
+                
+                // Method 2: Runtime environment variable (for current session)
                 process.env.BOT_CRITICAL_BACKUP = backupData;
-                console.log(`💾 Critical data UPDATED in environment variable backup`);
+                
+                console.log(`💾 Critical data UPDATED in backup`);
                 console.log(`💾 Current scores: ${Object.fromEntries(userScores)}`);
+                console.log(`💾 File saved: ${fileSaved ? 'Yes' : 'No'}`);
+                
             } catch (error) {
                 console.log(`❌ Failed to backup critical data: ${error.message}`);
             }
@@ -398,29 +426,85 @@ db.db.on('open', async () => {
     
     // Load bot data from database (Super2 approach - simple and reliable)
     // BUT: Render free tier has ephemeral file system - check for backup first
-    if (isRender && process.env.BOT_CRITICAL_BACKUP) {
-        console.log('🔄 RENDER FREE TIER: Loading from environment variable backup');
+    if (isRender) {
+        console.log('🔄 RENDER FREE TIER: Checking for persistent backups');
+        
+        // Method 1: Check for file backups first
         try {
-            const backupData = JSON.parse(process.env.BOT_CRITICAL_BACKUP);
-            console.log(`🔄 Backup timestamp: ${new Date(backupData.timestamp).toISOString()}`);
+            const fs = require('fs');
+            const path = require('path');
             
-            // Restore critical data
-            authorizedUsers.clear();
-            backupData.authorizedUsers.forEach(user => authorizedUsers.add(user));
+            const backupPaths = [
+                '/tmp/critical_backup.json',
+                path.join(process.cwd(), 'critical_backup.json'),
+                path.join(__dirname, 'critical_backup.json'),
+                '/app/critical_backup.json'
+            ];
             
-            admins.clear();
-            backupData.admins.forEach(admin => admins.add(admin));
+            let backupFound = false;
+            for (const backupPath of backupPaths) {
+                if (fs.existsSync(backupPath)) {
+                    try {
+                        const backupData = fs.readFileSync(backupPath, 'utf8');
+                        const criticalData = JSON.parse(backupData);
+                        console.log(`🔄 File backup found: ${backupPath}`);
+                        console.log(`🔄 Backup timestamp: ${new Date(criticalData.timestamp).toISOString()}`);
+                        
+                        // Restore critical data
+                        authorizedUsers.clear();
+                        criticalData.authorizedUsers.forEach(user => authorizedUsers.add(user));
+                        
+                        admins.clear();
+                        criticalData.admins.forEach(admin => admins.add(admin));
+                        
+                        userScores.clear();
+                        Object.entries(criticalData.userScores).forEach(([key, value]) => {
+                            userScores.set(key, value);
+                        });
+                        
+                        console.log(`✅ Critical data restored from file backup: ${authorizedUsers.size} users, ${admins.size} admins`);
+                        console.log(`📊 Restored scores: ${Object.fromEntries(userScores)}`);
+                        backupFound = true;
+                        break;
+                    } catch (err) {
+                        console.log(`⚠️ Error reading ${backupPath}: ${err.message}`);
+                    }
+                }
+            }
             
-            userScores.clear();
-            Object.entries(backupData.userScores).forEach(([key, value]) => {
-                userScores.set(key, value);
-            });
-            
-            console.log(`✅ Critical data restored from backup: ${authorizedUsers.size} users, ${admins.size} admins`);
-            console.log(`⚠️ RENDER FREE TIER LIMITATION: Only critical data restored, other data lost`);
-            
+            if (!backupFound) {
+                console.log('📂 No file backup found, checking environment variable');
+                // Method 2: Check environment variable backup
+                if (process.env.BOT_CRITICAL_BACKUP) {
+                    try {
+                        const backupData = JSON.parse(process.env.BOT_CRITICAL_BACKUP);
+                        console.log(`🔄 Environment backup timestamp: ${new Date(backupData.timestamp).toISOString()}`);
+                        
+                        // Restore critical data
+                        authorizedUsers.clear();
+                        backupData.authorizedUsers.forEach(user => authorizedUsers.add(user));
+                        
+                        admins.clear();
+                        backupData.admins.forEach(admin => admins.add(admin));
+                        
+                        userScores.clear();
+                        Object.entries(backupData.userScores).forEach(([key, value]) => {
+                            userScores.set(key, value);
+                        });
+                        
+                        console.log(`✅ Critical data restored from environment backup: ${authorizedUsers.size} users, ${admins.size} admins`);
+                        console.log(`📊 Restored scores: ${Object.fromEntries(userScores)}`);
+                    } catch (error) {
+                        console.log('❌ Error loading from environment backup, falling back to SQLite');
+                        await loadBotData();
+                    }
+                } else {
+                    console.log('📂 No environment backup found, loading from SQLite');
+                    await loadBotData();
+                }
+            }
         } catch (error) {
-            console.log('❌ Error loading from backup, falling back to SQLite');
+            console.log('❌ Error checking backups, falling back to SQLite');
             await loadBotData();
         }
     } else {
