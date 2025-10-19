@@ -2001,6 +2001,12 @@ async function handleCommand(chatId, userId, userName, text) {
         // Store reverse mapping for notifications (chatId -> userId)
         chatIdToUserId.set(chatId, userId);
         
+        // Set default language for new users (if not already set)
+        if (!userLanguage.has(userId)) {
+            userLanguage.set(userId, 'en'); // Default to English
+            console.log(`🌐 Set default language (English) for new user ${userName} (${userId})`);
+        }
+        
         const isAdmin = isUserAdmin(userName, userId);
         const isAuthorized = isUserAuthorized(userName);
         
