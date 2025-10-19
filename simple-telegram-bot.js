@@ -365,16 +365,24 @@ let dbReady = false;
 
 // Supabase doesn't use the same connection pattern as SQLite
 // Initialize immediately
-setTimeout(async () => {
-    console.log('✅ Supabase database connection established');
-    console.log('📊 Using Supabase PostgreSQL for true persistence');
-    console.log('📊 Data persists across restarts and deployments');
-    console.log('📊 No more ephemeral file system issues!');
-    dbReady = true;
-    
-    // Load bot data from Supabase database (true persistence!)
-    await loadBotData();
-}, 1000); // Give Supabase a moment to initialize
+(async () => {
+    try {
+        console.log('✅ Supabase database connection established');
+        console.log('📊 Using Supabase PostgreSQL for true persistence');
+        console.log('📊 Data persists across restarts and deployments');
+        console.log('📊 No more ephemeral file system issues!');
+        dbReady = true;
+        
+        // Load bot data from Supabase database (true persistence!)
+        await loadBotData();
+        
+        console.log('🎯 Bot initialization complete - ready to receive commands');
+    } catch (error) {
+        console.error('❌ Error during bot initialization:', error);
+        console.log('🔄 Bot will continue with empty state');
+        dbReady = true;
+    }
+})();
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
 // Monthly report tracking
