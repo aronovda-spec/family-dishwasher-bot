@@ -2400,6 +2400,11 @@ async function handleCommand(chatId, userId, userName, text) {
                 // Try to find chat ID for this user
                 let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
+                // If not found in userChatIds, check if this user is an admin
+                if (!userChatId && isUserAdmin(user)) {
+                    userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                }
+                
                 if (userChatId && userChatId !== chatId) {
                     // Get the correct userId for language preference
                     const recipientUserId = getUserIdFromChatId(userChatId);
@@ -2412,7 +2417,7 @@ async function handleCommand(chatId, userId, userName, text) {
                     console.log(`🔔 Sending user DONE notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
                     sendMessage(userChatId, userDoneMessage);
                 } else {
-                    console.log(`🔔 No chat ID found for ${user}`);
+                    console.log(`🔔 No chat ID found for ${user} (admin: ${isUserAdmin(user)})`);
                 }
             });
             
