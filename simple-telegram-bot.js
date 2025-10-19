@@ -1869,27 +1869,34 @@ async function handleCommand(chatId, userId, userName, text) {
                 // Grace period is still active - restore user
                 console.log(`🔄 Grace period restoration for ${userName}: score ${graceData.score}`);
                 
-                // Restore user to all data structures
-                authorizedUsers.add(userName);
-                userScores.set(userName, graceData.score);
-                
-                // Add back to originalQueue if not already there
-                if (!originalQueue.includes(userName)) {
-                    originalQueue.push(userName);
+                // Only restore to queue if user is NOT an admin
+                if (!isAdmin) {
+                    // Restore user to queue data structures
+                    authorizedUsers.add(userName);
+                    userScores.set(userName, graceData.score);
+                    
+                    // Add back to originalQueue if not already there
+                    if (!originalQueue.includes(userName)) {
+                        originalQueue.push(userName);
+                    }
+                    
+                    // Add back to turnOrder
+                    turnOrder.add(userName);
+                    
+                    // Restore queue mappings
+                    userQueueMapping.set(userName, userName);
+                    queueUserMapping.set(userName, userName);
+                    
+                    gracePeriodRestored = true;
+                    console.log(`✅ ${userName} restored from grace period with score ${graceData.score}`);
+                } else {
+                    // Admin in grace period - just restore their score but don't add to queue
+                    userScores.set(userName, graceData.score);
+                    console.log(`✅ Admin ${userName} score restored from grace period: ${graceData.score} (not added to queue)`);
                 }
-                
-                // Add back to turnOrder
-                turnOrder.add(userName);
-                
-                // Restore queue mappings
-                userQueueMapping.set(userName, userName);
-                queueUserMapping.set(userName, userName);
                 
                 // Clear grace period
                 global.gracePeriods.delete(userName);
-                
-                gracePeriodRestored = true;
-                console.log(`✅ ${userName} restored from grace period with score ${graceData.score}`);
                 
                 // Save the restoration
                 await saveBotData();
