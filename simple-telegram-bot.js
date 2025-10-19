@@ -309,10 +309,14 @@ function getNextThreeTurns() {
     return turns;
 }
 
-function incrementUserScore(userName) {
+async function incrementUserScore(userName) {
     const currentScore = userScores.get(userName) || 0;
-    userScores.set(userName, currentScore + 1);
-    console.log(`📊 ${userName} score incremented: ${currentScore} → ${currentScore + 1}`);
+    const newScore = currentScore + 1;
+    userScores.set(userName, newScore);
+    console.log(`📊 ${userName} score incremented: ${currentScore} → ${newScore}`);
+    
+    // Immediately save to database to prevent score mismatch
+    await db.setUserScore(userName, newScore);
     
     // Check if normalization is needed (when scores get too high)
     normalizeScoresIfNeeded();
@@ -2138,7 +2142,7 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             // Increment the score for the user who actually completed the turn (currentUser)
-            incrementUserScore(currentUser);
+            await incrementUserScore(currentUser);
             
             // Clear the assignment if it was assigned
             if (originalUser !== currentUser) {
@@ -2243,7 +2247,7 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             // Increment the score for the user who actually completed the turn (currentUser)
-            incrementUserScore(currentUser);
+            await incrementUserScore(currentUser);
             
             // Clear the assignment if it was assigned
             if (originalUser !== currentUser) {
