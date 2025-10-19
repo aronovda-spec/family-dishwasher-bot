@@ -3619,8 +3619,14 @@ async function handleCallback(chatId, userId, userName, data) {
         // Reset current turn index
         currentTurnIndex = 0;
         
+        // Reset all user scores to 0 (CRITICAL FIX!)
+        defaultOrder.forEach(user => {
+            userScores.set(user, 0);
+        });
+        
         console.log(`🔄 Turn order reset to default: ${defaultOrder.join(' → ')}`);
         console.log(`🔄 OriginalQueue reset to default: [${originalQueue.join(', ')}]`);
+        console.log(`🔄 All user scores reset to 0`);
         
         // Save the changes
         await saveBotData();
@@ -3805,21 +3811,10 @@ async function handleCallback(chatId, userId, userName, data) {
             userScores.set(user, 0);
         });
         
-        // Reset tie-breaker order to default (CRITICAL FIX!)
-        originalQueue.length = 0;
-        originalQueue.push('Eden', 'Adele', 'Emma');
-        
-        // Reset turn order to default
-        turnOrder.clear();
-        ['Eden', 'Adele', 'Emma'].forEach(user => turnOrder.add(user));
-        
-        // Reset current turn index
-        currentTurnIndex = 0;
-        
         // Save to database
         await saveBotData();
         
-        console.log('🔄 All scores reset to 0 and tie-breaker order reset to default');
+        console.log('🔄 All scores reset to 0');
         
         // Track for monthly report
         trackMonthlyAction('queue_reorder', null, userName);
