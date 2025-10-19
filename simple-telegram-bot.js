@@ -431,23 +431,54 @@ function getCurrentMonthKey() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// Helper function for case-insensitive authorization checking
+// Helper function for case-insensitive authorization checking with Hebrew support
 function isUserAuthorized(userName) {
+    // First normalize the input name to first name only
+    const normalizedName = getFirstName(userName);
+    
     // Check if user is authorized (case-insensitive)
     for (const authorizedUser of authorizedUsers) {
-        if (authorizedUser.toLowerCase() === userName.toLowerCase()) {
+        if (authorizedUser.toLowerCase() === normalizedName.toLowerCase()) {
             return true;
         }
     }
+    
+    // Also check if the normalized name matches any Hebrew names
+    for (const [englishName, hebrewName] of Object.entries(hebrewNames)) {
+        if (normalizedName === hebrewName) {
+            // Check if the corresponding English name is authorized
+            for (const authorizedUser of authorizedUsers) {
+                if (authorizedUser.toLowerCase() === englishName.toLowerCase()) {
+                    return true;
+                }
+            }
+        }
+    }
+    
     return false;
 }
 
-// Helper function for case-insensitive admin checking
+// Helper function for case-insensitive admin checking with Hebrew support
 function isUserAdmin(userName, userId = null) {
+    // First normalize the input name to first name only
+    const normalizedName = getFirstName(userName);
+    
     // Check if user is admin (case-insensitive)
     for (const admin of admins) {
-        if (admin.toLowerCase() === userName.toLowerCase()) {
+        if (admin.toLowerCase() === normalizedName.toLowerCase()) {
             return true;
+        }
+    }
+    
+    // Also check if the normalized name matches any Hebrew names
+    for (const [englishName, hebrewName] of Object.entries(hebrewNames)) {
+        if (normalizedName === hebrewName) {
+            // Check if the corresponding English name is an admin
+            for (const admin of admins) {
+                if (admin.toLowerCase() === englishName.toLowerCase()) {
+                    return true;
+                }
+            }
         }
     }
     
@@ -5070,3 +5101,4 @@ function cleanupOldData() {
 }
 
 // Cleanup timer removed - now combined with maintenance timer above
+
