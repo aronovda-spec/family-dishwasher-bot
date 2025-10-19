@@ -2320,16 +2320,15 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             const currentUser = getCurrentTurnUser();
-            const userQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
             
             if (!currentUser) {
                 sendMessage(chatId, t(userId, 'no_one_in_queue'));
                 return;
             }
             
-            // Check if it's actually their turn
-            if (userQueueName !== currentUser) {
-                sendMessage(chatId, `${t(userId, 'not_your_turn')}\n\n${t(userId, 'current_turn_user')} ${addRoyalEmojiTranslated(currentUser, userId)}\n${t(userId, 'your_queue_position')} ${addRoyalEmojiTranslated(userQueueName, userId)}\n\n${t(userId, 'please_wait_turn')}`);
+            // Check if it's actually their turn (compare canonical names directly)
+            if (userName !== currentUser) {
+                sendMessage(chatId, `${t(userId, 'not_your_turn')}\n\n${t(userId, 'current_turn_user')} ${addRoyalEmojiTranslated(currentUser, userId)}\n${t(userId, 'your_queue_position')} ${addRoyalEmojiTranslated(userName, userId)}\n\n${t(userId, 'please_wait_turn')}`);
                 return;
             }
             
@@ -2454,7 +2453,12 @@ async function handleCommand(chatId, userId, userName, text) {
         } else {
             let userList = '👥 **Authorized Users:**\n\n';
             authorizedUsers.forEach(user => {
-                const queueName = userQueueMapping.get(user);
+                // Find the queue name for this user
+                let queueName = userQueueMapping.get(user);
+                if (!queueName) {
+                    // If not found, use the user name directly
+                    queueName = user;
+                }
                 userList += `• ${user} → ${queueName}\n`;
             });
             userList += `\n📝 **Note:** Maximum 3 authorized users allowed.`;
@@ -2790,7 +2794,17 @@ async function applyPunishment(targetUser, reason, appliedBy) {
     
     // Send to all authorized users and admins
     [...authorizedUsers, ...admins].forEach(user => {
-        const userChatId = userQueueMapping.get(user) ? queueUserMapping.get(userQueueMapping.get(user)) : null;
+        // Find the canonical name for this user
+        let canonicalName = user;
+        for (const [canonical, queueName] of userQueueMapping.entries()) {
+            if (queueName === user) {
+                canonicalName = canonical;
+                break;
+            }
+        }
+        
+        // Get chat ID using the canonical name
+        const userChatId = userChatIds.get(canonicalName) || (canonicalName ? userChatIds.get(canonicalName.toLowerCase()) : null);
         if (userChatId) {
             sendMessage(userChatId, message);
         }
@@ -2806,7 +2820,17 @@ function reportUser(targetUser, reason, reportedBy) {
     
     // Send to all admins
     admins.forEach(admin => {
-        const adminChatId = userQueueMapping.get(admin) ? queueUserMapping.get(userQueueMapping.get(admin)) : null;
+        // Find the canonical name for this admin
+        let canonicalName = admin;
+        for (const [canonical, queueName] of userQueueMapping.entries()) {
+            if (queueName === admin) {
+                canonicalName = canonical;
+                break;
+            }
+        }
+        
+        // Get chat ID using the canonical name
+        const adminChatId = userChatIds.get(canonicalName) || (canonicalName ? userChatIds.get(canonicalName.toLowerCase()) : null);
         if (adminChatId) {
             sendMessage(adminChatId, message);
         }
@@ -2850,7 +2874,19 @@ async function executeSwap(swapRequest, requestId, status) {
     console.log(`🔍 User queue mapping:`, userQueueMapping);
     
     // Find queue positions
-        const fromQueueName = userQueueMapping.get(fromUser) || (fromUser ? userQueueMapping.get(fromUser.toLowerCase()) : null);
+    // Since fromUser is canonical ("Adele"), we need to find their queue representation
+    let fromQueueName = null;
+    for (const [canonicalName, queueName] of userQueueMapping.entries()) {
+        if (canonicalName === fromUser) {
+            fromQueueName = queueName;
+            break;
+        }
+    }
+    
+    // Fallback: if not found in mapping, use fromUser directly
+    if (!fromQueueName) {
+        fromQueueName = fromUser;
+    }
     const fromIndex = queue.indexOf(fromQueueName);
     const toIndex = queue.indexOf(toUser);
     
@@ -4030,7 +4066,20 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const currentUserQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
+        // For swap requests, we need to find the user's position in the queue
+        // Since userName is canonical ("Adele"), we need to find their queue representation
+        let currentUserQueueName = null;
+        for (const [canonicalName, queueName] of userQueueMapping.entries()) {
+            if (canonicalName === userName) {
+                currentUserQueueName = queueName;
+                break;
+            }
+        }
+        
+        // Fallback: if not found in mapping, use userName directly
+        if (!currentUserQueueName) {
+            currentUserQueueName = userName;
+        }
         
         // Show all users except the current user (can't swap with yourself)
         const uniqueUsers = [...new Set(queue)];
@@ -4044,7 +4093,21 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('swap_request_')) {
         const targetUser = data ? data.replace('swap_request_', '') : '';
-        const currentUserQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
+        
+        // For swap requests, we need to find the user's position in the queue
+        // Since userName is canonical ("Adele"), we need to find their queue representation
+        let currentUserQueueName = null;
+        for (const [canonicalName, queueName] of userQueueMapping.entries()) {
+            if (canonicalName === userName) {
+                currentUserQueueName = queueName;
+                break;
+            }
+        }
+        
+        // Fallback: if not found in mapping, use userName directly
+        if (!currentUserQueueName) {
+            currentUserQueueName = userName;
+        }
         
         if (!currentUserQueueName) {
             sendMessage(chatId, t(userId, 'error_queue_position'));
@@ -4358,7 +4421,20 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const currentUserQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
+        // For punishment requests, we need to find the user's position in the queue
+        // Since userName is canonical ("Adele"), we need to find their queue representation
+        let currentUserQueueName = null;
+        for (const [canonicalName, queueName] of userQueueMapping.entries()) {
+            if (canonicalName === userName) {
+                currentUserQueueName = queueName;
+                break;
+            }
+        }
+        
+        // Fallback: if not found in mapping, use userName directly
+        if (!currentUserQueueName) {
+            currentUserQueueName = userName;
+        }
         const availableUsers = queue.filter(name => name !== currentUserQueueName);
         
         if (availableUsers.length === 0) {
