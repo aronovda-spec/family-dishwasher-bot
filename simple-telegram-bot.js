@@ -74,12 +74,18 @@ async function saveBotData() {
                 userScores: Object.fromEntries(userScores)
             };
             
-            // ALSO save to file backup for Render persistence
+            // ALSO save to environment variable for Render persistence
             try {
-                const fs = require('fs');
-                const backupPath = '/tmp/bot_data_backup.json';
-                fs.writeFileSync(backupPath, JSON.stringify(global.botDataBackup, null, 2));
-                console.log(`💾 Bot data saved to SQLite, global backup, and file backup for Render persistence`);
+                const backupData = JSON.stringify(global.botDataBackup);
+                // Save to multiple environment variables to avoid size limits
+                process.env.BOT_DATA_BACKUP_1 = backupData.substring(0, 10000);
+                if (backupData.length > 10000) {
+                    process.env.BOT_DATA_BACKUP_2 = backupData.substring(10000, 20000);
+                }
+                if (backupData.length > 20000) {
+                    process.env.BOT_DATA_BACKUP_3 = backupData.substring(20000);
+                }
+                console.log(`💾 Bot data saved to SQLite, global backup, and environment variables for Render persistence`);
             } catch (error) {
                 console.log(`💾 Bot data saved to SQLite and global backup for Render persistence`);
             }
@@ -487,10 +493,18 @@ db.db.on('open', () => {
         console.log('🔄 Running on Render - loading from global backup');
         console.log(`🔄 Global backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
         loadFromGlobalBackup();
-    } else if (isRender && process.env.BOT_DATA_BACKUP) {
+    } else if (isRender && (process.env.BOT_DATA_BACKUP_1 || process.env.BOT_DATA_BACKUP)) {
         console.log('🔄 Running on Render - loading from environment variable backup');
         try {
-            global.botDataBackup = JSON.parse(process.env.BOT_DATA_BACKUP);
+            let backupData = '';
+            if (process.env.BOT_DATA_BACKUP) {
+                backupData = process.env.BOT_DATA_BACKUP;
+            } else {
+                backupData = process.env.BOT_DATA_BACKUP_1 || '';
+                if (process.env.BOT_DATA_BACKUP_2) backupData += process.env.BOT_DATA_BACKUP_2;
+                if (process.env.BOT_DATA_BACKUP_3) backupData += process.env.BOT_DATA_BACKUP_3;
+            }
+            global.botDataBackup = JSON.parse(backupData);
             console.log(`🔄 Environment backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
             loadFromGlobalBackup();
         } catch (error) {
@@ -2351,6 +2365,107 @@ async function handleCommand(chatId, userId, userName, text) {
             });
             userList += `\n📝 **Note:** Maximum 3 authorized users allowed.`;
             sendMessage(chatId, userList);
+        }
+        
+    } else if (command === '/backup') {
+        // Manual backup command for admins
+        if (!isUserAdmin(userName, userId)) {
+            sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
+            return;
+        }
+        
+        try {
+            const backupData = {
+                timestamp: Date.now(),
+                authorizedUsers: Array.from(authorizedUsers),
+                admins: Array.from(admins),
+                userChatIds: Object.fromEntries(userChatIds),
+                adminChatIds: Array.from(adminChatIds),
+                turnOrder: Array.from(turnOrder),
+                currentTurnIndex: currentTurnIndex,
+                userQueueMapping: Object.fromEntries(userQueueMapping),
+                queueUserMapping: Object.fromEntries(queueUserMapping),
+                suspendedUsers: Object.fromEntries(suspendedUsers),
+                turnAssignments: Object.fromEntries(turnAssignments),
+                monthlyStats: Object.fromEntries(monthlyStats),
+                userScores: Object.fromEntries(userScores)
+            };
+            
+            const backupString = JSON.stringify(backupData, null, 2);
+            sendMessage(chatId, `📋 **BACKUP DATA**\n\n\`\`\`json\n${backupString}\n\`\`\`\n\n💾 **Save this data!** You can restore it later with /restore`);
+            
+        } catch (error) {
+            sendMessage(chatId, `❌ Error creating backup: ${error.message}`);
+        }
+        
+    } else if (command.startsWith('/restore ')) {
+        // Manual restore command for admins
+        if (!isUserAdmin(userName, userId)) {
+            sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
+            return;
+        }
+        
+        try {
+            const backupString = command.replace('/restore ', '').trim();
+            const backupData = JSON.parse(backupString);
+            
+            // Restore data
+            authorizedUsers.clear();
+            backupData.authorizedUsers.forEach(user => authorizedUsers.add(user));
+            
+            admins.clear();
+            backupData.admins.forEach(admin => admins.add(admin));
+            
+            userChatIds.clear();
+            Object.entries(backupData.userChatIds).forEach(([key, value]) => {
+                userChatIds.set(key, value);
+            });
+            
+            adminChatIds.clear();
+            backupData.adminChatIds.forEach(chatId => adminChatIds.add(chatId));
+            
+            turnOrder.clear();
+            backupData.turnOrder.forEach(user => turnOrder.add(user));
+            
+            currentTurnIndex = backupData.currentTurnIndex;
+            
+            userQueueMapping.clear();
+            Object.entries(backupData.userQueueMapping).forEach(([key, value]) => {
+                userQueueMapping.set(key, value);
+            });
+            
+            queueUserMapping.clear();
+            Object.entries(backupData.queueUserMapping).forEach(([key, value]) => {
+                queueUserMapping.set(key, value);
+            });
+            
+            suspendedUsers.clear();
+            Object.entries(backupData.suspendedUsers).forEach(([key, value]) => {
+                suspendedUsers.set(key, value);
+            });
+            
+            turnAssignments.clear();
+            Object.entries(backupData.turnAssignments).forEach(([key, value]) => {
+                turnAssignments.set(key, value);
+            });
+            
+            monthlyStats.clear();
+            Object.entries(backupData.monthlyStats).forEach(([key, value]) => {
+                monthlyStats.set(key, value);
+            });
+            
+            userScores.clear();
+            Object.entries(backupData.userScores).forEach(([key, value]) => {
+                userScores.set(key, value);
+            });
+            
+            // Save to database
+            await saveBotData();
+            
+            sendMessage(chatId, `✅ **Data restored successfully!**\n\n👥 Users: ${authorizedUsers.size}\n👨‍💼 Admins: ${admins.size}\n📊 Scores: ${Object.fromEntries(userScores)}`);
+            
+        } catch (error) {
+            sendMessage(chatId, `❌ Error restoring backup: ${error.message}`);
         }
         
     } else if (command.startsWith('/addadmin ')) {
