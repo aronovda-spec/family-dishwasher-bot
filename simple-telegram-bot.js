@@ -3375,6 +3375,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Add chat IDs from authorized users who are admins
         [...authorizedUsers, ...admins].forEach(user => {
             let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+            
+            // If not found in userChatIds, check if this user is an admin
+            if (!userChatId && isUserAdmin(user)) {
+                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+            }
+            
             if (userChatId) {
                 chatIdsToNotify.add(userChatId);
             }
@@ -3462,6 +3468,12 @@ async function handleCallback(chatId, userId, userName, data) {
                 // Send dishwasher alert to all authorized users and admins
                 [...authorizedUsers, ...admins].forEach(user => {
                     let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                    
+                    // If not found in userChatIds, check if this user is an admin
+                    if (!userChatId && isUserAdmin(user)) {
+                        userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                    }
+                    
                     if (userChatId) {
                         // Get the correct userId for language preference
                         const recipientUserId = getUserIdFromChatId(userChatId);
@@ -4535,6 +4547,11 @@ async function handleCallback(chatId, userId, userName, data) {
             [...authorizedUsers, ...admins].forEach(user => {
                 let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
+                // If not found in userChatIds, check if this user is an admin
+                if (!userChatId && isUserAdmin(user)) {
+                    userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                }
+                
                 if (userChatId && userChatId !== chatId) {
                     // Get the correct userId for language preference
                     const recipientUserId = getUserIdFromChatId(userChatId);
@@ -5138,7 +5155,12 @@ function broadcastAnnouncement(announcementText, fromAdmin) {
     
     // Send to all authorized users and admins
     [...authorizedUsers, ...admins].forEach(user => {
-        const userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+        let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+        
+        // If not found in userChatIds, check if this user is an admin
+        if (!userChatId && isUserAdmin(user)) {
+            userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+        }
         
         if (userChatId) {
             // Get the correct userId for language preference
@@ -5169,7 +5191,12 @@ function broadcastMessage(messageText, fromUser, isAnnouncement = false) {
             return; // Don't send to sender
         }
         
-        const userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+        let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+        
+        // If not found in userChatIds, check if this user is an admin
+        if (!userChatId && isUserAdmin(user)) {
+            userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+        }
         
         if (userChatId) {
             // Get the correct userId for language preference
