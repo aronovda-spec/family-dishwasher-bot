@@ -28,6 +28,7 @@ async function saveBotData() {
         await db.saveBotState('admins', Array.from(admins));
         await db.saveBotState('userChatIds', Object.fromEntries(userChatIds));
         await db.saveBotState('adminChatIds', Array.from(adminChatIds));
+        await db.saveBotState('adminNameToChatId', Object.fromEntries(adminNameToChatId));
         await db.saveBotState('turnOrder', Array.from(turnOrder));
         await db.saveBotState('currentTurnIndex', currentTurnIndex);
         
@@ -114,6 +115,13 @@ async function loadBotData() {
         
         adminChatIds.clear();
         adminChatIdsData.forEach(chatId => adminChatIds.add(chatId));
+        
+        // Load admin name to chat ID mapping
+        const adminNameToChatIdData = await db.getBotState('adminNameToChatId') || {};
+        adminNameToChatId.clear();
+        Object.entries(adminNameToChatIdData).forEach(([key, value]) => {
+            adminNameToChatId.set(key, value);
+        });
         
         turnOrder.clear();
         turnOrderData.forEach(user => turnOrder.add(user));
@@ -325,7 +333,8 @@ function getRelativeScores() {
 
 // User management
 const admins = new Set(); // Set of admin user IDs
-const adminChatIds = new Set(); // Set of admin chat IDs for notifications
+const adminChatIds = new Set(); // Set of admin chat IDs
+const adminNameToChatId = new Map(); // Map: Admin name -> Chat ID for notifications
 const authorizedUsers = new Set(); // Set of authorized user IDs (max 3)
 const turnOrder = new Set(); // Set of users in turn order
 const userChatIds = new Map(); // Map: userName -> chatId for notifications
@@ -1802,7 +1811,9 @@ async function handleCommand(chatId, userId, userName, text) {
         // If this user is an admin, store their chat ID for admin notifications
         if (isAdmin) {
             adminChatIds.add(chatId);
-            console.log(`👨‍💼 Admin ${userName} (${userId}) chat ID ${chatId} added to adminChatIds`);
+            adminNameToChatId.set(userName, chatId);
+            adminNameToChatId.set(userName.toLowerCase(), chatId);
+            console.log(`👨‍💼 Admin ${userName} (${userId}) chat ID ${chatId} added to adminChatIds and adminNameToChatId`);
         }
         
         let text = `Dishwasher Bot Menu`;
@@ -2029,6 +2040,11 @@ async function handleCommand(chatId, userId, userName, text) {
                 // Try to find chat ID for this user
                 let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
                 
+                // If not found in userChatIds, check if this user is an admin
+                if (!userChatId && isUserAdmin(user)) {
+                    userChatId = adminNameToChatId.get(user) || adminNameToChatId.get(user.toLowerCase());
+                }
+                
                 if (userChatId && userChatId !== chatId) {
                     // Create message in recipient's language
                     const userDoneMessage = `${t(userChatId, 'admin_intervention')}\n\n` +
@@ -2040,7 +2056,7 @@ async function handleCommand(chatId, userId, userName, text) {
                     console.log(`🔔 Sending admin DONE notification to ${user} (${userChatId})`);
                     sendMessage(userChatId, userDoneMessage);
                 } else {
-                    console.log(`🔔 No chat ID found for ${user}`);
+                    console.log(`🔔 No chat ID found for ${user} (admin: ${isUserAdmin(user)})`);
                 }
             });
             
