@@ -1,5 +1,5 @@
 services:
-  # Fixed deployment command - use npm script instead of direct node command
+  # Super2-style deployment - simple single process like stable Python bot
   - type: web
     name: dishwasher-bot
     env: node
