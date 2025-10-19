@@ -60,6 +60,12 @@ async function saveBotData() {
 }
 
 async function loadBotData() {
+    // Wait for database to be ready
+    while (!dbReady) {
+        console.log('⏳ Waiting for database connection...');
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
     try {
         // Load core bot state
         const authorizedUsersData = await db.getBotState('authorizedUsers') || [];
@@ -316,6 +322,13 @@ const queueStatistics = new Map(); // userName -> { totalCompletions: number, mo
 // Initialize database after global variables are declared
 db = new Database();
 console.log('📊 SQLite database initialized for persistence');
+
+// Wait for database to be ready before proceeding
+let dbReady = false;
+db.db.on('open', () => {
+    console.log('✅ Database connection established');
+    dbReady = true;
+});
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
 // Monthly report tracking
