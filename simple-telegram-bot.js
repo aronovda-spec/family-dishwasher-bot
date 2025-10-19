@@ -3692,6 +3692,9 @@ async function handleCallback(chatId, userId, userName, data) {
         
         const success = suspendUser(selectedUser, days);
         if (success) {
+            // Save to database
+            await saveBotData();
+            
             const durationText = days === 1 ? t(userId, 'duration_1_day').replace('1️⃣ ', '') :
                                days === 3 ? t(userId, 'duration_3_days').replace('3️⃣ ', '') :
                                days === 7 ? t(userId, 'duration_7_days').replace('7️⃣ ', '') :
@@ -3718,6 +3721,9 @@ async function handleCallback(chatId, userId, userName, data) {
         const selectedUser = data.replace('reactivate_', '');
         const success = reactivateUser(selectedUser);
         if (success) {
+            // Save to database
+            await saveBotData();
+            
             sendMessage(chatId, t(userId, 'user_reactivated', {user: addRoyalEmoji(selectedUser)}));
         } else {
             sendMessage(chatId, `❌ Failed to reactivate ${addRoyalEmoji(selectedUser)}`);
@@ -3777,6 +3783,9 @@ async function handleCallback(chatId, userId, userName, data) {
             userScores.set(user, 0);
         });
         
+        // Save to database
+        await saveBotData();
+        
         console.log('🔄 All scores reset to 0');
         
         // Track for monthly report
@@ -3814,6 +3823,9 @@ async function handleCallback(chatId, userId, userName, data) {
         const oldScore = userScores.get(selectedUser) || 0;
         
         userScores.set(selectedUser, 0);
+        
+        // Save to database
+        await saveBotData();
         
         console.log(`🔄 ${selectedUser} score reset: ${oldScore} → 0`);
         
