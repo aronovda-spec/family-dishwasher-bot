@@ -1847,6 +1847,46 @@ async function handleCommand(chatId, userId, userName, text) {
         const isAdmin = isUserAdmin(userName, userId);
         const isAuthorized = isUserAuthorized(userName);
         
+        // Check if user is in grace period (CRITICAL FIX!)
+        let gracePeriodRestored = false;
+        if (global.gracePeriods && global.gracePeriods.has(userName)) {
+            const graceData = global.gracePeriods.get(userName);
+            const now = Date.now();
+            
+            if (now < graceData.endTime) {
+                // Grace period is still active - restore user
+                console.log(`🔄 Grace period restoration for ${userName}: score ${graceData.score}`);
+                
+                // Restore user to all data structures
+                authorizedUsers.add(userName);
+                userScores.set(userName, graceData.score);
+                
+                // Add back to originalQueue if not already there
+                if (!originalQueue.includes(userName)) {
+                    originalQueue.push(userName);
+                }
+                
+                // Add back to turnOrder
+                turnOrder.add(userName);
+                
+                // Restore queue mappings
+                userQueueMapping.set(userName, userName);
+                queueUserMapping.set(userName, userName);
+                
+                // Clear grace period
+                global.gracePeriods.delete(userName);
+                
+                gracePeriodRestored = true;
+                console.log(`✅ ${userName} restored from grace period with score ${graceData.score}`);
+                
+                // Save the restoration
+                await saveBotData();
+            } else {
+                // Grace period expired - clean up
+                global.gracePeriods.delete(userName);
+                console.log(`⏰ Grace period expired for ${userName} - treating as new user`);
+            }
+        }
         
         // If this user is an admin, store their chat ID for admin notifications
         if (isAdmin) {
@@ -1858,6 +1898,11 @@ async function handleCommand(chatId, userId, userName, text) {
         
         let text = `Dishwasher Bot Menu`;
         let buttons = [];
+        
+        // Show grace period restoration message if applicable
+        if (gracePeriodRestored) {
+            text += `\n\n✅ **Welcome back!** Your score has been restored from grace period.`;
+        }
         
         if (isAdmin) {
             text += t(userId, 'admin_menu');
