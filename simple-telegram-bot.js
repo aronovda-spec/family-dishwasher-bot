@@ -71,12 +71,6 @@ async function saveBotData() {
 // Supabase persistence - no complex backup functions needed
 
 async function loadBotData() {
-    // Wait for database to be ready
-    while (!dbReady) {
-        console.log('⏳ Waiting for database connection...');
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
     try {
         // Load core bot state
         const authorizedUsersData = await db.getBotState('authorizedUsers') || [];
