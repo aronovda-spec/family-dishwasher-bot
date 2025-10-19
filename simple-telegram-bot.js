@@ -1981,7 +1981,7 @@ async function handleCommand(chatId, userId, userName, text) {
         // Store chat ID for this user (for notifications)
         userChatIds.set(userName, chatId);
         if (userName) {
-            userChatIds.set(userName.toLowerCase(), chatId);
+        userChatIds.set(userName.toLowerCase(), chatId);
         }
         
         // Store reverse mapping for notifications (chatId -> userId)
@@ -2431,16 +2431,35 @@ async function handleCommand(chatId, userId, userName, text) {
         if (admins.size === 0) {
             sendMessage(chatId, t(userId, 'no_admins_set'));
         } else {
-            const adminList = Array.from(admins).map((admin, index) => {
+            let adminList = '👑 **Current Admins:**\n\n';
+            let activeCount = 0;
+            let totalCount = admins.size;
+            
+            Array.from(admins).forEach((admin, index) => {
                 // Check if it's a numeric ID or username
                 if (/^\d+$/.test(admin)) {
-                    return `• User ID: ${admin}`;
+                    // For numeric IDs, check if they're active by looking in adminNameToChatId
+                    const isActive = adminNameToChatId.has(admin.toString());
+                    if (isActive) {
+                        activeCount++;
+                        adminList += `• ✅ User ID: ${admin} → ${admin} → ${admin} (Active)\n`;
+                    } else {
+                        adminList += `• ⏳ User ID: ${admin} → ${admin} (Needs /start)\n`;
+                    }
                 } else {
-                    // Use emoji function for proper display
-                    return `• ${addRoyalEmojiTranslated(admin, userId)}`;
+                    // For usernames, check if they're active
+                    const isActive = adminNameToChatId.has(admin) || (admin ? adminNameToChatId.has(admin.toLowerCase()) : false);
+                    if (isActive) {
+                        activeCount++;
+                        adminList += `• ✅ ${addRoyalEmojiTranslated(admin, userId)} → ${admin} → ${admin} (Active)\n`;
+                    } else {
+                        adminList += `• ⏳ ${addRoyalEmojiTranslated(admin, userId)} → ${admin} (Needs /start)\n`;
+                    }
                 }
-            }).join('\n');
-            sendMessage(chatId, t(userId, 'current_admins', {adminList: adminList, count: admins.size}));
+            });
+            
+            adminList += `\n📊 **Status:** ${activeCount}/${totalCount} Active (${totalCount - activeCount} needs /start)`;
+            sendMessage(chatId, adminList);
         }
         
     } else if (command === '/users' || command === 'users') {
@@ -2451,16 +2470,23 @@ async function handleCommand(chatId, userId, userName, text) {
                 Emma: translateName('Emma', userId)
             }));
         } else {
-            let userList = '👥 **Authorized Users:**\n\n';
+            let userList = '👥 **Authorized and Active Users:**\n\n';
+            let activeCount = 0;
+            let totalCount = authorizedUsers.size;
+            
             authorizedUsers.forEach(user => {
-                // Find the queue name for this user
-                let queueName = userQueueMapping.get(user);
-                if (!queueName) {
-                    // If not found, use the user name directly
-                    queueName = user;
+                // Check if user is active (has pressed /start)
+                const isActive = userChatIds.has(user) || (user ? userChatIds.has(user.toLowerCase()) : false);
+                
+                if (isActive) {
+                    activeCount++;
+                    userList += `• ✅ ${user} → ${user} → ${user} (Active)\n`;
+                } else {
+                    userList += `• ⏳ ${user} → ${user} (Needs /start)\n`;
                 }
-                userList += `• ${user} → ${queueName}\n`;
             });
+            
+            userList += `\n📊 **Status:** ${activeCount}/${totalCount} Active (${totalCount - activeCount} needs /start)`;
             userList += `\n📝 **Note:** Maximum 3 authorized users allowed.`;
             sendMessage(chatId, userList);
         }
