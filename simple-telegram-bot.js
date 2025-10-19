@@ -31,6 +31,7 @@ async function saveBotData() {
         await db.saveBotState('adminNameToChatId', Object.fromEntries(adminNameToChatId));
         await db.saveBotState('turnOrder', Array.from(turnOrder));
         await db.saveBotState('currentTurnIndex', currentTurnIndex);
+        await db.saveBotState('originalQueue', originalQueue); // CRITICAL: Save originalQueue array
         
         // Save additional state
         await db.saveBotState('suspendedUsers', Object.fromEntries(suspendedUsers));
@@ -80,6 +81,7 @@ async function loadBotData() {
         const adminChatIdsData = await db.getBotState('adminChatIds') || [];
         const turnOrderData = await db.getBotState('turnOrder') || [];
         const currentTurnIndexData = await db.getBotState('currentTurnIndex') || 0;
+        const originalQueueData = await db.getBotState('originalQueue') || ['Eden', 'Adele', 'Emma']; // Default fallback
         
         // Load additional state
         const suspendedUsersData = await db.getBotState('suspendedUsers') || {};
@@ -124,6 +126,11 @@ async function loadBotData() {
         
         turnOrder.clear();
         turnOrderData.forEach(user => turnOrder.add(user));
+        
+        // Restore originalQueue array (CRITICAL FIX!)
+        originalQueue.length = 0;
+        originalQueue.push(...originalQueueData);
+        console.log(`🔄 Restored originalQueue: [${originalQueue.join(', ')}]`);
         
         userScores.clear();
         Object.entries(userScoresData).forEach(([key, value]) => {
@@ -2348,6 +2355,13 @@ async function handleCommand(chatId, userId, userName, text) {
         // Remove from turn assignments
         turnAssignments.delete(actualUserName);
         
+        // Remove from originalQueue array (CRITICAL FIX!)
+        const queueIndex = originalQueue.indexOf(actualUserName);
+        if (queueIndex !== -1) {
+            originalQueue.splice(queueIndex, 1);
+            console.log(`🗑️ Removed ${actualUserName} from originalQueue at index ${queueIndex}`);
+        }
+        
         // Remove from database directly
         await db.removeUser(actualUserName);
         
@@ -2382,6 +2396,13 @@ async function handleCommand(chatId, userId, userName, text) {
             turnOrder.delete(userName.toLowerCase());
             userScores.delete(userName);
             userScores.delete(userName.toLowerCase());
+            
+            // Remove from originalQueue array (CRITICAL FIX!)
+            const queueIndex = originalQueue.indexOf(userName);
+            if (queueIndex !== -1) {
+                originalQueue.splice(queueIndex, 1);
+                console.log(`🗑️ Removed ${userName} from originalQueue at index ${queueIndex} (self-removal)`);
+            }
             
             // Save bot data after self-removal
             await saveBotData();
@@ -2781,6 +2802,13 @@ async function handleCallback(chatId, userId, userName, data) {
         // Remove from turn assignments
         turnAssignments.delete(actualUserName);
         
+        // Remove from originalQueue array (CRITICAL FIX!)
+        const queueIndex = originalQueue.indexOf(actualUserName);
+        if (queueIndex !== -1) {
+            originalQueue.splice(queueIndex, 1);
+            console.log(`🗑️ Removed ${actualUserName} from originalQueue at index ${queueIndex}`);
+        }
+        
         // Remove from database directly
         await db.removeUser(actualUserName);
         
@@ -2909,6 +2937,13 @@ async function handleCallback(chatId, userId, userName, data) {
         turnOrder.delete(userName.toLowerCase());
         userScores.delete(userName);
         userScores.delete(userName.toLowerCase());
+        
+        // Remove from originalQueue array (CRITICAL FIX!)
+        const queueIndex = originalQueue.indexOf(userName);
+        if (queueIndex !== -1) {
+            originalQueue.splice(queueIndex, 1);
+            console.log(`🗑️ Removed ${userName} from originalQueue at index ${queueIndex} (grace period leave)`);
+        }
         
         // If user is admin, remove admin privileges
         const isAdmin = isUserAdmin(userName, userId);
