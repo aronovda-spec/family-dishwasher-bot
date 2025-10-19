@@ -3510,8 +3510,8 @@ async function handleCallback(chatId, userId, userName, data) {
         
     // Queue Management Handlers
     } else if (data === 'reorder_queue_menu') {
-        // Show current turn order and options to change it (only authorized users)
-        const currentOrder = Array.from(authorizedUsers).map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
+        // Show current turn order and options to change it (show originalQueue for tie-breaker priority)
+        const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
         const message = t(userId, 'reorder_tie_breaker_priority', {currentOrder: currentOrder});
         
         // DEBUG: Log translation values
@@ -3610,8 +3610,8 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'reorder_view_current') {
         console.log(`🔍 DEBUG: reorder_view_current handler triggered by ${userName}`);
-        // Show current turn order (only authorized users)
-        const currentOrder = Array.from(authorizedUsers).map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
+        // Show current tie-breaker priority order (show originalQueue)
+        const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
         const message = t(userId, 'current_tie_breaker_priority_order', {currentOrder: currentOrder});
         
         sendMessage(chatId, message);
