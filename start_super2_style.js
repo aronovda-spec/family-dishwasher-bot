@@ -1,25 +1,30 @@
 #!/usr/bin/env node
 /**
- * Simple startup script like Super2 - direct and stable
- * Runs the bot directly in main process with health endpoint
+ * Ultra-simple startup script like Super2 - no external dependencies
+ * Runs the bot directly in main process with built-in health endpoint
  */
 
-const express = require('express');
-const app = express();
+const http = require('http');
 const PORT = process.env.HEALTH_PORT || 8000;
 
-// Simple health endpoint (like Super2)
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'dishwasher-bot',
-        version: '1.0.0'
-    });
+// Simple health endpoint (like Super2) - no express needed
+const server = http.createServer((req, res) => {
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            service: 'dishwasher-bot',
+            version: '1.0.0'
+        }));
+    } else {
+        res.writeHead(404);
+        res.end('Not Found');
+    }
 });
 
 // Start health server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`🏥 Health check server running on port ${PORT}`);
 });
 
@@ -31,12 +36,16 @@ console.log('🌐 Service type: Web Service (direct process)');
 // Set up graceful shutdown handlers
 process.on('SIGTERM', () => {
     console.log('🛑 Received SIGTERM, shutting down gracefully...');
-    process.exit(0);
+    server.close(() => {
+        process.exit(0);
+    });
 });
 
 process.on('SIGINT', () => {
     console.log('🛑 Received SIGINT, shutting down gracefully...');
-    process.exit(0);
+    server.close(() => {
+        process.exit(0);
+    });
 });
 
 process.on('uncaughtException', (error) => {
