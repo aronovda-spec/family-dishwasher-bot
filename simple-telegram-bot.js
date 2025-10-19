@@ -343,12 +343,22 @@ function applyPunishment(userName) {
 }
 
 function getRelativeScores() {
-    // Calculate relative scores (score - minimum score)
-    const scores = Array.from(userScores.values());
-    const minScore = Math.min(...scores);
+    // Calculate relative scores (score - minimum score) for authorized users only
+    const authorizedScores = [];
+    for (const user of authorizedUsers) {
+        const score = userScores.get(user) || 0;
+        authorizedScores.push(score);
+    }
+    
+    if (authorizedScores.length === 0) {
+        return new Map();
+    }
+    
+    const minScore = Math.min(...authorizedScores);
     
     const relativeScores = new Map();
-    for (const [user, score] of userScores.entries()) {
+    for (const user of authorizedUsers) {
+        const score = userScores.get(user) || 0;
         relativeScores.set(user, score - minScore);
     }
     
@@ -2156,7 +2166,7 @@ async function handleCommand(chatId, userId, userName, text) {
             
         } else {
             // Regular user "Done" - Check if user is authorized
-            if (!authorizedUsers.has(userName) && !authorizedUsers.has(userName.toLowerCase())) {
+            if (!isUserAuthorized(userName)) {
                 sendMessage(chatId, t(userId, 'not_authorized_queue_commands', {user: userName}));
                 return;
             }
@@ -2466,7 +2476,7 @@ async function handleCommand(chatId, userId, userName, text) {
         // Allow users to remove themselves
         const userName = getUserName(userId);
         
-        if (authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase())) {
+        if (isUserAuthorized(userName)) {
             // Remove user from all data structures
             authorizedUsers.delete(userName);
             authorizedUsers.delete(userName.toLowerCase());
