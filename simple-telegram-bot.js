@@ -1687,6 +1687,9 @@ function getFirstName(fullName) {
     // Split by space and take first part
     const firstName = fullName.split(' ')[0];
     
+    // Safety check for empty firstName
+    if (!firstName) return '';
+    
     // Capitalize first letter, lowercase the rest
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
 }
@@ -1897,7 +1900,7 @@ function sendMessageWithButtons(chatId, text, buttons) {
 
 // Handle commands
 async function handleCommand(chatId, userId, userName, text) {
-    const command = text.toLowerCase().trim();
+    const command = (text || '').toLowerCase().trim();
     
     console.log(`🔍 Processing: "${command}" from ${userName}`);
     
@@ -2298,13 +2301,13 @@ async function handleCommand(chatId, userId, userName, text) {
             
         } else {
             // Regular user "Done" - Check if user is authorized
-            if (!isUserAuthorized(userName)) {
-                sendMessage(chatId, t(userId, 'not_authorized_queue_commands', {user: userName}));
+            if (!userName || !isUserAuthorized(userName)) {
+                sendMessage(chatId, t(userId, 'not_authorized_queue_commands', {user: userName || 'Unknown'}));
                 return;
             }
             
             const currentUser = getCurrentTurnUser();
-            const userQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
+            const userQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
             
             if (!currentUser) {
                 sendMessage(chatId, t(userId, 'no_one_in_queue'));
@@ -4645,6 +4648,13 @@ async function getUpdates(offset = 0) {
                             const fullName = (update.callback_query.from.first_name || '') + 
                                 (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '') || 'Unknown User';
                             const userName = getFirstName(fullName); // Use first name only
+                            
+                            // Safety check for userName
+                            if (!userName) {
+                                console.log(`❌ Error: userName is undefined for callback query from userId ${userId}`);
+                                continue;
+                            }
+                            
                             const data = update.callback_query.data;
                             
                             // Button click deduplication: prevent rapid multiple clicks on same button
