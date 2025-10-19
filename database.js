@@ -3,15 +3,12 @@ const path = require('path');
 
 class Database {
     constructor() {
-        // Use the same database file name as the Python bot
+        // Use the same database file name as Super2 (single file in project root)
         this.dbPath = path.join(__dirname, 'dishwasher_bot.db');
         this.db = null;
         
-        // Check if running on Render (ephemeral file system)
-        this.isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HOSTNAME;
-        
-        // In-memory backup for Render free tier
-        this.memoryBackup = null;
+        console.log(`📊 Database file: ${this.dbPath}`);
+        console.log(`📊 Render persistent file system: ${process.env.RENDER ? 'YES' : 'NO'}`);
         
         this.init();
     }

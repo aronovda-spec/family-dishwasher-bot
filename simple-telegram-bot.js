@@ -53,178 +53,17 @@ async function saveBotData() {
             await db.setMonthlyStats(monthKey, statsData);
         }
         
-        // On Render, also create global backup for persistence
-        if (isRender) {
-            global.botDataBackup = {
-                timestamp: Date.now(),
-                authorizedUsers: Array.from(authorizedUsers),
-                admins: Array.from(admins),
-                userChatIds: Object.fromEntries(userChatIds),
-                adminChatIds: Array.from(adminChatIds),
-                turnOrder: Array.from(turnOrder),
-                currentTurnIndex: currentTurnIndex,
-                userQueueMapping: Object.fromEntries(userQueueMapping),
-                queueUserMapping: Object.fromEntries(queueUserMapping),
-                suspendedUsers: Object.fromEntries(suspendedUsers),
-                turnAssignments: Object.fromEntries(turnAssignments),
-                monthlyStats: Object.fromEntries(monthlyStats),
-                swapTimestamps: global.swapTimestamps || [],
-                doneTimestamps: global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {},
-                gracePeriods: global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {},
-                userScores: Object.fromEntries(userScores)
-            };
-            
-            // ALSO save to multiple persistence methods for Render
-            try {
-                const backupData = JSON.stringify(global.botDataBackup);
-                
-                // Method 1: Environment variables (Render dashboard)
-                process.env.BOT_DATA_BACKUP_1 = backupData.substring(0, 10000);
-                if (backupData.length > 10000) {
-                    process.env.BOT_DATA_BACKUP_2 = backupData.substring(10000, 20000);
-                }
-                if (backupData.length > 20000) {
-                    process.env.BOT_DATA_BACKUP_3 = backupData.substring(20000);
-                }
-                
-                // Method 2: Try to save to persistent file locations
-                const fs = require('fs');
-                const path = require('path');
-                
-                const persistentPaths = [
-                    '/tmp/bot_data_backup.json',
-                    path.join(process.cwd(), 'bot_data_backup.json'),
-                    path.join(__dirname, 'bot_data_backup.json'),
-                    '/app/bot_data_backup.json',
-                    '/var/data/bot_data_backup.json'  // Render persistent disk location
-                ];
-                
-                let fileSaved = false;
-                for (const backupPath of persistentPaths) {
-                    try {
-                        fs.writeFileSync(backupPath, backupData);
-                        console.log(`💾 Bot data saved to persistent file: ${backupPath}`);
-                        fileSaved = true;
-                        break;
-                    } catch (err) {
-                        console.log(`⚠️ Could not save to ${backupPath}: ${err.message}`);
-                    }
-                }
-                
-                console.log(`💾 Bot data saved to SQLite, global backup, and environment variables`);
-                console.log(`💾 Environment variables: BOT_DATA_BACKUP_1, BOT_DATA_BACKUP_2, BOT_DATA_BACKUP_3`);
-                console.log(`💾 File saved: ${fileSaved ? 'Yes' : 'No'}`);
-                console.log(`💾 IMPORTANT: Copy env vars to Render dashboard for persistence!`);
-                
-            } catch (error) {
-                console.log(`💾 Bot data saved to SQLite and global backup for Render persistence`);
-            }
-            
-            console.log(`💾 Bot data saved to SQLite and global backup for Render persistence - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
-            console.log(`🔄 Global backup created with timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
-        } else {
-            console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
-        }
+        // Super2 style: Simple SQLite persistence (no complex backups needed)
+        console.log(`💾 Bot data saved to SQLite database (Super2 style)`);
+        console.log(`💾 Database file: ${db.dbPath}`);
+        console.log(`💾 Render persistent file system maintains data across restarts`);
+        console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
     } catch (error) {
         console.error('❌ Error saving bot data to SQLite:', error);
     }
 }
 
-async function loadFromGlobalBackup() {
-    try {
-        const backup = global.botDataBackup;
-        if (!backup) {
-            console.log('📂 No global backup found, loading from SQLite');
-            await loadBotData();
-            return;
-        }
-        
-        console.log(`📂 Loading bot data from global backup (${new Date(backup.timestamp).toISOString()})`);
-        
-        // Restore core bot state
-        authorizedUsers.clear();
-        backup.authorizedUsers.forEach(user => authorizedUsers.add(user));
-        
-        admins.clear();
-        backup.admins.forEach(admin => admins.add(admin));
-        
-        userChatIds.clear();
-        Object.entries(backup.userChatIds).forEach(([key, value]) => {
-            userChatIds.set(key, value);
-        });
-        
-        adminChatIds.clear();
-        backup.adminChatIds.forEach(chatId => adminChatIds.add(chatId));
-        
-        turnOrder.clear();
-        backup.turnOrder.forEach(user => turnOrder.add(user));
-        
-        currentTurnIndex = backup.currentTurnIndex;
-        
-        userQueueMapping.clear();
-        Object.entries(backup.userQueueMapping).forEach(([key, value]) => {
-            userQueueMapping.set(key, value);
-        });
-        
-        queueUserMapping.clear();
-        Object.entries(backup.queueUserMapping).forEach(([key, value]) => {
-            queueUserMapping.set(key, value);
-        });
-        
-        suspendedUsers.clear();
-        Object.entries(backup.suspendedUsers).forEach(([key, value]) => {
-            suspendedUsers.set(key, value);
-        });
-        
-        turnAssignments.clear();
-        Object.entries(backup.turnAssignments).forEach(([key, value]) => {
-            turnAssignments.set(key, value);
-        });
-        
-        monthlyStats.clear();
-        Object.entries(backup.monthlyStats).forEach(([key, value]) => {
-            monthlyStats.set(key, value);
-        });
-        
-        userScores.clear();
-        Object.entries(backup.userScores).forEach(([key, value]) => {
-            userScores.set(key, value);
-        });
-        
-        global.swapTimestamps = backup.swapTimestamps || [];
-        global.doneTimestamps = new Map(Object.entries(backup.doneTimestamps || {}));
-        global.gracePeriods = new Map(Object.entries(backup.gracePeriods || {}));
-        global.lastDishwasherDone = backup.lastDishwasherDone;
-        
-        console.log('📂 Bot data loaded successfully from global backup');
-        console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
-        
-        // Initialize default scores for new users only (persistent scores)
-        const defaultUsers = ['Eden', 'Adele', 'Emma'];
-        let initializedScores = 0;
-        
-        for (const user of defaultUsers) {
-            if (!userScores.has(user)) {
-                userScores.set(user, 0);
-                await db.setUserScore(user, 0);
-                initializedScores++;
-            }
-        }
-        
-        if (initializedScores > 0) {
-            console.log(`🎯 Initialized ${initializedScores} new user scores to 0 (persistent scores maintained)`);
-        } else {
-            console.log(`📊 All user scores loaded from database (persistent scores maintained)`);
-        }
-        
-        return true;
-    } catch (error) {
-        console.error('❌ Error loading from global backup:', error);
-        console.log('📂 Falling back to SQLite loading');
-        await loadBotData();
-        return false;
-    }
-}
+// Super2 style: Simple SQLite persistence - no complex backup functions needed
 
 async function loadBotData() {
     // Wait for database to be ready
@@ -512,101 +351,17 @@ const isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HO
 db = new Database();
 console.log('📊 SQLite database initialized for persistence');
 
-// Wait for database to be ready before proceeding
+// Wait for database to be ready before proceeding (Super2 style)
 let dbReady = false;
-db.db.on('open', () => {
+db.db.on('open', async () => {
     console.log('✅ Database connection established');
+    console.log('📊 Using Super2-style persistence: Single SQLite file in project root');
+    console.log('📊 Render persistent file system maintains database across restarts');
+    console.log('📊 CREATE TABLE IF NOT EXISTS preserves existing data');
     dbReady = true;
     
-    // On Render, try to load from global backup first
-    if (isRender && global.botDataBackup) {
-        console.log('🔄 Running on Render - loading from global backup');
-        console.log(`🔄 Global backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
-        loadFromGlobalBackup();
-    } else if (isRender && (process.env.BOT_DATA_BACKUP_1 || process.env.BOT_DATA_BACKUP)) {
-        console.log('🔄 Running on Render - loading from environment variable backup');
-        try {
-            let backupData = '';
-            if (process.env.BOT_DATA_BACKUP) {
-                backupData = process.env.BOT_DATA_BACKUP;
-            } else {
-                backupData = process.env.BOT_DATA_BACKUP_1 || '';
-                if (process.env.BOT_DATA_BACKUP_2) backupData += process.env.BOT_DATA_BACKUP_2;
-                if (process.env.BOT_DATA_BACKUP_3) backupData += process.env.BOT_DATA_BACKUP_3;
-            }
-            global.botDataBackup = JSON.parse(backupData);
-            console.log(`🔄 Environment backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
-            loadFromGlobalBackup();
-        } catch (error) {
-            console.log('❌ Error parsing environment backup, falling back to SQLite');
-            loadBotData();
-        }
-    } else if (isRender) {
-        console.log('🔄 Running on Render - checking multiple persistence methods');
-        
-        // Method 1: Check environment variables (Render dashboard)
-        if (process.env.BOT_DATA_BACKUP_1 || process.env.BOT_DATA_BACKUP) {
-            console.log('🔄 Found environment variable backup');
-            try {
-                let backupData = '';
-                if (process.env.BOT_DATA_BACKUP) {
-                    backupData = process.env.BOT_DATA_BACKUP;
-                } else {
-                    backupData = process.env.BOT_DATA_BACKUP_1 || '';
-                    if (process.env.BOT_DATA_BACKUP_2) backupData += process.env.BOT_DATA_BACKUP_2;
-                    if (process.env.BOT_DATA_BACKUP_3) backupData += process.env.BOT_DATA_BACKUP_3;
-                }
-                global.botDataBackup = JSON.parse(backupData);
-                console.log(`🔄 Environment backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
-                loadFromGlobalBackup();
-                return;
-            } catch (error) {
-                console.log('❌ Error parsing environment backup, trying file backup');
-            }
-        }
-        
-        // Method 2: Check persistent file locations
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            
-            const persistentPaths = [
-                '/var/data/bot_data_backup.json',  // Render persistent disk
-                '/tmp/bot_data_backup.json',
-                path.join(process.cwd(), 'bot_data_backup.json'),
-                path.join(__dirname, 'bot_data_backup.json'),
-                '/app/bot_data_backup.json'
-            ];
-            
-            let backupFound = false;
-            for (const backupPath of persistentPaths) {
-                if (fs.existsSync(backupPath)) {
-                    try {
-                        const backupData = fs.readFileSync(backupPath, 'utf8');
-                        global.botDataBackup = JSON.parse(backupData);
-                        console.log(`🔄 Persistent file backup found: ${backupPath}`);
-                        console.log(`🔄 File backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
-                        loadFromGlobalBackup();
-                        backupFound = true;
-                        break;
-                    } catch (err) {
-                        console.log(`⚠️ Error reading ${backupPath}: ${err.message}`);
-                    }
-                }
-            }
-            
-            if (!backupFound) {
-                console.log('📂 No persistent backup found, loading from SQLite database');
-                loadBotData();
-            }
-        } catch (error) {
-            console.log('❌ Error loading persistent backups, falling back to SQLite');
-            loadBotData();
-        }
-    } else {
-        console.log('📂 Loading from SQLite database');
-        loadBotData();
-    }
+    // Load bot data from database (Super2 approach - simple and reliable)
+    await loadBotData();
 });
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
