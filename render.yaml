@@ -1,4 +1,5 @@
 services:
+  # Fixed deployment command - use npm script instead of direct node command
   - type: web
     name: dishwasher-bot
     env: node
