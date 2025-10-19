@@ -4278,7 +4278,13 @@ async function handleCallback(chatId, userId, userName, data) {
         await executeSwap(swapRequest, requestId, 'approved');
         
     } else if (data.startsWith('swap_reject_')) {
-        const requestId = parseInt(data.replace('swap_reject_', ''));
+        const requestId = data ? parseInt(data.replace('swap_reject_', '')) : 0;
+        
+        if (isNaN(requestId) || requestId <= 0) {
+            sendMessage(chatId, t(userId, 'error_invalid_request_id'));
+            return;
+        }
+        
         const swapRequest = pendingSwaps.get(requestId);
         
         if (!swapRequest) {
@@ -4313,7 +4319,13 @@ async function handleCallback(chatId, userId, userName, data) {
         pendingSwaps.delete(requestId);
         
     } else if (data.startsWith('swap_cancel_')) {
-        const requestId = parseInt(data.replace('swap_cancel_', ''));
+        const requestId = data ? parseInt(data.replace('swap_cancel_', '')) : 0;
+        
+        if (isNaN(requestId) || requestId <= 0) {
+            sendMessage(chatId, t(userId, 'error_invalid_request_id'));
+            return;
+        }
+        
         const swapRequest = pendingSwaps.get(requestId);
         
         if (!swapRequest) {
@@ -4378,7 +4390,12 @@ async function handleCallback(chatId, userId, userName, data) {
         );
         
     } else if (data.startsWith('force_swap_select_')) {
-        const firstUser = data.replace('force_swap_select_', '');
+        const firstUser = data ? data.replace('force_swap_select_', '') : '';
+        
+        if (!firstUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
         
         // Get all users from original queue excluding the current turn user
         const remainingUsers = originalQueue.filter(name => name !== firstUser);
@@ -4392,10 +4409,21 @@ async function handleCallback(chatId, userId, userName, data) {
         );
         
     } else if (data.startsWith('force_swap_execute_')) {
-        const dataWithoutPrefix = data.replace('force_swap_execute_', '');
+        const dataWithoutPrefix = data ? data.replace('force_swap_execute_', '') : '';
         const lastUnderscoreIndex = dataWithoutPrefix.lastIndexOf('_');
+        
+        if (lastUnderscoreIndex === -1 || dataWithoutPrefix.length === 0) {
+            sendMessage(chatId, t(userId, 'error_invalid_swap_data'));
+            return;
+        }
+        
         const firstUser = dataWithoutPrefix.substring(0, lastUnderscoreIndex);
         const secondUser = dataWithoutPrefix.substring(lastUnderscoreIndex + 1);
+        
+        if (!firstUser || !secondUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_swap_users'));
+            return;
+        }
         
         
         // In the new score-based system, force swap means:
@@ -4701,7 +4729,12 @@ async function handleCallback(chatId, userId, userName, data) {
         );
         
     } else if (data.startsWith('admin_punish_')) {
-        const targetUser = data.replace('admin_punish_', '');
+        const targetUser = data ? data.replace('admin_punish_', '') : '';
+        
+        if (!targetUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
         
         // Show reason selection for admin punishment
         const buttons = [
