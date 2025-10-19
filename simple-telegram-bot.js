@@ -39,6 +39,8 @@ async function saveBotData() {
         await db.saveBotState('swapTimestamps', global.swapTimestamps || []);
         await db.saveBotState('doneTimestamps', global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {});
         await db.saveBotState('gracePeriods', global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {});
+        await db.saveBotState('queueStatistics', Object.fromEntries(queueStatistics));
+        await db.saveBotState('punishmentTurns', Object.fromEntries(punishmentTurns));
         
         // Save user scores
         for (const [userName, score] of userScores.entries()) {
@@ -89,6 +91,8 @@ async function loadBotData() {
         const swapTimestampsData = await db.getBotState('swapTimestamps') || [];
         const doneTimestampsData = await db.getBotState('doneTimestamps') || {};
         const gracePeriodsData = await db.getBotState('gracePeriods') || {};
+        const queueStatisticsData = await db.getBotState('queueStatistics') || {};
+        const punishmentTurnsData = await db.getBotState('punishmentTurns') || {};
         
         // Load user scores
         const userScoresData = await db.getAllUserScores();
@@ -166,6 +170,18 @@ async function loadBotData() {
         global.swapTimestamps = swapTimestampsData;
         global.doneTimestamps = new Map(Object.entries(doneTimestampsData));
         global.gracePeriods = new Map(Object.entries(gracePeriodsData));
+        
+        // Restore queue statistics
+        queueStatistics.clear();
+        Object.entries(queueStatisticsData).forEach(([key, value]) => {
+            queueStatistics.set(key, value);
+        });
+        
+        // Restore punishment turns
+        punishmentTurns.clear();
+        Object.entries(punishmentTurnsData).forEach(([key, value]) => {
+            punishmentTurns.set(key, value);
+        });
         
         // Restore monthly statistics
         monthlyStats.clear();
@@ -2366,6 +2382,12 @@ async function handleCommand(chatId, userId, userName, text) {
         // Remove from turn assignments
         turnAssignments.delete(actualUserName);
         
+        // Remove from queue statistics (CRITICAL FIX!)
+        queueStatistics.delete(actualUserName);
+        
+        // Remove from punishment turns (CRITICAL FIX!)
+        punishmentTurns.delete(actualUserName);
+        
         // Remove from originalQueue array (CRITICAL FIX!)
         const queueIndex = originalQueue.indexOf(actualUserName);
         if (queueIndex !== -1) {
@@ -2407,6 +2429,12 @@ async function handleCommand(chatId, userId, userName, text) {
             turnOrder.delete(userName.toLowerCase());
             userScores.delete(userName);
             userScores.delete(userName.toLowerCase());
+            
+            // Remove from queue statistics (CRITICAL FIX!)
+            queueStatistics.delete(userName);
+            
+            // Remove from punishment turns (CRITICAL FIX!)
+            punishmentTurns.delete(userName);
             
             // Remove from originalQueue array (CRITICAL FIX!)
             const queueIndex = originalQueue.indexOf(userName);
@@ -2813,6 +2841,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Remove from turn assignments
         turnAssignments.delete(actualUserName);
         
+        // Remove from queue statistics (CRITICAL FIX!)
+        queueStatistics.delete(actualUserName);
+        
+        // Remove from punishment turns (CRITICAL FIX!)
+        punishmentTurns.delete(actualUserName);
+        
         // Remove from originalQueue array (CRITICAL FIX!)
         const queueIndex = originalQueue.indexOf(actualUserName);
         if (queueIndex !== -1) {
@@ -2948,6 +2982,12 @@ async function handleCallback(chatId, userId, userName, data) {
         turnOrder.delete(userName.toLowerCase());
         userScores.delete(userName);
         userScores.delete(userName.toLowerCase());
+        
+        // Remove from queue statistics (CRITICAL FIX!)
+        queueStatistics.delete(userName);
+        
+        // Remove from punishment turns (CRITICAL FIX!)
+        punishmentTurns.delete(userName);
         
         // Remove from originalQueue array (CRITICAL FIX!)
         const queueIndex = originalQueue.indexOf(userName);
