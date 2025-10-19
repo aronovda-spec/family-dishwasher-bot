@@ -1,0 +1,10 @@
+[33mef9dc3c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelopment[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m CRITICAL FIX: Change rapid done detection from per-user to global tracking - ANY user pressing /done within 30 minutes of last dishwasher completion triggers alert
+[33me817499[m Fix debt check edge case: Allow users to leave when all scores are equal (no actual debt) - prevents blocking users with score 0 when max score is also 0
+[33me852237[m Fix admin leave: Skip debt check for admins since they're not part of queue - admins can leave directly without turn validation
+[33m3c84f37[m Fix remove user button formatting: Extract first name and normalize case to show proper emojis and translations
+[33m333c138[m Fix remove user button text: Show user names with royal emojis instead of 'Remove' prefix
+[33m4b6f378[m Fix missing getUserName function: Add helper function to get userName from userId
+[33m1f096fb[m Fix admin leave button: Allow admins to use leave bot even if not in authorizedUsers
+[33m8fc7be2[m CRITICAL FIX: Use sendMessageWithButtons instead of sendMessage for all button handlers - Reset Bot, Remove User, and Leave Bot buttons now work properly
+[33md9bd69e[m Fix reset bot button rendering: correct sendMessage indentation
+[33m31af3ff[m Add debug message to verify reset bot handler version

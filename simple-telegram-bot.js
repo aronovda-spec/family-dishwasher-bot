@@ -2,6 +2,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const Database = require('./database');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -13,167 +14,145 @@ if (!token) {
 const botUrl = `https://api.telegram.org/bot${token}`;
 
 // ============================================================================
-// FILE-BASED PERSISTENCE SYSTEM
+// SQLITE-BASED PERSISTENCE SYSTEM
 // ============================================================================
 
-const DATA_DIR = path.join(__dirname, 'data');
-const BOT_DATA_FILE = path.join(DATA_DIR, 'bot_state.json');
+// Initialize database
+const db = new Database();
+console.log('📊 SQLite database initialized for persistence');
 
-// Check if we're running on Render (ephemeral file system)
-const isRender = process.env.RENDER_EXTERNAL_HOSTNAME;
-const useFilePersistence = !isRender; // Use file persistence only when NOT on Render
-
-if (useFilePersistence) {
-    // Ensure data directory exists
-    if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-        console.log('📁 Created data directory for persistence');
-    }
-} else {
-    console.log('🌐 Running on Render - using in-memory persistence only');
-}
-
-// Persistence functions
+// Persistence functions using SQLite
 async function saveBotData() {
     try {
-        const botData = {
-            // Core bot state
-            authorizedUsers: Array.from(authorizedUsers),
-            admins: Array.from(admins),
-            userChatIds: Object.fromEntries(userChatIds),
-            adminChatIds: Array.from(adminChatIds),
-            turnOrder: Array.from(turnOrder),
-            userScores: Object.fromEntries(userScores),
-            currentTurnIndex: currentTurnIndex,
-            
-            // Queue mappings (CRITICAL for authorization persistence)
-            userQueueMapping: Object.fromEntries(userQueueMapping),
-            queueUserMapping: Object.fromEntries(queueUserMapping),
-            
-            // Additional state
-            suspendedUsers: Object.fromEntries(suspendedUsers),
-            turnAssignments: Object.fromEntries(turnAssignments),
-            swapTimestamps: global.swapTimestamps || [],
-            doneTimestamps: global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {},
-            
-            // Grace period tracking
-            gracePeriods: global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {},
-            
-            // Monthly statistics tracking
-            monthlyStats: Object.fromEntries(monthlyStats),
-            
-            // Timestamps
-            lastSave: Date.now(),
-            version: '1.0.0'
-        };
+        // Save core bot state
+        await db.saveBotState('authorizedUsers', Array.from(authorizedUsers));
+        await db.saveBotState('admins', Array.from(admins));
+        await db.saveBotState('userChatIds', Object.fromEntries(userChatIds));
+        await db.saveBotState('adminChatIds', Array.from(adminChatIds));
+        await db.saveBotState('turnOrder', Array.from(turnOrder));
+        await db.saveBotState('currentTurnIndex', currentTurnIndex);
         
-        if (useFilePersistence) {
-            const jsonData = JSON.stringify(botData, null, 2);
-            fs.writeFileSync(BOT_DATA_FILE, jsonData, 'utf8');
-            console.log(`💾 Bot data saved to file - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
-        } else {
-            // On Render, store in global variable (persists during session)
-            global.botDataBackup = JSON.stringify(botData);
-            console.log(`💾 Bot data saved to memory - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        // Save additional state
+        await db.saveBotState('suspendedUsers', Object.fromEntries(suspendedUsers));
+        await db.saveBotState('turnAssignments', Object.fromEntries(turnAssignments));
+        await db.saveBotState('swapTimestamps', global.swapTimestamps || []);
+        await db.saveBotState('doneTimestamps', global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {});
+        await db.saveBotState('gracePeriods', global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {});
+        
+        // Save user scores
+        for (const [userName, score] of userScores.entries()) {
+            await db.setUserScore(userName, score);
         }
+        
+        // Save queue mappings
+        for (const [userName, queueMember] of userQueueMapping.entries()) {
+            await db.setQueueMapping(userName, queueMember);
+        }
+        
+        // Save monthly statistics
+        for (const [monthKey, statsData] of monthlyStats.entries()) {
+            await db.setMonthlyStats(monthKey, statsData);
+        }
+        
+        console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
     } catch (error) {
-        console.error('❌ Error saving bot data:', error);
-        if (useFilePersistence) {
-            console.error('❌ File path:', BOT_DATA_FILE);
-            console.error('❌ Data directory exists:', fs.existsSync(DATA_DIR));
-        }
+        console.error('❌ Error saving bot data to SQLite:', error);
     }
 }
 
 async function loadBotData() {
     try {
-        let botData = null;
+        // Load core bot state
+        const authorizedUsersData = await db.getBotState('authorizedUsers') || [];
+        const adminsData = await db.getBotState('admins') || [];
+        const userChatIdsData = await db.getBotState('userChatIds') || {};
+        const adminChatIdsData = await db.getBotState('adminChatIds') || [];
+        const turnOrderData = await db.getBotState('turnOrder') || [];
+        const currentTurnIndexData = await db.getBotState('currentTurnIndex') || 0;
         
-        if (useFilePersistence) {
-            if (!fs.existsSync(BOT_DATA_FILE)) {
-                console.log('📄 No existing bot data found, starting fresh');
-                return false;
-            }
-            
-            const jsonData = fs.readFileSync(BOT_DATA_FILE, 'utf8');
-            botData = JSON.parse(jsonData);
-            console.log(`📂 Loading bot data from file: ${BOT_DATA_FILE}`);
-        } else {
-            // On Render, try to load from global variable
-            if (global.botDataBackup) {
-                botData = JSON.parse(global.botDataBackup);
-                console.log(`📂 Loading bot data from memory backup`);
-            } else {
-                console.log('📄 No existing bot data found in memory, starting fresh');
-                return false;
-            }
-        }
+        // Load additional state
+        const suspendedUsersData = await db.getBotState('suspendedUsers') || {};
+        const turnAssignmentsData = await db.getBotState('turnAssignments') || {};
+        const swapTimestampsData = await db.getBotState('swapTimestamps') || [];
+        const doneTimestampsData = await db.getBotState('doneTimestamps') || {};
+        const gracePeriodsData = await db.getBotState('gracePeriods') || {};
         
-        console.log(`📊 Found ${botData.authorizedUsers?.length || 0} authorized users, ${botData.admins?.length || 0} admins, ${Object.keys(botData.queueUserMapping || {}).length} queue mappings`);
+        // Load user scores
+        const userScoresData = await db.getAllUserScores();
+        
+        // Load queue mappings
+        const queueMappingsData = await db.getAllQueueMappings();
+        
+        // Load monthly statistics
+        const monthlyStatsData = await db.getAllMonthlyStats();
+        
+        console.log(`📂 Loading bot data from SQLite database`);
+        console.log(`📊 Found ${authorizedUsersData.length} authorized users, ${adminsData.length} admins, ${Object.keys(queueMappingsData).length} queue mappings`);
         
         // Restore core bot state
         authorizedUsers.clear();
-        botData.authorizedUsers?.forEach(user => authorizedUsers.add(user));
+        authorizedUsersData.forEach(user => authorizedUsers.add(user));
         
         admins.clear();
-        botData.admins?.forEach(admin => admins.add(admin));
+        adminsData.forEach(admin => admins.add(admin));
         
         userChatIds.clear();
-        Object.entries(botData.userChatIds || {}).forEach(([key, value]) => {
+        Object.entries(userChatIdsData).forEach(([key, value]) => {
             userChatIds.set(key, value);
         });
         
         adminChatIds.clear();
-        botData.adminChatIds?.forEach(chatId => adminChatIds.add(chatId));
+        adminChatIdsData.forEach(chatId => adminChatIds.add(chatId));
         
         turnOrder.clear();
-        botData.turnOrder?.forEach(user => turnOrder.add(user));
+        turnOrderData.forEach(user => turnOrder.add(user));
         
         userScores.clear();
-        Object.entries(botData.userScores || {}).forEach(([key, value]) => {
+        Object.entries(userScoresData).forEach(([key, value]) => {
             userScores.set(key, value);
         });
         
-        currentTurnIndex = botData.currentTurnIndex || 0;
+        currentTurnIndex = currentTurnIndexData;
         
-        // Restore queue mappings (CRITICAL for authorization persistence)
+        // Restore queue mappings
         userQueueMapping.clear();
-        Object.entries(botData.userQueueMapping || {}).forEach(([key, value]) => {
+        Object.entries(queueMappingsData).forEach(([key, value]) => {
             userQueueMapping.set(key, value);
         });
         
+        // Create reverse mapping
         queueUserMapping.clear();
-        Object.entries(botData.queueUserMapping || {}).forEach(([key, value]) => {
-            queueUserMapping.set(key, value);
+        Object.entries(queueMappingsData).forEach(([userName, queueMember]) => {
+            queueUserMapping.set(queueMember, userName);
         });
         
         // Restore additional state
         suspendedUsers.clear();
-        Object.entries(botData.suspendedUsers || {}).forEach(([key, value]) => {
+        Object.entries(suspendedUsersData).forEach(([key, value]) => {
             suspendedUsers.set(key, value);
         });
         
         turnAssignments.clear();
-        Object.entries(botData.turnAssignments || {}).forEach(([key, value]) => {
+        Object.entries(turnAssignmentsData).forEach(([key, value]) => {
             turnAssignments.set(key, value);
         });
         
         // Restore global variables
-        global.swapTimestamps = botData.swapTimestamps || [];
-        global.doneTimestamps = new Map(Object.entries(botData.doneTimestamps || {}));
-        global.gracePeriods = new Map(Object.entries(botData.gracePeriods || {}));
+        global.swapTimestamps = swapTimestampsData;
+        global.doneTimestamps = new Map(Object.entries(doneTimestampsData));
+        global.gracePeriods = new Map(Object.entries(gracePeriodsData));
         
-        // Restore monthly statistics (backward compatible)
+        // Restore monthly statistics
         monthlyStats.clear();
-        Object.entries(botData.monthlyStats || {}).forEach(([key, value]) => {
+        Object.entries(monthlyStatsData).forEach(([key, value]) => {
             monthlyStats.set(key, value);
         });
         
-        console.log('📂 Bot data loaded successfully');
+        console.log('📂 Bot data loaded successfully from SQLite');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
         return true;
     } catch (error) {
-        console.error('❌ Error loading bot data:', error);
+        console.error('❌ Error loading bot data from SQLite:', error);
         return false;
     }
 }
