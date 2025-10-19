@@ -4188,6 +4188,9 @@ async function handleCallback(chatId, userId, userName, data) {
         const newLang = currentLang === 'en' ? 'he' : 'en';
         userLanguage.set(userId, newLang);
         
+        // Save language preference to database immediately
+        await saveBotData();
+        
         const switchMessage = newLang === 'he' ? 
             `🇮🇱 **שפה שונתה לעברית!** ✅\n\nהבוט יציג כעת הכל בעברית.\nשלח /start כדי לראות את התפריט החדש! 🎯` :
             `🇺🇸 **Language switched to English!** ✅\n\nThe bot will now display everything in English.\nSend /start to see the new menu! 🎯`;
