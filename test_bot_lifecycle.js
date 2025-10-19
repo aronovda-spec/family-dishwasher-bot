@@ -160,24 +160,18 @@ async function simulateBotLifecycle() {
     // Simulate bot operations
     console.log('\n🤖 SIMULATING BOT OPERATIONS:');
     
-    // Authorize users
+    // Authorize users (only canonical names)
     console.log('📝 Authorizing users...');
     authorizedUsers.add('Eden');
-    authorizedUsers.add('Eden'.toLowerCase());
     userQueueMapping.set('Eden', 'Eden');
-    userQueueMapping.set('Eden'.toLowerCase(), 'Eden');
     queueUserMapping.set('Eden', 'Eden');
     
     authorizedUsers.add('Adele');
-    authorizedUsers.add('Adele'.toLowerCase());
     userQueueMapping.set('Adele', 'Adele');
-    userQueueMapping.set('Adele'.toLowerCase(), 'Adele');
     queueUserMapping.set('Adele', 'Adele');
     
     authorizedUsers.add('Emma');
-    authorizedUsers.add('Emma'.toLowerCase());
     userQueueMapping.set('Emma', 'Emma');
-    userQueueMapping.set('Emma'.toLowerCase(), 'Emma');
     queueUserMapping.set('Emma', 'Emma');
     
     // Set up turn order

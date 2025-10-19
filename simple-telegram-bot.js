@@ -340,6 +340,17 @@ function getCurrentMonthKey() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+// Helper function for case-insensitive authorization checking
+function isUserAuthorized(userName) {
+    // Check if user is authorized (case-insensitive)
+    for (const authorizedUser of authorizedUsers) {
+        if (authorizedUser.toLowerCase() === userName.toLowerCase()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Helper function to initialize user stats for current month
 function initializeMonthlyStats(monthKey) {
     if (!monthlyStats.has(monthKey)) {
@@ -1729,7 +1740,7 @@ async function handleCommand(chatId, userId, userName, text) {
         userChatIds.set(userName.toLowerCase(), chatId);
         
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
-        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
+        const isAuthorized = isUserAuthorized(userName);
         
         // If this user is an admin, store their chat ID for admin notifications
         if (isAdmin) {
@@ -2361,10 +2372,9 @@ async function handleCommand(chatId, userId, userName, text) {
                 );
                 
                 if (queueMember) {
+                    // Store only the canonical name (original case)
                     authorizedUsers.add(userToAuth);
-                    authorizedUsers.add(userToAuth.toLowerCase()); // Add lowercase version for case-insensitive matching
                     userQueueMapping.set(userToAuth, queueMember);
-                    userQueueMapping.set(userToAuth.toLowerCase(), queueMember); // Add lowercase mapping
                     queueUserMapping.set(queueMember, userToAuth);
                     
                     // Save bot data after authorization
@@ -2697,7 +2707,7 @@ async function handleCallback(chatId, userId, userName, data) {
         const userName = getUserName(userId);
         
         // Check if user is authorized OR admin
-        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
+        const isAuthorized = isUserAuthorized(userName);
         const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         
         if (isAuthorized || isAdmin) {
@@ -2994,7 +3004,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'send_user_message') {
         // User or admin sends message
-        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase()) || 
+        const isAuthorized = isUserAuthorized(userName) || 
                            admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
         if (!isAuthorized) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -3533,7 +3543,7 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, switchMessage);
         
     } else if (data === 'swap_menu') {
-        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
+        const isAuthorized = isUserAuthorized(userName);
         if (!isAuthorized) {
             sendMessage(chatId, t(userId, 'not_authorized_swap_features'));
             return;
@@ -3843,7 +3853,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
     } else if (data === 'request_punishment_menu') {
-        const isAuthorized = authorizedUsers.has(userName) || authorizedUsers.has(userName.toLowerCase());
+        const isAuthorized = isUserAuthorized(userName);
         if (!isAuthorized) {
             sendMessage(chatId, t(userId, 'not_authorized_punishment'));
             return;
