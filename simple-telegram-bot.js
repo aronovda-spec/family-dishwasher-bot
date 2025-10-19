@@ -17,9 +17,8 @@ const botUrl = `https://api.telegram.org/bot${token}`;
 // SQLITE-BASED PERSISTENCE SYSTEM
 // ============================================================================
 
-// Initialize database
-const db = new Database();
-console.log('📊 SQLite database initialized for persistence');
+// Database will be initialized after global variables are declared
+let db = null;
 
 // Persistence functions using SQLite
 async function saveBotData() {
@@ -313,6 +312,10 @@ const queueUserMapping = new Map(); // Map: Queue name -> Telegram user ID
 // Queue management system
 const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason: string, originalPosition: number }
 const queueStatistics = new Map(); // userName -> { totalCompletions: number, monthlyCompletions: number, lastCompleted: Date }
+
+// Initialize database after global variables are declared
+db = new Database();
+console.log('📊 SQLite database initialized for persistence');
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
 // Monthly report tracking
