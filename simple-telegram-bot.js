@@ -3805,10 +3805,21 @@ async function handleCallback(chatId, userId, userName, data) {
             userScores.set(user, 0);
         });
         
+        // Reset tie-breaker order to default (CRITICAL FIX!)
+        originalQueue.length = 0;
+        originalQueue.push('Eden', 'Adele', 'Emma');
+        
+        // Reset turn order to default
+        turnOrder.clear();
+        ['Eden', 'Adele', 'Emma'].forEach(user => turnOrder.add(user));
+        
+        // Reset current turn index
+        currentTurnIndex = 0;
+        
         // Save to database
         await saveBotData();
         
-        console.log('🔄 All scores reset to 0');
+        console.log('🔄 All scores reset to 0 and tie-breaker order reset to default');
         
         // Track for monthly report
         trackMonthlyAction('queue_reorder', null, userName);
