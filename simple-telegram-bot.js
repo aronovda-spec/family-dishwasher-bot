@@ -351,6 +351,23 @@ function isUserAuthorized(userName) {
     return false;
 }
 
+// Helper function for case-insensitive admin checking
+function isUserAdmin(userName, userId = null) {
+    // Check if user is admin (case-insensitive)
+    for (const admin of admins) {
+        if (admin.toLowerCase() === userName.toLowerCase()) {
+            return true;
+        }
+    }
+    
+    // Also check by user ID if provided
+    if (userId) {
+        return admins.has(userId.toString());
+    }
+    
+    return false;
+}
+
 // Helper function to initialize user stats for current month
 function initializeMonthlyStats(monthKey) {
     if (!monthlyStats.has(monthKey)) {
@@ -1739,7 +1756,7 @@ async function handleCommand(chatId, userId, userName, text) {
         userChatIds.set(userName, chatId);
         userChatIds.set(userName.toLowerCase(), chatId);
         
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         const isAuthorized = isUserAuthorized(userName);
         
         // If this user is an admin, store their chat ID for admin notifications
@@ -1946,7 +1963,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
     } else if (command === '/done' || command === 'done') {
         // Check if user is admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (isAdmin) {
             // Initialize anti-cheating tracking for admin
@@ -2194,7 +2211,6 @@ async function handleCommand(chatId, userId, userName, text) {
         if (admins.size === 0) {
             // First admin can add themselves or anyone
             admins.add(userToAdd);
-            admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
             
             // Note: We don't add chatId here because we don't know the new admin's chat ID yet
             // The new admin's chat ID will be stored when they send /start or interact with the bot
@@ -2203,7 +2219,7 @@ async function handleCommand(chatId, userId, userName, text) {
         }
         
         // If there are existing admins, check if current user is an admin
-        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+        if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'not_authorized_queue_commands', {user: userName}));
             return;
         }
@@ -2216,7 +2232,6 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Add the new admin
         admins.add(userToAdd);
-        admins.add(userToAdd.toLowerCase()); // Add lowercase version for case-insensitive matching
         
         // Save bot data after adding admin
         await saveBotData();
@@ -2227,7 +2242,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
     } else if (command.startsWith('/removeadmin ')) {
         // Check if user is already an admin
-        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+        if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
             return;
         }
@@ -2241,9 +2256,14 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             // Check if user exists in admins
-            if (admins.has(userToRemove)) {
-                admins.delete(userToRemove);
-                admins.delete(userToRemove.toLowerCase()); // Remove lowercase version too
+            if (isUserAdmin(userToRemove)) {
+                // Find and remove the actual admin entry (case-insensitive)
+                for (const admin of admins) {
+                    if (admin.toLowerCase() === userToRemove.toLowerCase()) {
+                        admins.delete(admin);
+                        break;
+                    }
+                }
                 
                 // Save bot data after removing admin
                 await saveBotData();
@@ -2258,7 +2278,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
     } else if (command.startsWith('/removeuser ')) {
         // Check if user is admin
-        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+        if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
             return;
         }
@@ -2314,7 +2334,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
     } else if (command === '/resetbot') {
         // Check if user is admin
-        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+        if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'admin_access_required_simple', {user: translateName(userName, userId)}));
             return;
         }
@@ -2355,7 +2375,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
     } else if (command.startsWith('/authorize ')) {
         // Check if user is an admin
-        if (!admins.has(userName) && !admins.has(userName.toLowerCase()) && !admins.has(userId.toString())) {
+        if (!isUserAdmin(userName, userId)) {
             sendMessage(chatId, t(userId, 'admin_access_required_authorize', {user: userName}));
             return;
         }
@@ -2591,7 +2611,7 @@ async function handleCallback(chatId, userId, userName, data) {
         await handleCommand(chatId, userId, userName, 'help');
     } else if (data === 'confirm_bot_reset') {
         // Check if user is admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -2623,7 +2643,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'remove_user_menu') {
         // Check if user is admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -2656,7 +2676,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('remove_user_')) {
         // Check if user is admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -2683,7 +2703,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'reset_bot_menu') {
         // Check if user is admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -2708,7 +2728,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Check if user is authorized OR admin
         const isAuthorized = isUserAuthorized(userName);
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (isAuthorized || isAdmin) {
             if (isAdmin) {
@@ -2790,7 +2810,7 @@ async function handleCallback(chatId, userId, userName, data) {
         userScores.delete(userName.toLowerCase());
         
         // If user is admin, remove admin privileges
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (isAdmin) {
             admins.delete(userName);
             admins.delete(userName.toLowerCase());
@@ -2812,7 +2832,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'dishwasher_alert') {
         // Check if this is an admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -2861,7 +2881,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'dishwasher_started') {
         // Check if this is an admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
@@ -2943,7 +2963,7 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${translateName(currentUser, userId)}\n${t(userId, 'sent_to_all')}`);
         
     } else if (data === 'authorize_menu') {
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (isAdmin) {
             const message = `🔧 **Authorize Users**\n\n` +
                 `📋 **Available queue members:**\n` +
@@ -2956,7 +2976,7 @@ async function handleCallback(chatId, userId, userName, data) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
         }
     } else if (data === 'addadmin_menu') {
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (isAdmin) {
             const message = `➕ **Add Admin**\n\n` +
                 `💡 **Usage:** Type \`/addadmin <username>\`\n\n` +
@@ -2993,7 +3013,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'create_announcement') {
         // Admin creates announcement
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3005,7 +3025,7 @@ async function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'send_user_message') {
         // User or admin sends message
         const isAuthorized = isUserAuthorized(userName) || 
-                           admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+                           isUserAdmin(userName, userId);
         if (!isAuthorized) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3049,7 +3069,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'maintenance_menu') {
         // Admin maintenance menu
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3085,7 +3105,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'hard_reset_section') {
         // Hard reset section - shows warning and options
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3109,7 +3129,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'monthly_report_show') {
         // Show monthly report
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3121,7 +3141,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'share_monthly_report') {
         // Share monthly report with all users
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3133,7 +3153,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data === 'queue_management_menu') {
         // Queue Management submenu
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3755,7 +3775,7 @@ async function handleCallback(chatId, userId, userName, data) {
         pendingSwaps.delete(requestId);
         
     } else if (data === 'force_swap_menu') {
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3939,7 +3959,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Check if this is an admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -3990,7 +4010,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Check if this is an admin
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
@@ -4027,7 +4047,7 @@ async function handleCallback(chatId, userId, userName, data) {
         pendingPunishments.delete(requestId);
         
     } else if (data === 'apply_punishment_menu') {
-        const isAdmin = admins.has(userName) || admins.has(userName.toLowerCase()) || admins.has(userId.toString());
+        const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;

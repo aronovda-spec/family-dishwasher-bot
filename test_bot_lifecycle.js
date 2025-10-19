@@ -184,8 +184,16 @@ async function simulateBotLifecycle() {
     userScores.set('Adele', 0);
     userScores.set('Emma', 0);
     
+    // Add some admins
+    console.log('👑 Adding admins...');
+    admins.add('Dani');
+    admins.add('Marianna');
+    
     // Save data
     await saveBotData();
+    
+    console.log('📊 After adding admins:');
+    console.log('Admins:', Array.from(admins));
     
     // Simulate some turns
     console.log('🔄 Simulating turns...');
@@ -212,6 +220,7 @@ async function simulateBotLifecycle() {
     // Verify data persistence
     console.log('\n✅ VERIFICATION:');
     console.log('Authorized users:', Array.from(authorizedUsers));
+    console.log('Admins:', Array.from(admins));
     console.log('User scores:', Object.fromEntries(userScores));
     console.log('Queue mappings:', Object.fromEntries(userQueueMapping));
     console.log('Turn order:', Array.from(turnOrder));
