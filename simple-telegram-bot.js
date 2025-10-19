@@ -1608,6 +1608,17 @@ function getUserLanguage(userId) {
     return userLanguage.get(userId) || 'en'; // Default to English
 }
 
+// Extract first name only from full names (e.g., "Eden Aronov" -> "Eden")
+function getFirstName(fullName) {
+    if (!fullName) return '';
+    
+    // Split by space and take first part
+    const firstName = fullName.split(' ')[0];
+    
+    // Capitalize first letter, lowercase the rest
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+}
+
 // Translate names based on user's language preference
 function translateName(name, userId) {
     const userLang = getUserLanguage(userId);
@@ -1628,7 +1639,7 @@ function translateName(name, userId) {
             }
         }
     }
-    return name; // Return original name for English or unknown names
+    return getFirstName(name); // Return first name only for English or unknown names
 }
 
 // Get translated text
@@ -2349,7 +2360,7 @@ async function handleCommand(chatId, userId, userName, text) {
         }
         
     } else if (command.startsWith('/addadmin ')) {
-        const userToAdd = command.replace('/addadmin ', '').trim();
+        const userToAdd = getFirstName(command.replace('/addadmin ', '').trim()); // Normalize to first name only
         
         if (!userToAdd) {
             sendMessage(chatId, t(userId, 'usage_addadmin'));
@@ -2595,7 +2606,7 @@ async function handleCommand(chatId, userId, userName, text) {
             return;
         }
         
-        const userToAuth = command.replace('/authorize ', '').trim();
+        const userToAuth = getFirstName(command.replace('/authorize ', '').trim()); // Normalize to first name only
         if (userToAuth) {
             if (authorizedUsers.size >= 3) {
                 sendMessage(chatId, t(userId, 'max_authorized_users'));
@@ -2607,7 +2618,7 @@ async function handleCommand(chatId, userId, userName, text) {
                 );
                 
                 if (queueMember) {
-                    // Store only the canonical name (original case)
+                    // Store only the canonical name (first name only)
                     authorizedUsers.add(userToAuth);
                     userQueueMapping.set(userToAuth, queueMember);
                     queueUserMapping.set(queueMember, userToAuth);
@@ -4456,8 +4467,9 @@ async function getUpdates(offset = 0) {
                         if (update.message) {
                             const chatId = update.message.chat.id;
                             const userId = update.message.from.id;
-                            const userName = update.message.from.first_name + 
+                            const fullName = update.message.from.first_name + 
                                 (update.message.from.last_name ? ' ' + update.message.from.last_name : '');
+                            const userName = getFirstName(fullName); // Use first name only
                             const text = update.message.text;
                             
                             await handleCommand(chatId, userId, userName, text);
@@ -4466,8 +4478,9 @@ async function getUpdates(offset = 0) {
                         if (update.callback_query) {
                             const chatId = update.callback_query.message.chat.id;
                             const userId = update.callback_query.from.id;
-                            const userName = (update.callback_query.from.first_name || '') + 
+                            const fullName = (update.callback_query.from.first_name || '') + 
                                 (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '') || 'Unknown User';
+                            const userName = getFirstName(fullName); // Use first name only
                             const data = update.callback_query.data;
                             
                             // Button click deduplication: prevent rapid multiple clicks on same button
@@ -4607,8 +4620,9 @@ const server = http.createServer(async (req, res) => {
                 if (update.message) {
                     const chatId = update.message.chat.id;
                     const userId = update.message.from.id;
-                    const userName = update.message.from.first_name + 
+                    const fullName = update.message.from.first_name + 
                         (update.message.from.last_name ? ' ' + update.message.from.last_name : '');
+                    const userName = getFirstName(fullName); // Use first name only
                     const text = update.message.text;
                     
                     await handleCommand(chatId, userId, userName, text);
@@ -4617,8 +4631,9 @@ const server = http.createServer(async (req, res) => {
                 if (update.callback_query) {
                     const chatId = update.callback_query.message.chat.id;
                     const userId = update.callback_query.from.id;
-                    const userName = (update.callback_query.from.first_name || '') + 
+                    const fullName = (update.callback_query.from.first_name || '') + 
                         (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '') || 'Unknown User';
+                    const userName = getFirstName(fullName); // Use first name only
                     const data = update.callback_query.data;
                     
                     // Button click deduplication: prevent rapid multiple clicks on same button
