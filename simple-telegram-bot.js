@@ -834,7 +834,7 @@ function broadcastMonthlyReport(monthKey = null, isAutoReport = false) {
     
     // Add chat IDs from authorized users
     authorizedUsers.forEach(userName => {
-        const chatId = userChatIds.get(userName.toLowerCase());
+        const chatId = userName ? userChatIds.get(userName.toLowerCase()) : null;
         if (chatId) {
             chatIdsToNotify.add(chatId);
         }
@@ -1971,7 +1971,9 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Store chat ID for this user (for notifications)
         userChatIds.set(userName, chatId);
-        userChatIds.set(userName.toLowerCase(), chatId);
+        if (userName) {
+            userChatIds.set(userName.toLowerCase(), chatId);
+        }
         
         // Store reverse mapping for notifications (chatId -> userId)
         chatIdToUserId.set(chatId, userId);
@@ -2477,7 +2479,7 @@ async function handleCommand(chatId, userId, userName, text) {
         }
         
         // Prevent self-promotion for existing admins
-        if (userToAdd.toLowerCase() === userName.toLowerCase() || userToAdd === userId.toString()) {
+        if ((userToAdd && userName && userToAdd.toLowerCase() === userName.toLowerCase()) || userToAdd === userId.toString()) {
             sendMessage(chatId, t(userId, 'cannot_add_yourself_admin', {user: userName}));
             return;
         }
@@ -2502,7 +2504,7 @@ async function handleCommand(chatId, userId, userName, text) {
         const userToRemove = command.replace('/removeadmin ', '').trim();
         if (userToRemove) {
             // Prevent self-removal (security protection)
-            if (userToRemove.toLowerCase() === userName.toLowerCase() || userToRemove === userId.toString()) {
+            if ((userToRemove && userName && userToRemove.toLowerCase() === userName.toLowerCase()) || userToRemove === userId.toString()) {
                 sendMessage(chatId, t(userId, 'cannot_remove_yourself_admin', {user: userName}));
                 return;
             }
@@ -2511,7 +2513,7 @@ async function handleCommand(chatId, userId, userName, text) {
             if (isUserAdmin(userToRemove)) {
                 // Find and remove the actual admin entry (case-insensitive)
                 for (const admin of admins) {
-                    if (admin.toLowerCase() === userToRemove.toLowerCase()) {
+                    if (admin && userToRemove && admin.toLowerCase() === userToRemove.toLowerCase()) {
                         admins.delete(admin);
                         break;
                     }
@@ -2550,7 +2552,7 @@ async function handleCommand(chatId, userId, userName, text) {
         // Find the actual user name (case-insensitive)
         let actualUserName = null;
         for (const authorizedUser of authorizedUsers) {
-            if (authorizedUser.toLowerCase() === userToRemove.toLowerCase()) {
+            if (authorizedUser && userToRemove && authorizedUser.toLowerCase() === userToRemove.toLowerCase()) {
                 actualUserName = authorizedUser;
                 break;
             }
@@ -2618,13 +2620,21 @@ async function handleCommand(chatId, userId, userName, text) {
         if (isUserAuthorized(userName)) {
             // Remove user from all data structures
             authorizedUsers.delete(userName);
-            authorizedUsers.delete(userName.toLowerCase());
+            if (userName) {
+                authorizedUsers.delete(userName.toLowerCase());
+            }
             userChatIds.delete(userName);
-            userChatIds.delete(userName.toLowerCase());
+            if (userName) {
+                userChatIds.delete(userName.toLowerCase());
+            }
             turnOrder.delete(userName);
-            turnOrder.delete(userName.toLowerCase());
+            if (userName) {
+                turnOrder.delete(userName.toLowerCase());
+            }
             userScores.delete(userName);
-            userScores.delete(userName.toLowerCase());
+            if (userName) {
+                userScores.delete(userName.toLowerCase());
+            }
             
             // Remove from queue statistics (CRITICAL FIX!)
             queueStatistics.delete(userName);
@@ -4009,7 +4019,7 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
+        const currentUserQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
         
         // Show all users except the current user (can't swap with yourself)
         const uniqueUsers = [...new Set(queue)];
@@ -4023,7 +4033,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('swap_request_')) {
         const targetUser = data.replace('swap_request_', '');
-        const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
+        const currentUserQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
         
         if (!currentUserQueueName) {
             sendMessage(chatId, t(userId, 'error_queue_position'));
@@ -4337,7 +4347,7 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const currentUserQueueName = userQueueMapping.get(userName) || userQueueMapping.get(userName.toLowerCase());
+        const currentUserQueueName = userQueueMapping.get(userName) || (userName ? userQueueMapping.get(userName.toLowerCase()) : null);
         const availableUsers = queue.filter(name => name !== currentUserQueueName);
         
         if (availableUsers.length === 0) {
