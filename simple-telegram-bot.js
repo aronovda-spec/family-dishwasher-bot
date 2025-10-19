@@ -3332,6 +3332,11 @@ async function handleCallback(chatId, userId, userName, data) {
         const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
         const message = t(userId, 'reorder_tie_breaker_priority', {currentOrder: currentOrder});
         
+        // DEBUG: Log translation values
+        console.log(`🔍 DEBUG: set_custom_order = "${t(userId, 'set_custom_order')}"`);
+        console.log(`🔍 DEBUG: reset_to_default = "${t(userId, 'reset_to_default')}"`);
+        console.log(`🔍 DEBUG: view_current_order = "${t(userId, 'view_current_order')}"`);
+        
         const buttons = [
             [
                 { text: t(userId, 'set_custom_order'), callback_data: 'reorder_custom_order' },
@@ -3342,6 +3347,7 @@ async function handleCallback(chatId, userId, userName, data) {
             ]
         ];
         
+        console.log(`🔍 DEBUG: Sending reorder queue menu with buttons:`, JSON.stringify(buttons, null, 2));
         sendMessageWithButtons(chatId, message, buttons);
         
     } else if (data === 'reorder_custom_order') {
@@ -3394,6 +3400,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
     } else if (data === 'reorder_reset_default') {
+        console.log(`🔍 DEBUG: reorder_reset_default handler triggered by ${userName}`);
         // Reset to default order
         const defaultOrder = ['Eden', 'Adele', 'Emma'];
         
@@ -3420,6 +3427,7 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, message);
         
     } else if (data === 'reorder_view_current') {
+        console.log(`🔍 DEBUG: reorder_view_current handler triggered by ${userName}`);
         // Show current turn order (use originalQueue, not turnOrder)
         const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
         const message = t(userId, 'current_tie_breaker_priority_order', {currentOrder: currentOrder});
