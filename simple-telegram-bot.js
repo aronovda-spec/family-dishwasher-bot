@@ -2624,7 +2624,7 @@ async function handleCommand(chatId, userId, userName, text) {
         }
         
         // Apply punishment directly (admin doesn't need approval)
-        applyPunishment(punishmentRequest.targetUser, reason, userName);
+        await applyPunishment(punishmentRequest.targetUser, reason, userName);
         
         sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${translateName(punishmentRequest.targetUser, userId)}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${translateName(userName, userId)}`);
         
@@ -2679,7 +2679,7 @@ async function handleCommand(chatId, userId, userName, text) {
 }
 
 // Apply punishment to a user (ONLY called by admin approval or admin direct action)
-function applyPunishment(targetUser, reason, appliedBy) {
+async function applyPunishment(targetUser, reason, appliedBy) {
     // In the new score-based system, punishment = subtract 3 from score
     // This makes them scheduled sooner (they have fewer turns performed)
     const currentScore = userScores.get(targetUser) || 0;
@@ -2700,6 +2700,9 @@ function applyPunishment(targetUser, reason, appliedBy) {
         extraTurns: 3,
         endDate: endDate
     });
+    
+    // Save to database
+    await saveBotData();
     
     // Get current turn user for display
     const currentTurnUser = getCurrentTurnUser();
@@ -2735,7 +2738,7 @@ function reportUser(targetUser, reason, reportedBy) {
 }
 
 // Execute approved swap
-function executeSwap(swapRequest, requestId, status) {
+async function executeSwap(swapRequest, requestId, status) {
     const { fromUser, toUser, fromUserId, toUserId } = swapRequest;
     
     // Initialize anti-cheating tracking for swaps
@@ -2846,6 +2849,9 @@ function executeSwap(swapRequest, requestId, status) {
             }
         });
     }
+    
+    // Save to database
+    await saveBotData();
     
     // Remove the request
     pendingSwaps.delete(requestId);
@@ -4059,7 +4065,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         console.log(`✅ Approval valid, executing swap...`);
         // Execute the swap
-        executeSwap(swapRequest, requestId, 'approved');
+        await executeSwap(swapRequest, requestId, 'approved');
         
     } else if (data.startsWith('swap_reject_')) {
         const requestId = parseInt(data.replace('swap_reject_', ''));
@@ -4210,6 +4216,9 @@ async function handleCallback(chatId, userId, userName, data) {
             // Track admin force swap for monthly report
             trackMonthlyAction('admin_force_swap', firstUser, userName);
             
+            // Save to database
+            await saveBotData();
+            
             // Get current turn user for display
             const currentTurnUser = getCurrentTurnUser();
             
@@ -4326,7 +4335,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Apply punishment
-        applyPunishment(punishmentRequest.targetUser, punishmentRequest.reason, userName);
+        await applyPunishment(punishmentRequest.targetUser, punishmentRequest.reason, userName);
         
         // Send confirmation to admin who approved
         sendMessage(chatId, `${t(userId, 'punishment_approved')}\n\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${punishmentRequest.reason}\n${t(userId, 'approved_by')} ${userName}\n\n${t(userId, 'extra_turns_applied')}`);
@@ -4445,7 +4454,7 @@ async function handleCallback(chatId, userId, userName, data) {
         const reason = parts[1];
         
         // Apply punishment directly with selected reason
-        applyPunishment(targetUser, reason, userName);
+        await applyPunishment(targetUser, reason, userName);
         sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${userName}\n\n${t(userId, 'extra_turns_added')}`);
         
         // Notify all authorized users and admins about the admin direct punishment in their language
