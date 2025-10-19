@@ -2863,7 +2863,13 @@ async function applyPunishment(targetUser, reason, appliedBy) {
         }
         
         // Get chat ID using the canonical name
-        const userChatId = userChatIds.get(canonicalName) || (canonicalName ? userChatIds.get(canonicalName.toLowerCase()) : null);
+        let userChatId = userChatIds.get(canonicalName) || (canonicalName ? userChatIds.get(canonicalName.toLowerCase()) : null);
+        
+        // If not found in userChatIds, check if this user is an admin
+        if (!userChatId && isUserAdmin(canonicalName)) {
+            userChatId = adminNameToChatId.get(canonicalName) || (canonicalName ? adminNameToChatId.get(canonicalName.toLowerCase()) : null);
+        }
+        
         if (userChatId) {
             sendMessage(userChatId, message);
         }
@@ -3433,6 +3439,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Add chat IDs from authorized users who are admins
         [...authorizedUsers, ...admins].forEach(user => {
             let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+            
+            // If not found in userChatIds, check if this user is an admin
+            if (!userChatId && isUserAdmin(user)) {
+                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+            }
+            
             if (userChatId) {
                 chatIdsToNotify.add(userChatId);
             }
