@@ -17,8 +17,6 @@ class SupabaseDatabase {
         if (!this.supabaseUrl || !this.supabaseKey) {
             console.log('⚠️ Supabase credentials not found in environment variables');
             console.log('💡 Set SUPABASE_URL and SUPABASE_ANON_KEY in Render dashboard');
-            console.log('🔍 SUPABASE_URL:', this.supabaseUrl ? 'SET' : 'NOT SET');
-            console.log('🔍 SUPABASE_ANON_KEY:', this.supabaseKey ? 'SET' : 'NOT SET');
             this.supabase = null;
             return;
         }
@@ -37,7 +35,6 @@ class SupabaseDatabase {
             }
         });
         console.log('📊 Supabase client initialized');
-        console.log('🔗 Supabase URL:', this.supabaseUrl);
         
         // Test connection
         this.testConnection();

@@ -1815,9 +1815,6 @@ async function handleCommand(chatId, userId, userName, text) {
         const isAdmin = isUserAdmin(userName, userId);
         const isAuthorized = isUserAuthorized(userName);
         
-        console.log(`🔍 User check: isAdmin=${isAdmin}, isAuthorized=${isAuthorized}`);
-        console.log(`🔍 Current admins: ${Array.from(admins)}`);
-        console.log(`🔍 Current authorized users: ${Array.from(authorizedUsers)}`);
         
         // If this user is an admin, store their chat ID for admin notifications
         if (isAdmin) {
