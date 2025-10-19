@@ -1041,6 +1041,13 @@ const translations = {
         
         // Admin management messages
         'current_admins': '👨‍💼 **Current Admins:**\n\n{adminList}\n\n📊 **Total admins:** {count}',
+        'authorized_and_active_users': '👥 **Authorized and Active Users:**',
+        'current_admins_status': '👑 **Current Admins:**',
+        'active_status': 'Active',
+        'needs_start': 'Needs /start',
+        'status_summary': '📊 **Status:**',
+        'active_count': 'Active',
+        'needs_start_count': 'needs /start',
         'no_authorized_users': '👥 **No authorized users set yet.**\n\nUse `/authorize <user>` to authorize a user.\n\n📋 **Available queue members:**\n• {Eden}\n• {Adele}\n• {Emma}',
         'first_admin_added': '✅ **First Admin Added!**\n\n👨‍💼 {user} is now the first admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** {user} needs to send /start to the bot to receive notifications.',
         'admin_added': '✅ **Admin Added!**\n\n👨‍💼 {user} is now an admin.\n\n🔑 **Admin privileges:**\n• Manage queue\n• Authorize users\n• Add/remove admins\n• Force swaps\n• Apply punishments\n\n💡 **Note:** {user} needs to send /start to the bot to receive notifications.',
@@ -1425,6 +1432,13 @@ const translations = {
         
         // Admin management messages
         'current_admins': '👨‍💼 **מנהלים נוכחיים:**\n\n{adminList}\n\n📊 **סך מנהלים:** {count}',
+        'authorized_and_active_users': '👥 **משתמשים מורשים ופעילים:**',
+        'current_admins_status': '👑 **מנהלים נוכחיים:**',
+        'active_status': 'פעיל',
+        'needs_start': 'צריך /start',
+        'status_summary': '📊 **סטטוס:**',
+        'active_count': 'פעיל',
+        'needs_start_count': 'צריך /start',
         'no_authorized_users': '👥 **עדיין לא הוגדרו משתמשים מורשים.**\n\nהשתמש ב-`/authorize <user>` כדי להרשות משתמש.\n\n📋 **חברי התור הזמינים:**\n• {Eden}\n• {Adele}\n• {Emma}',
         'first_admin_added': '✅ **מנהל ראשון נוסף!**\n\n👨‍💼 {user} הוא כעת המנהל הראשון.\n\n🔑 **הרשאות מנהל:**\n• ניהול התור\n• הרשאת משתמשים\n• הוספה/הסרה של מנהלים\n• החלפות בכוח\n• הפעלת עונשים\n\n💡 **הערה:** {user} צריך לשלוח /start לבוט כדי לקבל התראות.',
         'admin_added': '✅ **מנהל נוסף!**\n\n👨‍💼 {user} הוא כעת מנהל.\n\n🔑 **הרשאות מנהל:**\n• ניהול התור\n• הרשאת משתמשים\n• הוספה/הסרה של מנהלים\n• החלפות בכוח\n• הפעלת עונשים\n\n💡 **הערה:** {user} צריך לשלוח /start לבוט כדי לקבל התראות.',
@@ -2431,7 +2445,7 @@ async function handleCommand(chatId, userId, userName, text) {
         if (admins.size === 0) {
             sendMessage(chatId, t(userId, 'no_admins_set'));
         } else {
-            let adminList = '👑 **Current Admins:**\n\n';
+            let adminList = t(userId, 'current_admins_status') + '\n\n';
             let activeCount = 0;
             let totalCount = admins.size;
             
@@ -2442,23 +2456,23 @@ async function handleCommand(chatId, userId, userName, text) {
                     const isActive = adminNameToChatId.has(admin.toString());
                     if (isActive) {
                         activeCount++;
-                        adminList += `• ✅ User ID: ${admin} → ${admin} → ${admin} (Active)\n`;
+                        adminList += `• ✅ User ID: ${admin} → ${admin} → ${admin} (${t(userId, 'active_status')})\n`;
                     } else {
-                        adminList += `• ⏳ User ID: ${admin} → ${admin} (Needs /start)\n`;
+                        adminList += `• ⏳ User ID: ${admin} → ${admin} (${t(userId, 'needs_start')})\n`;
                     }
                 } else {
                     // For usernames, check if they're active
                     const isActive = adminNameToChatId.has(admin) || (admin ? adminNameToChatId.has(admin.toLowerCase()) : false);
                     if (isActive) {
                         activeCount++;
-                        adminList += `• ✅ ${addRoyalEmojiTranslated(admin, userId)} → ${admin} → ${admin} (Active)\n`;
+                        adminList += `• ✅ ${addRoyalEmojiTranslated(admin, userId)} → ${admin} → ${admin} (${t(userId, 'active_status')})\n`;
                     } else {
-                        adminList += `• ⏳ ${addRoyalEmojiTranslated(admin, userId)} → ${admin} (Needs /start)\n`;
+                        adminList += `• ⏳ ${addRoyalEmojiTranslated(admin, userId)} → ${admin} (${t(userId, 'needs_start')})\n`;
                     }
                 }
             });
             
-            adminList += `\n📊 **Status:** ${activeCount}/${totalCount} Active (${totalCount - activeCount} needs /start)`;
+            adminList += `\n${t(userId, 'status_summary')} ${activeCount}/${totalCount} ${t(userId, 'active_count')} (${totalCount - activeCount} ${t(userId, 'needs_start_count')})`;
             sendMessage(chatId, adminList);
         }
         
@@ -2470,7 +2484,7 @@ async function handleCommand(chatId, userId, userName, text) {
                 Emma: translateName('Emma', userId)
             }));
         } else {
-            let userList = '👥 **Authorized and Active Users:**\n\n';
+            let userList = t(userId, 'authorized_and_active_users') + '\n\n';
             let activeCount = 0;
             let totalCount = authorizedUsers.size;
             
@@ -2480,13 +2494,13 @@ async function handleCommand(chatId, userId, userName, text) {
                 
                 if (isActive) {
                     activeCount++;
-                    userList += `• ✅ ${user} → ${user} → ${user} (Active)\n`;
+                    userList += `• ✅ ${user} → ${user} → ${user} (${t(userId, 'active_status')})\n`;
                 } else {
-                    userList += `• ⏳ ${user} → ${user} (Needs /start)\n`;
+                    userList += `• ⏳ ${user} → ${user} (${t(userId, 'needs_start')})\n`;
                 }
             });
             
-            userList += `\n📊 **Status:** ${activeCount}/${totalCount} Active (${totalCount - activeCount} needs /start)`;
+            userList += `\n${t(userId, 'status_summary')} ${activeCount}/${totalCount} ${t(userId, 'active_count')} (${totalCount - activeCount} ${t(userId, 'needs_start_count')})`;
             userList += `\n📝 **Note:** Maximum 3 authorized users allowed.`;
             sendMessage(chatId, userList);
         }
