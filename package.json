@@ -5,6 +5,7 @@
   "main": "simple-telegram-bot.js",
   "scripts": {
     "start": "node start_simple.js",
+    "start-direct": "node start_direct.js",
     "start-multi": "node start_render.js",
     "dev": "node simple-telegram-bot.js",
     "health": "node health_server.js",
