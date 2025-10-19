@@ -163,37 +163,22 @@ async function loadFromGlobalBackup() {
         console.log('📂 Bot data loaded successfully from global backup');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
         
-        // ONE-TIME RESET: Clean existing scores to 0, then persistent scores
+        // Initialize default scores for new users only (persistent scores)
         const defaultUsers = ['Eden', 'Adele', 'Emma'];
-        let resetScores = 0;
+        let initializedScores = 0;
         
-        // Check if we need to reset existing scores (one-time cleanup)
-        const hasExistingScores = defaultUsers.some(user => userScores.has(user) && userScores.get(user) > 0);
-        
-        if (hasExistingScores) {
-            console.log('🧹 ONE-TIME CLEANUP: Resetting existing scores to 0');
-            for (const user of defaultUsers) {
+        for (const user of defaultUsers) {
+            if (!userScores.has(user)) {
                 userScores.set(user, 0);
                 await db.setUserScore(user, 0);
-                resetScores++;
+                initializedScores++;
             }
-            console.log(`🎯 ONE-TIME RESET: All ${resetScores} user scores reset to 0 (clean start)`);
+        }
+        
+        if (initializedScores > 0) {
+            console.log(`🎯 Initialized ${initializedScores} new user scores to 0 (persistent scores maintained)`);
         } else {
-            // Normal initialization for new users only
-            let initializedScores = 0;
-            for (const user of defaultUsers) {
-                if (!userScores.has(user)) {
-                    userScores.set(user, 0);
-                    await db.setUserScore(user, 0);
-                    initializedScores++;
-                }
-            }
-            
-            if (initializedScores > 0) {
-                console.log(`🎯 Initialized ${initializedScores} new user scores to 0 (persistent scores maintained)`);
-            } else {
-                console.log(`📊 All user scores loaded from database (persistent scores maintained)`);
-            }
+            console.log(`📊 All user scores loaded from database (persistent scores maintained)`);
         }
         
         return true;
@@ -302,37 +287,22 @@ async function loadBotData() {
         console.log('📂 Bot data loaded successfully from SQLite');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
         
-        // ONE-TIME RESET: Clean existing scores to 0, then persistent scores
+        // Initialize default scores for new users only (persistent scores)
         const defaultUsers = ['Eden', 'Adele', 'Emma'];
-        let resetScores = 0;
+        let initializedScores = 0;
         
-        // Check if we need to reset existing scores (one-time cleanup)
-        const hasExistingScores = defaultUsers.some(user => userScores.has(user) && userScores.get(user) > 0);
-        
-        if (hasExistingScores) {
-            console.log('🧹 ONE-TIME CLEANUP: Resetting existing scores to 0');
-            for (const user of defaultUsers) {
+        for (const user of defaultUsers) {
+            if (!userScores.has(user)) {
                 userScores.set(user, 0);
                 await db.setUserScore(user, 0);
-                resetScores++;
+                initializedScores++;
             }
-            console.log(`🎯 ONE-TIME RESET: All ${resetScores} user scores reset to 0 (clean start)`);
+        }
+        
+        if (initializedScores > 0) {
+            console.log(`🎯 Initialized ${initializedScores} new user scores to 0 (persistent scores maintained)`);
         } else {
-            // Normal initialization for new users only
-            let initializedScores = 0;
-            for (const user of defaultUsers) {
-                if (!userScores.has(user)) {
-                    userScores.set(user, 0);
-                    await db.setUserScore(user, 0);
-                    initializedScores++;
-                }
-            }
-            
-            if (initializedScores > 0) {
-                console.log(`🎯 Initialized ${initializedScores} new user scores to 0 (persistent scores maintained)`);
-            } else {
-                console.log(`📊 All user scores loaded from database (persistent scores maintained)`);
-            }
+            console.log(`📊 All user scores loaded from database (persistent scores maintained)`);
         }
         
         return true;
