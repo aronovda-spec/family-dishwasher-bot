@@ -440,11 +440,11 @@ let dbReady = false;
         console.log('✅ Supabase database connection established');
         console.log('📊 Using Supabase PostgreSQL for true persistence');
         console.log('📊 Data persists across restarts and deployments');
-        dbReady = true;
         
         // Load bot data from Supabase database (true persistence!)
         await loadBotData();
         
+        dbReady = true;
         console.log('🎯 Bot initialization complete - ready to receive commands');
     } catch (error) {
         console.error('❌ Error during bot initialization:', error);
@@ -2005,6 +2005,8 @@ async function handleCommand(chatId, userId, userName, text) {
         if (!userLanguage.has(userId)) {
             userLanguage.set(userId, 'en'); // Default to English
             console.log(`🌐 Set default language (English) for new user ${userName} (${userId})`);
+        } else {
+            console.log(`🌐 User ${userName} (${userId}) already has language preference: ${userLanguage.get(userId)}`);
         }
         
         const isAdmin = isUserAdmin(userName, userId);
