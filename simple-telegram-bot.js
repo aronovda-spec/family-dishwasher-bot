@@ -1088,6 +1088,17 @@ const translations = {
         'normalize_now': '✅ Normalize Now',
         'scores_normalized': '✅ Scores Normalized!\n\n📊 New Scores:\n{newScores}\n\n🎯 Relative positions preserved, numbers reduced.',
         
+        // Reorder Queue
+        'reorder_tie_breaker_priority': '🔄 **Reorder Tie-Breaker Priority**\n\n📋 **Current Priority Order:**\n{currentOrder}\n\n💡 **This affects who gets priority when scores are tied.**\n\n**Options:**',
+        'set_custom_order': '🔄 Set Custom Order',
+        'reset_to_default': '🔄 Reset To Default',
+        'view_current_order': '📊 View Current Order',
+        'select_user_move_priority': 'Select user to move to different priority position:',
+        'tie_breaker_order_updated': '✅ **Tie-breaker Order Updated!**\n\n📋 **New Priority Order:**\n{newOrder}\n\n💡 **This affects who gets priority when scores are tied.**',
+        'invalid_position_selected': '❌ Invalid position selected.',
+        'tie_breaker_order_reset': '✅ **Tie-breaker Order Reset to Default!**\n\n📋 **Default Priority Order:**\n{defaultOrder}',
+        'current_tie_breaker_priority_order': '📋 **Current Tie-Breaker Priority Order:**\n\n{currentOrder}\n\n💡 **This affects who gets priority when scores are tied.**',
+        
         // Monthly Reports
         'monthly_report': '📊 Monthly Report',
         'share_monthly_report': '📤 Share Monthly Report',
@@ -3317,8 +3328,8 @@ async function handleCallback(chatId, userId, userName, data) {
         
     // Queue Management Handlers
     } else if (data === 'reorder_queue_menu') {
-        // Show current turn order and options to change it
-        const currentOrder = Array.from(turnOrder).map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
+        // Show current turn order and options to change it (use originalQueue, not turnOrder)
+        const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
         const message = t(userId, 'reorder_tie_breaker_priority', {currentOrder: currentOrder});
         
         const buttons = [
@@ -3390,10 +3401,15 @@ async function handleCallback(chatId, userId, userName, data) {
         turnOrder.clear();
         defaultOrder.forEach(user => turnOrder.add(user));
         
+        // Reset originalQueue to default (CRITICAL FIX!)
+        originalQueue.length = 0;
+        originalQueue.push(...defaultOrder);
+        
         // Reset current turn index
         currentTurnIndex = 0;
         
         console.log(`🔄 Turn order reset to default: ${defaultOrder.join(' → ')}`);
+        console.log(`🔄 OriginalQueue reset to default: [${originalQueue.join(', ')}]`);
         
         // Save the changes
         await saveBotData();
@@ -3404,8 +3420,8 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, message);
         
     } else if (data === 'reorder_view_current') {
-        // Show current turn order
-        const currentOrder = Array.from(turnOrder).map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
+        // Show current turn order (use originalQueue, not turnOrder)
+        const currentOrder = originalQueue.map((user, index) => `${index + 1}. ${addRoyalEmojiTranslated(user, userId)}`).join('\n');
         const message = t(userId, 'current_tie_breaker_priority_order', {currentOrder: currentOrder});
         
         sendMessage(chatId, message);
