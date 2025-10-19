@@ -74,36 +74,23 @@ async function saveBotData() {
                 userScores: Object.fromEntries(userScores)
             };
             
-            // ALSO save to persistent file for Render persistence
+            // ALSO save to Render environment variables for persistence
             try {
-                const fs = require('fs');
-                const path = require('path');
+                const backupData = JSON.stringify(global.botDataBackup);
                 
-                // Try multiple persistent locations
-                const persistentPaths = [
-                    '/tmp/bot_data_backup.json',  // /tmp might persist on some systems
-                    path.join(process.cwd(), 'bot_data_backup.json'),  // Current working directory
-                    path.join(__dirname, 'bot_data_backup.json'),  // Bot directory
-                    '/app/bot_data_backup.json'  // App directory
-                ];
-                
-                const backupData = JSON.stringify(global.botDataBackup, null, 2);
-                let saved = false;
-                
-                for (const backupPath of persistentPaths) {
-                    try {
-                        fs.writeFileSync(backupPath, backupData);
-                        console.log(`💾 Bot data saved to persistent file: ${backupPath}`);
-                        saved = true;
-                        break;
-                    } catch (err) {
-                        console.log(`⚠️ Could not save to ${backupPath}: ${err.message}`);
-                    }
+                // Save to multiple environment variables to avoid size limits
+                // These will be set in Render dashboard, not at runtime
+                process.env.BOT_DATA_BACKUP_1 = backupData.substring(0, 10000);
+                if (backupData.length > 10000) {
+                    process.env.BOT_DATA_BACKUP_2 = backupData.substring(10000, 20000);
+                }
+                if (backupData.length > 20000) {
+                    process.env.BOT_DATA_BACKUP_3 = backupData.substring(20000);
                 }
                 
-                if (!saved) {
-                    console.log(`💾 Bot data saved to SQLite and global backup only`);
-                }
+                console.log(`💾 Bot data saved to SQLite, global backup, and environment variables`);
+                console.log(`💾 Environment variables updated: BOT_DATA_BACKUP_1, BOT_DATA_BACKUP_2, BOT_DATA_BACKUP_3`);
+                console.log(`💾 IMPORTANT: Copy these values to Render dashboard environment variables!`);
                 
             } catch (error) {
                 console.log(`💾 Bot data saved to SQLite and global backup for Render persistence`);
@@ -2406,6 +2393,96 @@ async function handleCommand(chatId, userId, userName, text) {
             });
             userList += `\n📝 **Note:** Maximum 3 authorized users allowed.`;
             sendMessage(chatId, userList);
+        }
+        
+    } else if (command === '/setup') {
+        // Simple setup command - no admin required
+        try {
+            const setupData = {
+                timestamp: Date.now(),
+                authorizedUsers: ['Eden', 'Adele', 'Emma'],
+                admins: ['Dani'],
+                userChatIds: {},
+                adminChatIds: [],
+                turnOrder: ['Eden', 'Adele', 'Emma'],
+                currentTurnIndex: 0,
+                userQueueMapping: {
+                    'Eden': 'Eden',
+                    'Adele': 'Adele', 
+                    'Emma': 'Emma'
+                },
+                queueUserMapping: {
+                    'Eden': 'Eden',
+                    'Adele': 'Adele',
+                    'Emma': 'Emma'
+                },
+                suspendedUsers: {},
+                turnAssignments: {},
+                monthlyStats: {},
+                userScores: {
+                    'Eden': 0,
+                    'Adele': 0,
+                    'Emma': 0
+                }
+            };
+            
+            // Restore data
+            authorizedUsers.clear();
+            setupData.authorizedUsers.forEach(user => authorizedUsers.add(user));
+            
+            admins.clear();
+            setupData.admins.forEach(admin => admins.add(admin));
+            
+            userChatIds.clear();
+            Object.entries(setupData.userChatIds).forEach(([key, value]) => {
+                userChatIds.set(key, value);
+            });
+            
+            adminChatIds.clear();
+            setupData.adminChatIds.forEach(chatId => adminChatIds.add(chatId));
+            
+            turnOrder.clear();
+            setupData.turnOrder.forEach(user => turnOrder.add(user));
+            
+            currentTurnIndex = setupData.currentTurnIndex;
+            
+            userQueueMapping.clear();
+            Object.entries(setupData.userQueueMapping).forEach(([key, value]) => {
+                userQueueMapping.set(key, value);
+            });
+            
+            queueUserMapping.clear();
+            Object.entries(setupData.queueUserMapping).forEach(([key, value]) => {
+                queueUserMapping.set(key, value);
+            });
+            
+            suspendedUsers.clear();
+            Object.entries(setupData.suspendedUsers).forEach(([key, value]) => {
+                suspendedUsers.set(key, value);
+            });
+            
+            turnAssignments.clear();
+            Object.entries(setupData.turnAssignments).forEach(([key, value]) => {
+                turnAssignments.set(key, value);
+            });
+            
+            monthlyStats.clear();
+            Object.entries(setupData.monthlyStats).forEach(([key, value]) => {
+                monthlyStats.set(key, value);
+            });
+            
+            userScores.clear();
+            Object.entries(setupData.userScores).forEach(([key, value]) => {
+                userScores.set(key, value);
+            });
+            
+            // Save to database
+            await saveBotData();
+            
+            sendMessage(chatId, `✅ **Bot setup completed!**\n\n👥 Users: Eden, Adele, Emma\n👨‍💼 Admins: Dani\n📊 Scores: All 0\n\n🎯 Bot is ready to use!`);
+            
+        } catch (error) {
+            sendMessage(chatId, `❌ Error setting up bot: ${error.message}`);
         }
         
     } else if (command === '/backup') {
