@@ -74,12 +74,11 @@ async function saveBotData() {
                 userScores: Object.fromEntries(userScores)
             };
             
-            // ALSO save to Render environment variables for persistence
+            // ALSO save to multiple persistence methods for Render
             try {
                 const backupData = JSON.stringify(global.botDataBackup);
                 
-                // Save to multiple environment variables to avoid size limits
-                // These will be set in Render dashboard, not at runtime
+                // Method 1: Environment variables (Render dashboard)
                 process.env.BOT_DATA_BACKUP_1 = backupData.substring(0, 10000);
                 if (backupData.length > 10000) {
                     process.env.BOT_DATA_BACKUP_2 = backupData.substring(10000, 20000);
@@ -88,9 +87,34 @@ async function saveBotData() {
                     process.env.BOT_DATA_BACKUP_3 = backupData.substring(20000);
                 }
                 
+                // Method 2: Try to save to persistent file locations
+                const fs = require('fs');
+                const path = require('path');
+                
+                const persistentPaths = [
+                    '/tmp/bot_data_backup.json',
+                    path.join(process.cwd(), 'bot_data_backup.json'),
+                    path.join(__dirname, 'bot_data_backup.json'),
+                    '/app/bot_data_backup.json',
+                    '/var/data/bot_data_backup.json'  // Render persistent disk location
+                ];
+                
+                let fileSaved = false;
+                for (const backupPath of persistentPaths) {
+                    try {
+                        fs.writeFileSync(backupPath, backupData);
+                        console.log(`💾 Bot data saved to persistent file: ${backupPath}`);
+                        fileSaved = true;
+                        break;
+                    } catch (err) {
+                        console.log(`⚠️ Could not save to ${backupPath}: ${err.message}`);
+                    }
+                }
+                
                 console.log(`💾 Bot data saved to SQLite, global backup, and environment variables`);
-                console.log(`💾 Environment variables updated: BOT_DATA_BACKUP_1, BOT_DATA_BACKUP_2, BOT_DATA_BACKUP_3`);
-                console.log(`💾 IMPORTANT: Copy these values to Render dashboard environment variables!`);
+                console.log(`💾 Environment variables: BOT_DATA_BACKUP_1, BOT_DATA_BACKUP_2, BOT_DATA_BACKUP_3`);
+                console.log(`💾 File saved: ${fileSaved ? 'Yes' : 'No'}`);
+                console.log(`💾 IMPORTANT: Copy env vars to Render dashboard for persistence!`);
                 
             } catch (error) {
                 console.log(`💾 Bot data saved to SQLite and global backup for Render persistence`);
@@ -518,13 +542,36 @@ db.db.on('open', () => {
             loadBotData();
         }
     } else if (isRender) {
-        console.log('🔄 Running on Render - checking persistent file backups');
+        console.log('🔄 Running on Render - checking multiple persistence methods');
+        
+        // Method 1: Check environment variables (Render dashboard)
+        if (process.env.BOT_DATA_BACKUP_1 || process.env.BOT_DATA_BACKUP) {
+            console.log('🔄 Found environment variable backup');
+            try {
+                let backupData = '';
+                if (process.env.BOT_DATA_BACKUP) {
+                    backupData = process.env.BOT_DATA_BACKUP;
+                } else {
+                    backupData = process.env.BOT_DATA_BACKUP_1 || '';
+                    if (process.env.BOT_DATA_BACKUP_2) backupData += process.env.BOT_DATA_BACKUP_2;
+                    if (process.env.BOT_DATA_BACKUP_3) backupData += process.env.BOT_DATA_BACKUP_3;
+                }
+                global.botDataBackup = JSON.parse(backupData);
+                console.log(`🔄 Environment backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
+                loadFromGlobalBackup();
+                return;
+            } catch (error) {
+                console.log('❌ Error parsing environment backup, trying file backup');
+            }
+        }
+        
+        // Method 2: Check persistent file locations
         try {
             const fs = require('fs');
             const path = require('path');
             
-            // Check multiple persistent locations
             const persistentPaths = [
+                '/var/data/bot_data_backup.json',  // Render persistent disk
                 '/tmp/bot_data_backup.json',
                 path.join(process.cwd(), 'bot_data_backup.json'),
                 path.join(__dirname, 'bot_data_backup.json'),
@@ -532,7 +579,6 @@ db.db.on('open', () => {
             ];
             
             let backupFound = false;
-            
             for (const backupPath of persistentPaths) {
                 if (fs.existsSync(backupPath)) {
                     try {
@@ -550,11 +596,11 @@ db.db.on('open', () => {
             }
             
             if (!backupFound) {
-                console.log('📂 No persistent file backup found, loading from SQLite database');
+                console.log('📂 No persistent backup found, loading from SQLite database');
                 loadBotData();
             }
         } catch (error) {
-            console.log('❌ Error loading persistent file backups, falling back to SQLite');
+            console.log('❌ Error loading persistent backups, falling back to SQLite');
             loadBotData();
         }
     } else {
