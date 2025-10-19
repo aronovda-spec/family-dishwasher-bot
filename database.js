@@ -314,10 +314,10 @@ class Database {
     }
 
     // Cleanup methods
-    async removeUser(userId) {
+    async removeUser(userName) {
         return new Promise((resolve, reject) => {
-            const sql = `DELETE FROM users WHERE user_id = ?`;
-            this.db.run(sql, [userId], function(err) {
+            const sql = `DELETE FROM user_scores WHERE user_name = ?`;
+            this.db.run(sql, [userName], function(err) {
                 if (err) {
                     reject(err);
                 } else {

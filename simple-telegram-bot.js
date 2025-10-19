@@ -2307,24 +2307,61 @@ async function handleCommand(chatId, userId, userName, text) {
         }
         
         // Check if user exists in authorized users
-        if (authorizedUsers.has(userToRemove) || authorizedUsers.has(userToRemove.toLowerCase())) {
-            // Remove from all data structures
-            authorizedUsers.delete(userToRemove);
-            authorizedUsers.delete(userToRemove.toLowerCase());
-            userChatIds.delete(userToRemove);
-            userChatIds.delete(userToRemove.toLowerCase());
-            turnOrder.delete(userToRemove);
-            turnOrder.delete(userToRemove.toLowerCase());
-            userScores.delete(userToRemove);
-            userScores.delete(userToRemove.toLowerCase());
-            
-            // Save bot data after removing user
-            await saveBotData();
-            
-            sendMessage(chatId, t(userId, 'user_removed_success', {user: userToRemove}));
-        } else {
+        if (!isUserAuthorized(userToRemove)) {
             sendMessage(chatId, t(userId, 'user_not_found', {user: userToRemove}));
+            return;
         }
+        
+        // Find the actual user name (case-insensitive)
+        let actualUserName = null;
+        for (const authorizedUser of authorizedUsers) {
+            if (authorizedUser.toLowerCase() === userToRemove.toLowerCase()) {
+                actualUserName = authorizedUser;
+                break;
+            }
+        }
+        
+        if (!actualUserName) {
+            sendMessage(chatId, t(userId, 'user_not_found', {user: userToRemove}));
+            return;
+        }
+        
+        // Remove user from ALL data structures
+        authorizedUsers.delete(actualUserName);
+        userChatIds.delete(actualUserName);
+        userChatIds.delete(actualUserName.toLowerCase());
+        turnOrder.delete(actualUserName);
+        userScores.delete(actualUserName);
+        
+        // Remove from queue mappings
+        userQueueMapping.delete(actualUserName);
+        queueUserMapping.delete(actualUserName);
+        
+        // Remove from suspended users
+        suspendedUsers.delete(actualUserName);
+        
+        // Remove from turn assignments
+        turnAssignments.delete(actualUserName);
+        
+        // Remove from database directly
+        await db.removeUser(actualUserName);
+        
+        // Clean up any turn assignments TO the removed user
+        for (const [assigner, assignee] of turnAssignments.entries()) {
+            if (assignee === actualUserName) {
+                turnAssignments.delete(assigner);
+            }
+        }
+        
+        // Adjust current turn index if needed
+        if (currentTurnIndex >= turnOrder.size) {
+            currentTurnIndex = 0;
+        }
+        
+        // Save bot data after removing user
+        await saveBotData();
+        
+        sendMessage(chatId, t(userId, 'user_removed_success', {user: actualUserName}));
         
     } else if (command === '/leave' || command === '/quit') {
         // Allow users to remove themselves
@@ -2702,21 +2739,63 @@ async function handleCallback(chatId, userId, userName, data) {
         
         const targetUser = data.replace('remove_user_', '');
         
-        // Remove user from all data structures
-        authorizedUsers.delete(targetUser);
-        authorizedUsers.delete(targetUser.toLowerCase());
-        userChatIds.delete(targetUser);
-        userChatIds.delete(targetUser.toLowerCase());
-        turnOrder.delete(targetUser);
-        turnOrder.delete(targetUser.toLowerCase());
-        userScores.delete(targetUser);
-        userScores.delete(targetUser.toLowerCase());
+        // Check if user exists in authorized users
+        if (!isUserAuthorized(targetUser)) {
+            sendMessage(chatId, t(userId, 'user_not_found', {user: targetUser}));
+            return;
+        }
+        
+        // Find the actual user name (case-insensitive)
+        let actualUserName = null;
+        for (const authorizedUser of authorizedUsers) {
+            if (authorizedUser.toLowerCase() === targetUser.toLowerCase()) {
+                actualUserName = authorizedUser;
+                break;
+            }
+        }
+        
+        if (!actualUserName) {
+            sendMessage(chatId, t(userId, 'user_not_found', {user: targetUser}));
+            return;
+        }
+        
+        // Remove user from ALL data structures
+        authorizedUsers.delete(actualUserName);
+        userChatIds.delete(actualUserName);
+        userChatIds.delete(actualUserName.toLowerCase());
+        turnOrder.delete(actualUserName);
+        userScores.delete(actualUserName);
+        
+        // Remove from queue mappings
+        userQueueMapping.delete(actualUserName);
+        queueUserMapping.delete(actualUserName);
+        
+        // Remove from suspended users
+        suspendedUsers.delete(actualUserName);
+        
+        // Remove from turn assignments
+        turnAssignments.delete(actualUserName);
+        
+        // Remove from database directly
+        await db.removeUser(actualUserName);
+        
+        // Clean up any turn assignments TO the removed user
+        for (const [assigner, assignee] of turnAssignments.entries()) {
+            if (assignee === actualUserName) {
+                turnAssignments.delete(assigner);
+            }
+        }
+        
+        // Adjust current turn index if needed
+        if (currentTurnIndex >= turnOrder.size) {
+            currentTurnIndex = 0;
+        }
         
         // Save bot data after removing user
         await saveBotData();
         
         // Update the message
-        sendMessage(chatId, t(userId, 'user_removed_success', {user: targetUser}));
+        sendMessage(chatId, t(userId, 'user_removed_success', {user: actualUserName}));
         
     } else if (data === 'reset_bot_menu') {
         // Check if user is admin
