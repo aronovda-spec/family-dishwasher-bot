@@ -41,6 +41,7 @@ async function saveBotData() {
         await db.saveBotState('gracePeriods', global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {});
         await db.saveBotState('queueStatistics', Object.fromEntries(queueStatistics));
         await db.saveBotState('punishmentTurns', Object.fromEntries(punishmentTurns));
+        await db.saveBotState('userLanguage', Object.fromEntries(userLanguage));
         
         // Save user scores
         for (const [userName, score] of userScores.entries()) {
@@ -93,6 +94,7 @@ async function loadBotData() {
         const gracePeriodsData = await db.getBotState('gracePeriods') || {};
         const queueStatisticsData = await db.getBotState('queueStatistics') || {};
         const punishmentTurnsData = await db.getBotState('punishmentTurns') || {};
+        const userLanguageData = await db.getBotState('userLanguage') || {};
         
         // Load user scores
         const userScoresData = await db.getAllUserScores();
@@ -181,6 +183,12 @@ async function loadBotData() {
         punishmentTurns.clear();
         Object.entries(punishmentTurnsData).forEach(([key, value]) => {
             punishmentTurns.set(key, value);
+        });
+        
+        // Restore user language preferences
+        userLanguage.clear();
+        Object.entries(userLanguageData).forEach(([key, value]) => {
+            userLanguage.set(key, value);
         });
         
         // Restore monthly statistics
@@ -2120,9 +2128,9 @@ async function handleCommand(chatId, userId, userName, text) {
             if (authorizedUsers.has(user)) {
                 // Fetch score directly from database to ensure accuracy
                 const score = await db.getUserScore(user) || 0;
-                const relativeScore = relativeScores.get(user) || 0;
-                const royalName = addRoyalEmojiTranslated(user, userId);
-                statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+            const relativeScore = relativeScores.get(user) || 0;
+            const royalName = addRoyalEmojiTranslated(user, userId);
+            statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
             }
         }
         
@@ -3663,9 +3671,9 @@ async function handleCallback(chatId, userId, userName, data) {
             if (authorizedUsers.has(user)) {
                 // Fetch score directly from database to ensure accuracy
                 const score = await db.getUserScore(user) || 0;
-                const relativeScore = relativeScores.get(user) || 0;
-                const emoji = addRoyalEmoji(user);
-                statsMessage += `${emoji}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+            const relativeScore = relativeScores.get(user) || 0;
+            const emoji = addRoyalEmoji(user);
+            statsMessage += `${emoji}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
             }
         }
         
