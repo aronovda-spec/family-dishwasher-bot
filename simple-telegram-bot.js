@@ -20,7 +20,7 @@ const botUrl = `https://api.telegram.org/bot${token}`;
 // Database will be initialized after global variables are declared
 let db = null;
 
-// Persistence functions using SQLite
+// Persistence functions using Supabase
 async function saveBotData() {
     try {
         // Save core bot state
@@ -57,14 +57,13 @@ async function saveBotData() {
         // Supabase persistence: True persistence across restarts and deployments!
         console.log(`💾 Bot data saved to Supabase PostgreSQL database`);
         console.log(`💾 Data persists across restarts and deployments`);
-        console.log(`💾 No more ephemeral file system issues!`);
         console.log(`💾 Bot data saved to Supabase - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
     } catch (error) {
         console.error('❌ Error saving bot data to Supabase:', error);
     }
 }
 
-// Super2 style: Simple SQLite persistence - no complex backup functions needed
+// Supabase persistence - no complex backup functions needed
 
 async function loadBotData() {
     // Wait for database to be ready
@@ -190,7 +189,7 @@ async function loadBotData() {
         
         return true;
     } catch (error) {
-        console.error('❌ Error loading bot data from SQLite:', error);
+        console.error('❌ Error loading bot data from Supabase:', error);
         return false;
     }
 }
@@ -353,7 +352,7 @@ const queueUserMapping = new Map(); // Map: Queue name -> Telegram user ID
 const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason: string, originalPosition: number }
 const queueStatistics = new Map(); // userName -> { totalCompletions: number, monthlyCompletions: number, lastCompleted: Date }
 
-// Check if running on Render (ephemeral file system)
+// Check if running on Render
 const isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HOSTNAME;
 
 // Initialize Supabase database after global variables are declared
@@ -370,7 +369,6 @@ let dbReady = false;
         console.log('✅ Supabase database connection established');
         console.log('📊 Using Supabase PostgreSQL for true persistence');
         console.log('📊 Data persists across restarts and deployments');
-        console.log('📊 No more ephemeral file system issues!');
         dbReady = true;
         
         // Load bot data from Supabase database (true persistence!)
