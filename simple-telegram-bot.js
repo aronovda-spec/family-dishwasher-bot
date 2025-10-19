@@ -19,10 +19,18 @@ const botUrl = `https://api.telegram.org/bot${token}`;
 const DATA_DIR = path.join(__dirname, 'data');
 const BOT_DATA_FILE = path.join(DATA_DIR, 'bot_state.json');
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    console.log('📁 Created data directory for persistence');
+// Check if we're running on Render (ephemeral file system)
+const isRender = process.env.RENDER_EXTERNAL_HOSTNAME;
+const useFilePersistence = !isRender; // Disable file persistence on Render
+
+if (useFilePersistence) {
+    // Ensure data directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        console.log('📁 Created data directory for persistence');
+    }
+} else {
+    console.log('🌐 Running on Render - using in-memory persistence only');
 }
 
 // Persistence functions
@@ -59,28 +67,49 @@ async function saveBotData() {
             version: '1.0.0'
         };
         
-        const jsonData = JSON.stringify(botData, null, 2);
-        fs.writeFileSync(BOT_DATA_FILE, jsonData, 'utf8');
-        console.log(`💾 Bot data saved successfully - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        if (useFilePersistence) {
+            const jsonData = JSON.stringify(botData, null, 2);
+            fs.writeFileSync(BOT_DATA_FILE, jsonData, 'utf8');
+            console.log(`💾 Bot data saved to file - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        } else {
+            // On Render, store in environment variable (limited but better than nothing)
+            const jsonData = JSON.stringify(botData);
+            process.env.BOT_DATA_BACKUP = jsonData;
+            console.log(`💾 Bot data saved to memory - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        }
     } catch (error) {
         console.error('❌ Error saving bot data:', error);
-        console.error('❌ File path:', BOT_DATA_FILE);
-        console.error('❌ Data directory exists:', fs.existsSync(DATA_DIR));
-        console.error('❌ Data directory writable:', fs.accessSync ? 'checking...' : 'unknown');
+        if (useFilePersistence) {
+            console.error('❌ File path:', BOT_DATA_FILE);
+            console.error('❌ Data directory exists:', fs.existsSync(DATA_DIR));
+        }
     }
 }
 
 async function loadBotData() {
     try {
-        if (!fs.existsSync(BOT_DATA_FILE)) {
-            console.log('📄 No existing bot data found, starting fresh');
-            return false;
+        let botData = null;
+        
+        if (useFilePersistence) {
+            if (!fs.existsSync(BOT_DATA_FILE)) {
+                console.log('📄 No existing bot data found, starting fresh');
+                return false;
+            }
+            
+            const jsonData = fs.readFileSync(BOT_DATA_FILE, 'utf8');
+            botData = JSON.parse(jsonData);
+            console.log(`📂 Loading bot data from file: ${BOT_DATA_FILE}`);
+        } else {
+            // On Render, try to load from environment variable
+            if (process.env.BOT_DATA_BACKUP) {
+                botData = JSON.parse(process.env.BOT_DATA_BACKUP);
+                console.log(`📂 Loading bot data from memory backup`);
+            } else {
+                console.log('📄 No existing bot data found in memory, starting fresh');
+                return false;
+            }
         }
         
-        const jsonData = fs.readFileSync(BOT_DATA_FILE, 'utf8');
-        const botData = JSON.parse(jsonData);
-        
-        console.log(`📂 Loading bot data from ${BOT_DATA_FILE}`);
         console.log(`📊 Found ${botData.authorizedUsers?.length || 0} authorized users, ${botData.admins?.length || 0} admins, ${Object.keys(botData.queueUserMapping || {}).length} queue mappings`);
         
         // Restore core bot state
