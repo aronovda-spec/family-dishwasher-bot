@@ -65,6 +65,7 @@ async function saveBotData() {
             console.log(`💡 SOLUTION: Upgrade to paid tier for persistent disk OR use external database`);
             
             // Save critical data to environment variables as backup
+            // CRITICAL: Update backup every time saveBotData() is called
             try {
                 const criticalData = {
                     authorizedUsers: Array.from(authorizedUsers),
@@ -75,7 +76,8 @@ async function saveBotData() {
                 
                 const backupData = JSON.stringify(criticalData);
                 process.env.BOT_CRITICAL_BACKUP = backupData;
-                console.log(`💾 Critical data backed up to environment variable (temporary solution)`);
+                console.log(`💾 Critical data UPDATED in environment variable backup`);
+                console.log(`💾 Current scores: ${Object.fromEntries(userScores)}`);
             } catch (error) {
                 console.log(`❌ Failed to backup critical data: ${error.message}`);
             }
