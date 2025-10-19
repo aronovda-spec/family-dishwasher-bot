@@ -21,7 +21,7 @@ const BOT_DATA_FILE = path.join(DATA_DIR, 'bot_state.json');
 
 // Check if we're running on Render (ephemeral file system)
 const isRender = process.env.RENDER_EXTERNAL_HOSTNAME;
-const useFilePersistence = !isRender; // Disable file persistence on Render
+const useFilePersistence = !isRender; // Use file persistence only when NOT on Render
 
 if (useFilePersistence) {
     // Ensure data directory exists
@@ -72,9 +72,8 @@ async function saveBotData() {
             fs.writeFileSync(BOT_DATA_FILE, jsonData, 'utf8');
             console.log(`💾 Bot data saved to file - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
         } else {
-            // On Render, store in environment variable (limited but better than nothing)
-            const jsonData = JSON.stringify(botData);
-            process.env.BOT_DATA_BACKUP = jsonData;
+            // On Render, store in global variable (persists during session)
+            global.botDataBackup = JSON.stringify(botData);
             console.log(`💾 Bot data saved to memory - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
         }
     } catch (error) {
@@ -100,9 +99,9 @@ async function loadBotData() {
             botData = JSON.parse(jsonData);
             console.log(`📂 Loading bot data from file: ${BOT_DATA_FILE}`);
         } else {
-            // On Render, try to load from environment variable
-            if (process.env.BOT_DATA_BACKUP) {
-                botData = JSON.parse(process.env.BOT_DATA_BACKUP);
+            // On Render, try to load from global variable
+            if (global.botDataBackup) {
+                botData = JSON.parse(global.botDataBackup);
                 console.log(`📂 Loading bot data from memory backup`);
             } else {
                 console.log('📄 No existing bot data found in memory, starting fresh');
