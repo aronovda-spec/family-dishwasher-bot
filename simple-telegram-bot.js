@@ -2114,12 +2114,16 @@ async function handleCommand(chatId, userId, userName, text) {
         // Show current scores (only for authorized users) - fetch from database for accuracy
         statusMessage += `\n\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
-        for (const user of authorizedUsers) {
-            // Fetch score directly from database to ensure accuracy
-            const score = await db.getUserScore(user) || 0;
-            const relativeScore = relativeScores.get(user) || 0;
-            const royalName = addRoyalEmojiTranslated(user, userId);
-            statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+        
+        // Display scores in originalQueue order for consistency
+        for (const user of originalQueue) {
+            if (authorizedUsers.has(user)) {
+                // Fetch score directly from database to ensure accuracy
+                const score = await db.getUserScore(user) || 0;
+                const relativeScore = relativeScores.get(user) || 0;
+                const royalName = addRoyalEmojiTranslated(user, userId);
+                statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+            }
         }
         
         // Show punishment information
@@ -3619,14 +3623,9 @@ async function handleCallback(chatId, userId, userName, data) {
         // Reset current turn index
         currentTurnIndex = 0;
         
-        // Reset all user scores to 0 (CRITICAL FIX!)
-        defaultOrder.forEach(user => {
-            userScores.set(user, 0);
-        });
-        
         console.log(`🔄 Turn order reset to default: ${defaultOrder.join(' → ')}`);
         console.log(`🔄 OriginalQueue reset to default: [${originalQueue.join(', ')}]`);
-        console.log(`🔄 All user scores reset to 0`);
+        console.log(`🔄 User scores preserved (tie-breaker priority reset)`);
         
         // Save the changes
         await saveBotData();
@@ -3658,12 +3657,16 @@ async function handleCallback(chatId, userId, userName, data) {
         // Current scores (only for authorized users) - fetch from database for accuracy
         statsMessage += `\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
-        for (const user of authorizedUsers) {
-            // Fetch score directly from database to ensure accuracy
-            const score = await db.getUserScore(user) || 0;
-            const relativeScore = relativeScores.get(user) || 0;
-            const emoji = addRoyalEmoji(user);
-            statsMessage += `${emoji}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+        
+        // Display scores in originalQueue order for consistency
+        for (const user of originalQueue) {
+            if (authorizedUsers.has(user)) {
+                // Fetch score directly from database to ensure accuracy
+                const score = await db.getUserScore(user) || 0;
+                const relativeScore = relativeScores.get(user) || 0;
+                const emoji = addRoyalEmoji(user);
+                statsMessage += `${emoji}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+            }
         }
         
         // Current turn and next 3 turns
