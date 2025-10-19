@@ -1652,12 +1652,7 @@ function createLocalizedButtons(recipientUserId, buttonConfigs) {
 
 // Function to add royal emoji to user names
 function addRoyalEmoji(userName) {
-    // Check if it's a queue member first
-    if (royalEmojis[userName]) {
-        return `${royalEmojis[userName]} ${userName}`;
-    }
-    
-    // Check if it's an admin (by order)
+    // Check if it's an admin first (admins get priority emojis)
     const adminArray = Array.from(admins);
     if (adminArray.length > 0 && (adminArray[0] === userName || adminArray[0] === userName.toLowerCase())) {
         return `${royalEmojis.admin_1} ${userName}`; // King
@@ -1666,19 +1661,33 @@ function addRoyalEmoji(userName) {
         return `${royalEmojis.admin_2} ${userName}`; // Queen
     }
     
-    // Return plain name if no royal emoji found
-    return userName;
+    // Check if it's a predefined queue member
+    if (royalEmojis[userName]) {
+        return `${royalEmojis[userName]} ${userName}`;
+    }
+    
+    // For other authorized users, assign emojis based on their position in authorizedUsers
+    const authorizedArray = Array.from(authorizedUsers);
+    const userIndex = authorizedArray.findIndex(user => 
+        user === userName || user.toLowerCase() === userName.toLowerCase()
+    );
+    
+    if (userIndex !== -1) {
+        // Assign emojis based on position in authorized users
+        const userEmojis = ['🔱', '⭐', '✨']; // Princess emojis
+        const emoji = userEmojis[userIndex] || '👤'; // Default user emoji
+        return `${emoji} ${userName}`;
+    }
+    
+    // Default: return name with generic emoji
+    return `👤 ${userName}`;
 }
 
 // Function to add royal emoji AND translate names based on user's language
 function addRoyalEmojiTranslated(userName, userId) {
     const translatedName = translateName(userName, userId);
-    // Check if it's a queue member first
-    if (royalEmojis[userName]) {
-        return `${royalEmojis[userName]} ${translatedName}`;
-    }
     
-    // Check if it's an admin (by order)
+    // Check if it's an admin first (admins get priority emojis)
     const adminArray = Array.from(admins);
     if (adminArray.length > 0 && (adminArray[0] === userName || adminArray[0] === userName.toLowerCase())) {
         return `${royalEmojis.admin_1} ${translatedName}`; // King
@@ -1687,8 +1696,26 @@ function addRoyalEmojiTranslated(userName, userId) {
         return `${royalEmojis.admin_2} ${translatedName}`; // Queen
     }
     
-    // Default: just return the translated name
-    return translatedName;
+    // Check if it's a predefined queue member
+    if (royalEmojis[userName]) {
+        return `${royalEmojis[userName]} ${translatedName}`;
+    }
+    
+    // For other authorized users, assign emojis based on their position in authorizedUsers
+    const authorizedArray = Array.from(authorizedUsers);
+    const userIndex = authorizedArray.findIndex(user => 
+        user === userName || user.toLowerCase() === userName.toLowerCase()
+    );
+    
+    if (userIndex !== -1) {
+        // Assign emojis based on position in authorized users
+        const userEmojis = ['🔱', '⭐', '✨']; // Princess emojis
+        const emoji = userEmojis[userIndex] || '👤'; // Default user emoji
+        return `${emoji} ${translatedName}`;
+    }
+    
+    // Default: just return the translated name with a generic emoji
+    return `👤 ${translatedName}`;
 }
 
 // Get user name from user ID (helper function)
