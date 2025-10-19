@@ -155,6 +155,23 @@ async function loadBotData() {
         
         console.log('📂 Bot data loaded successfully from SQLite');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
+        
+        // Initialize default scores for all users if not already set
+        const defaultUsers = ['Eden', 'Adele', 'Emma'];
+        let initializedScores = 0;
+        
+        for (const user of defaultUsers) {
+            if (!userScores.has(user)) {
+                userScores.set(user, 0);
+                await db.setUserScore(user, 0);
+                initializedScores++;
+            }
+        }
+        
+        if (initializedScores > 0) {
+            console.log(`🎯 Initialized ${initializedScores} default user scores (0 points each)`);
+        }
+        
         return true;
     } catch (error) {
         console.error('❌ Error loading bot data from SQLite:', error);
