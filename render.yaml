@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     buildCommand: npm install
-    startCommand: node start_direct.js
+    startCommand: npm run start-direct
     healthCheckPath: /health
     envVars:
       - key: TELEGRAM_BOT_TOKEN
