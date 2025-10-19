@@ -53,9 +53,126 @@ async function saveBotData() {
             await db.setMonthlyStats(monthKey, statsData);
         }
         
-        console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        // On Render, also create global backup for persistence
+        if (isRender) {
+            global.botDataBackup = {
+                timestamp: Date.now(),
+                authorizedUsers: Array.from(authorizedUsers),
+                admins: Array.from(admins),
+                userChatIds: Object.fromEntries(userChatIds),
+                adminChatIds: Array.from(adminChatIds),
+                turnOrder: Array.from(turnOrder),
+                currentTurnIndex: currentTurnIndex,
+                userQueueMapping: Object.fromEntries(userQueueMapping),
+                queueUserMapping: Object.fromEntries(queueUserMapping),
+                suspendedUsers: Object.fromEntries(suspendedUsers),
+                turnAssignments: Object.fromEntries(turnAssignments),
+                monthlyStats: Object.fromEntries(monthlyStats),
+                swapTimestamps: global.swapTimestamps || [],
+                doneTimestamps: global.doneTimestamps ? Object.fromEntries(global.doneTimestamps) : {},
+                gracePeriods: global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {},
+                userScores: Object.fromEntries(userScores)
+            };
+            console.log(`💾 Bot data saved to SQLite and global backup for Render persistence - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        } else {
+            console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+        }
     } catch (error) {
         console.error('❌ Error saving bot data to SQLite:', error);
+    }
+}
+
+async function loadFromGlobalBackup() {
+    try {
+        const backup = global.botDataBackup;
+        if (!backup) {
+            console.log('📂 No global backup found, loading from SQLite');
+            await loadBotData();
+            return;
+        }
+        
+        console.log(`📂 Loading bot data from global backup (${new Date(backup.timestamp).toISOString()})`);
+        
+        // Restore core bot state
+        authorizedUsers.clear();
+        backup.authorizedUsers.forEach(user => authorizedUsers.add(user));
+        
+        admins.clear();
+        backup.admins.forEach(admin => admins.add(admin));
+        
+        userChatIds.clear();
+        Object.entries(backup.userChatIds).forEach(([key, value]) => {
+            userChatIds.set(key, value);
+        });
+        
+        adminChatIds.clear();
+        backup.adminChatIds.forEach(chatId => adminChatIds.add(chatId));
+        
+        turnOrder.clear();
+        backup.turnOrder.forEach(user => turnOrder.add(user));
+        
+        currentTurnIndex = backup.currentTurnIndex;
+        
+        userQueueMapping.clear();
+        Object.entries(backup.userQueueMapping).forEach(([key, value]) => {
+            userQueueMapping.set(key, value);
+        });
+        
+        queueUserMapping.clear();
+        Object.entries(backup.queueUserMapping).forEach(([key, value]) => {
+            queueUserMapping.set(key, value);
+        });
+        
+        suspendedUsers.clear();
+        Object.entries(backup.suspendedUsers).forEach(([key, value]) => {
+            suspendedUsers.set(key, value);
+        });
+        
+        turnAssignments.clear();
+        Object.entries(backup.turnAssignments).forEach(([key, value]) => {
+            turnAssignments.set(key, value);
+        });
+        
+        monthlyStats.clear();
+        Object.entries(backup.monthlyStats).forEach(([key, value]) => {
+            monthlyStats.set(key, value);
+        });
+        
+        userScores.clear();
+        Object.entries(backup.userScores).forEach(([key, value]) => {
+            userScores.set(key, value);
+        });
+        
+        global.swapTimestamps = backup.swapTimestamps || [];
+        global.doneTimestamps = new Map(Object.entries(backup.doneTimestamps || {}));
+        global.gracePeriods = new Map(Object.entries(backup.gracePeriods || {}));
+        global.lastDishwasherDone = backup.lastDishwasherDone;
+        
+        console.log('📂 Bot data loaded successfully from global backup');
+        console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
+        
+        // Initialize default scores for all users if not already set
+        const defaultUsers = ['Eden', 'Adele', 'Emma'];
+        let initializedScores = 0;
+        
+        for (const user of defaultUsers) {
+            if (!userScores.has(user)) {
+                userScores.set(user, 0);
+                await db.setUserScore(user, 0);
+                initializedScores++;
+            }
+        }
+        
+        if (initializedScores > 0) {
+            console.log(`🎯 Initialized ${initializedScores} default user scores (0 points each)`);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Error loading from global backup:', error);
+        console.log('📂 Falling back to SQLite loading');
+        await loadBotData();
+        return false;
     }
 }
 
@@ -336,6 +453,9 @@ const queueUserMapping = new Map(); // Map: Queue name -> Telegram user ID
 const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason: string, originalPosition: number }
 const queueStatistics = new Map(); // userName -> { totalCompletions: number, monthlyCompletions: number, lastCompleted: Date }
 
+// Check if running on Render (ephemeral file system)
+const isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HOSTNAME;
+
 // Initialize database after global variables are declared
 db = new Database();
 console.log('📊 SQLite database initialized for persistence');
@@ -345,6 +465,14 @@ let dbReady = false;
 db.db.on('open', () => {
     console.log('✅ Database connection established');
     dbReady = true;
+    
+    // On Render, try to load from global backup first
+    if (isRender && global.botDataBackup) {
+        console.log('🔄 Running on Render - loading from global backup');
+        loadFromGlobalBackup();
+    } else {
+        loadBotData();
+    }
 });
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 

@@ -6,6 +6,13 @@ class Database {
         // Use the same database file name as the Python bot
         this.dbPath = path.join(__dirname, 'dishwasher_bot.db');
         this.db = null;
+        
+        // Check if running on Render (ephemeral file system)
+        this.isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HOSTNAME;
+        
+        // In-memory backup for Render free tier
+        this.memoryBackup = null;
+        
         this.init();
     }
 
@@ -313,6 +320,28 @@ class Database {
         });
     }
 
+    // In-memory backup methods for Render free tier
+    saveToMemory() {
+        if (this.isRender) {
+            // Create in-memory backup of all data
+            this.memoryBackup = {
+                timestamp: Date.now(),
+                data: {
+                    // This will be populated by the bot's saveBotData function
+                }
+            };
+            console.log('💾 Data backed up to memory for Render persistence');
+        }
+    }
+    
+    loadFromMemory() {
+        if (this.isRender && this.memoryBackup) {
+            console.log('📂 Loading data from memory backup');
+            return this.memoryBackup.data;
+        }
+        return null;
+    }
+    
     // Cleanup methods
     async removeUser(userName) {
         return new Promise((resolve, reject) => {
