@@ -73,6 +73,17 @@ async function saveBotData() {
                 gracePeriods: global.gracePeriods ? Object.fromEntries(global.gracePeriods) : {},
                 userScores: Object.fromEntries(userScores)
             };
+            
+            // ALSO save to file backup for Render persistence
+            try {
+                const fs = require('fs');
+                const backupPath = '/tmp/bot_data_backup.json';
+                fs.writeFileSync(backupPath, JSON.stringify(global.botDataBackup, null, 2));
+                console.log(`💾 Bot data saved to SQLite, global backup, and file backup for Render persistence`);
+            } catch (error) {
+                console.log(`💾 Bot data saved to SQLite and global backup for Render persistence`);
+            }
+            
             console.log(`💾 Bot data saved to SQLite and global backup for Render persistence - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
             console.log(`🔄 Global backup created with timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
         } else {
@@ -506,6 +517,34 @@ db.db.on('open', () => {
         console.log('🔄 Running on Render - loading from global backup');
         console.log(`🔄 Global backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
         loadFromGlobalBackup();
+    } else if (isRender && process.env.BOT_DATA_BACKUP) {
+        console.log('🔄 Running on Render - loading from environment variable backup');
+        try {
+            global.botDataBackup = JSON.parse(process.env.BOT_DATA_BACKUP);
+            console.log(`🔄 Environment backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
+            loadFromGlobalBackup();
+        } catch (error) {
+            console.log('❌ Error parsing environment backup, falling back to SQLite');
+            loadBotData();
+        }
+    } else if (isRender) {
+        console.log('🔄 Running on Render - checking file backup');
+        try {
+            const fs = require('fs');
+            const backupPath = '/tmp/bot_data_backup.json';
+            if (fs.existsSync(backupPath)) {
+                const backupData = fs.readFileSync(backupPath, 'utf8');
+                global.botDataBackup = JSON.parse(backupData);
+                console.log(`🔄 File backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
+                loadFromGlobalBackup();
+            } else {
+                console.log('📂 No file backup found, loading from SQLite database');
+                loadBotData();
+            }
+        } catch (error) {
+            console.log('❌ Error loading file backup, falling back to SQLite');
+            loadBotData();
+        }
     } else {
         console.log('📂 Loading from SQLite database');
         loadBotData();
