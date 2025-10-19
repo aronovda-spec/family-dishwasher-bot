@@ -243,7 +243,8 @@ function getCurrentTurnUser() {
     let lowestScore = Infinity;
     let currentUser = null;
     
-    for (const user of originalQueue) {
+    // Only consider authorized users (CRITICAL FIX!)
+    for (const user of authorizedUsers) {
         // Skip suspended users
         if (suspendedUsers.has(user)) {
             continue;
@@ -276,7 +277,8 @@ function getNextThreeTurns() {
         let lowestScore = Infinity;
         let nextUser = null;
         
-        for (const user of originalQueue) {
+        // Only consider authorized users (CRITICAL FIX!)
+        for (const user of authorizedUsers) {
             // Skip suspended users
             if (suspendedUsers.has(user)) {
                 continue;
@@ -2003,10 +2005,10 @@ async function handleCommand(chatId, userId, userName, text) {
         
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
         
-        // Show current scores
+        // Show current scores (only for authorized users)
         statusMessage += `\n\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
-        for (const user of originalQueue) {
+        for (const user of authorizedUsers) {
             const score = userScores.get(user) || 0;
             const relativeScore = relativeScores.get(user) || 0;
             const royalName = addRoyalEmojiTranslated(user, userId);
@@ -3530,10 +3532,10 @@ async function handleCallback(chatId, userId, userName, data) {
             statsMessage += `${index + 1}. ${emoji}\n`;
         });
         
-        // Current scores
+        // Current scores (only for authorized users)
         statsMessage += `\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
-        originalQueue.forEach(user => {
+        authorizedUsers.forEach(user => {
             const score = userScores.get(user) || 0;
             const relativeScore = relativeScores.get(user) || 0;
             const emoji = addRoyalEmoji(user);
