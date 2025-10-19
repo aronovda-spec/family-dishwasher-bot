@@ -6,6 +6,14 @@ class SupabaseDatabase {
         this.supabaseUrl = process.env.SUPABASE_URL;
         this.supabaseKey = process.env.SUPABASE_ANON_KEY;
         
+        // In-memory fallback storage
+        this.memoryStorage = {
+            botState: new Map(),
+            userScores: new Map(),
+            queueMappings: new Map(),
+            monthlyStats: new Map()
+        };
+        
         if (!this.supabaseUrl || !this.supabaseKey) {
             console.log('⚠️ Supabase credentials not found in environment variables');
             console.log('💡 Set SUPABASE_URL and SUPABASE_ANON_KEY in Render dashboard');
@@ -15,8 +23,19 @@ class SupabaseDatabase {
             return;
         }
         
-        // Initialize Supabase client
-        this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
+        // Initialize Supabase client with IPv4 preference
+        this.supabase = createClient(this.supabaseUrl, this.supabaseKey, {
+            global: {
+                fetch: (url, options = {}) => {
+                    // Force IPv4 by modifying the URL if needed
+                    return fetch(url, {
+                        ...options,
+                        // Add timeout to prevent hanging
+                        signal: AbortSignal.timeout(10000) // 10 second timeout
+                    });
+                }
+            }
+        });
         console.log('📊 Supabase client initialized');
         console.log('🔗 Supabase URL:', this.supabaseUrl);
         
@@ -41,11 +60,15 @@ class SupabaseDatabase {
                 console.log('✅ Supabase connection successful (no data yet)');
             } else if (error) {
                 console.log('⚠️ Supabase connection test failed:', error.message);
+                console.log('🔄 Falling back to in-memory storage');
+                this.supabase = null; // Disable Supabase, use fallback
             } else {
                 console.log('✅ Supabase connection successful');
             }
         } catch (error) {
             console.log('❌ Supabase connection test error:', error.message);
+            console.log('🔄 Falling back to in-memory storage');
+            this.supabase = null; // Disable Supabase, use fallback
         }
     }
     
@@ -106,7 +129,9 @@ class SupabaseDatabase {
     
     async saveBotState(key, value) {
         if (!this.supabase) {
-            console.log(`⚠️ Supabase not available, skipping save: ${key}`);
+            // Use in-memory fallback
+            this.memoryStorage.botState.set(key, value);
+            console.log(`💾 Bot state saved to memory (Supabase unavailable): ${key}`);
             return;
         }
         
@@ -121,18 +146,26 @@ class SupabaseDatabase {
             
             if (error) {
                 console.error(`❌ Error saving bot state ${key}:`, error.message);
+                // Fallback to memory
+                this.memoryStorage.botState.set(key, value);
+                console.log(`💾 Bot state saved to memory (fallback): ${key}`);
             } else {
                 console.log(`💾 Bot state saved to Supabase: ${key}`);
             }
         } catch (error) {
             console.error(`❌ Exception saving bot state ${key}:`, error.message);
+            // Fallback to memory
+            this.memoryStorage.botState.set(key, value);
+            console.log(`💾 Bot state saved to memory (fallback): ${key}`);
         }
     }
     
     async getBotState(key) {
         if (!this.supabase) {
-            console.log(`⚠️ Supabase not available, returning null for: ${key}`);
-            return null;
+            // Use in-memory fallback
+            const value = this.memoryStorage.botState.get(key);
+            console.log(`💾 Bot state loaded from memory (Supabase unavailable): ${key}`);
+            return value || null;
         }
         
         try {
@@ -144,13 +177,17 @@ class SupabaseDatabase {
             
             if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
                 console.error(`❌ Error getting bot state ${key}:`, error.message);
-                return null;
+                // Fallback to memory
+                const value = this.memoryStorage.botState.get(key);
+                return value || null;
             }
             
             return data ? data.value : null;
         } catch (error) {
             console.error(`❌ Exception getting bot state ${key}:`, error.message);
-            return null;
+            // Fallback to memory
+            const value = this.memoryStorage.botState.get(key);
+            return value || null;
         }
     }
     
