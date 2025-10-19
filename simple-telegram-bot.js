@@ -2315,12 +2315,13 @@ async function handleCommand(chatId, userId, userName, text) {
         if (admins.size === 0) {
             sendMessage(chatId, t(userId, 'no_admins_set'));
         } else {
-            const adminList = Array.from(admins).map(id => {
+            const adminList = Array.from(admins).map((admin, index) => {
                 // Check if it's a numeric ID or username
-                if (/^\d+$/.test(id)) {
-                    return `• User ID: ${id}`;
+                if (/^\d+$/.test(admin)) {
+                    return `• User ID: ${admin}`;
                 } else {
-                    return `• Username: ${id}`;
+                    // Use emoji function for proper display
+                    return `• ${addRoyalEmojiTranslated(admin, userId)}`;
                 }
             }).join('\n');
             sendMessage(chatId, t(userId, 'current_admins', {adminList: adminList, count: admins.size}));
