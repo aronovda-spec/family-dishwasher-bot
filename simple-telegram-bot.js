@@ -3673,6 +3673,12 @@ async function handleCallback(chatId, userId, userName, data) {
     } else if (data.startsWith('reorder_select_')) {
         // Step 2: Select new position for user
         const selectedUser = data ? data.replace('reorder_select_', '') : '';
+        
+        if (!selectedUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
         const positionButtons = [
             [{ text: t(userId, 'position_1'), callback_data: `reorder_position_${selectedUser}_1` }],
             [{ text: t(userId, 'position_2'), callback_data: `reorder_position_${selectedUser}_2` }],
@@ -3684,7 +3690,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Execute reorder (change tie-breaker priority order)
         const parts = data ? data.replace('reorder_position_', '').split('_') : [];
         const selectedUser = parts[0];
-        const newPosition = parseInt(parts[1]) - 1; // Convert to 0-based index
+        const newPosition = parts[1] ? parseInt(parts[1]) - 1 : -1; // Convert to 0-based index
+        
+        if (!selectedUser || isNaN(newPosition) || newPosition < 0) {
+            sendMessage(chatId, t(userId, 'error_invalid_position'));
+            return;
+        }
         
         // Create new priority order
         const newOrder = [...originalQueue];
@@ -3811,7 +3822,13 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('suspend_select_')) {
         // Select suspension duration
-        const selectedUser = data.replace('suspend_select_', '');
+        const selectedUser = data ? data.replace('suspend_select_', '') : '';
+        
+        if (!selectedUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
         const durationButtons = [
             [{ text: t(userId, 'duration_1_day'), callback_data: `suspend_duration_${selectedUser}_1` }],
             [{ text: t(userId, 'duration_3_days'), callback_data: `suspend_duration_${selectedUser}_3` }],
@@ -3823,9 +3840,14 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('suspend_duration_')) {
         // Execute suspension
-        const parts = data.replace('suspend_duration_', '').split('_');
+        const parts = data ? data.replace('suspend_duration_', '').split('_') : [];
         const selectedUser = parts[0];
-        const days = parseInt(parts[1]);
+        const days = parts[1] ? parseInt(parts[1]) : 0;
+        
+        if (!selectedUser || isNaN(days) || days <= 0) {
+            sendMessage(chatId, t(userId, 'error_invalid_duration'));
+            return;
+        }
         
         const success = suspendUser(selectedUser, days);
         if (success) {
@@ -3855,7 +3877,13 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('reactivate_')) {
         // Execute reactivation
-        const selectedUser = data.replace('reactivate_', '');
+        const selectedUser = data ? data.replace('reactivate_', '') : '';
+        
+        if (!selectedUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
         const success = reactivateUser(selectedUser);
         if (success) {
             // Save to database
@@ -3876,7 +3904,13 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('remove_')) {
         // Execute permanent removal (100-year suspension)
-        const selectedUser = data.replace('remove_', '');
+        const selectedUser = data ? data.replace('remove_', '') : '';
+        
+        if (!selectedUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
         const success = suspendUser(selectedUser, 36500, t(userId, 'permanently_removed')); // 100 years
         if (success) {
             sendMessage(chatId, t(userId, 'user_removed', {user: addRoyalEmoji(selectedUser)}));
@@ -3943,7 +3977,13 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('reset_score_select_')) {
         // Confirm individual score reset
-        const selectedUser = data.replace('reset_score_select_', '');
+        const selectedUser = data ? data.replace('reset_score_select_', '') : '';
+        
+        if (!selectedUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
         const currentScore = userScores.get(selectedUser) || 0;
         
         const confirmButtons = [
@@ -3956,7 +3996,13 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else if (data.startsWith('reset_score_execute_')) {
         // Execute individual score reset
-        const selectedUser = data.replace('reset_score_execute_', '');
+        const selectedUser = data ? data.replace('reset_score_execute_', '') : '';
+        
+        if (!selectedUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
         const oldScore = userScores.get(selectedUser) || 0;
         
         userScores.set(selectedUser, 0);
@@ -4450,7 +4496,12 @@ async function handleCallback(chatId, userId, userName, data) {
         );
         
     } else if (data.startsWith('punishment_target_')) {
-        const targetUser = data.replace('punishment_target_', '');
+        const targetUser = data ? data.replace('punishment_target_', '') : '';
+        
+        if (!targetUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
         
         // Show reason selection buttons
         const reasonButtons = [
@@ -4467,9 +4518,14 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessageWithButtons(chatId, t(userId, 'request_punishment_select_reason', {user: targetUser}), reasonButtons);
         
     } else if (data.startsWith('punishment_reason_')) {
-        const parts = data.replace('punishment_reason_', '').split('_');
+        const parts = data ? data.replace('punishment_reason_', '').split('_') : [];
         const targetUser = parts[0];
         const reason = parts[1];
+        
+        if (!targetUser || !reason) {
+            sendMessage(chatId, t(userId, 'error_invalid_punishment_data'));
+            return;
+        }
         
         // Create punishment request (similar to swap request system)
         const requestId = ++punishmentRequestCounter;
@@ -4508,7 +4564,13 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, `${t(userId, 'punishment_request_submitted')}\n\n${t(userId, 'target_user')} ${translateName(targetUser, userId)}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'requested_by', {user: translateName(userName, userId)})}\n\n${t(userId, 'admins_notified')}`);
         
     } else if (data.startsWith('punishment_approve_')) {
-        const requestId = parseInt(data.replace('punishment_approve_', ''));
+        const requestId = data ? parseInt(data.replace('punishment_approve_', '')) : 0;
+        
+        if (isNaN(requestId) || requestId <= 0) {
+            sendMessage(chatId, t(userId, 'error_invalid_request_id'));
+            return;
+        }
+        
         const punishmentRequest = pendingPunishments.get(requestId);
         
         if (!punishmentRequest) {
@@ -4565,7 +4627,13 @@ async function handleCallback(chatId, userId, userName, data) {
         pendingPunishments.delete(requestId);
         
     } else if (data.startsWith('punishment_reject_')) {
-        const requestId = parseInt(data.replace('punishment_reject_', ''));
+        const requestId = data ? parseInt(data.replace('punishment_reject_', '')) : 0;
+        
+        if (isNaN(requestId) || requestId <= 0) {
+            sendMessage(chatId, t(userId, 'error_invalid_request_id'));
+            return;
+        }
+        
         const punishmentRequest = pendingPunishments.get(requestId);
         
         if (!punishmentRequest) {
@@ -4650,9 +4718,14 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessageWithButtons(chatId, t(userId, 'apply_punishment_select_reason', {user: targetUser}), buttons);
         
     } else if (data.startsWith('admin_punishment_reason_')) {
-        const parts = data.replace('admin_punishment_reason_', '').split('_');
+        const parts = data ? data.replace('admin_punishment_reason_', '').split('_') : [];
         const targetUser = parts[0];
         const reason = parts[1];
+        
+        if (!targetUser || !reason) {
+            sendMessage(chatId, t(userId, 'error_invalid_punishment_data'));
+            return;
+        }
         
         // Apply punishment directly with selected reason
         await applyPunishment(targetUser, reason, userName);
