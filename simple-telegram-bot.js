@@ -254,6 +254,14 @@ function getCurrentTurnUser() {
         if (score < lowestScore) {
             lowestScore = score;
             currentUser = user;
+        } else if (score === lowestScore && currentUser) {
+            // Tie-breaker: use originalQueue order
+            const userIndex = originalQueue.indexOf(user);
+            const currentUserIndex = originalQueue.indexOf(currentUser);
+            
+            if (userIndex !== -1 && currentUserIndex !== -1 && userIndex < currentUserIndex) {
+                currentUser = user; // User comes first in tie-breaker order
+            }
         }
     }
     
@@ -273,7 +281,7 @@ function getNextThreeTurns() {
     const turns = [];
     
     for (let i = 0; i < 3; i++) {
-        // Find user with lowest score
+        // Find user with lowest score, using originalQueue as tie-breaker
         let lowestScore = Infinity;
         let nextUser = null;
         
@@ -288,6 +296,14 @@ function getNextThreeTurns() {
             if (score < lowestScore) {
                 lowestScore = score;
                 nextUser = user;
+            } else if (score === lowestScore && nextUser) {
+                // Tie-breaker: use originalQueue order
+                const userIndex = originalQueue.indexOf(user);
+                const nextUserIndex = originalQueue.indexOf(nextUser);
+                
+                if (userIndex !== -1 && nextUserIndex !== -1 && userIndex < nextUserIndex) {
+                    nextUser = user; // User comes first in tie-breaker order
+                }
             }
         }
         
