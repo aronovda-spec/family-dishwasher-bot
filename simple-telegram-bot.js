@@ -468,9 +468,12 @@ function isUserAuthorized(userName) {
     // First normalize the input name to first name only
     const normalizedName = getFirstName(userName);
     
+    // Safety check for normalizedName
+    if (!normalizedName) return false;
+    
     // Check if user is authorized (case-insensitive)
     for (const authorizedUser of authorizedUsers) {
-        if (authorizedUser.toLowerCase() === normalizedName.toLowerCase()) {
+        if (authorizedUser && normalizedName && authorizedUser.toLowerCase() === normalizedName.toLowerCase()) {
             return true;
         }
     }
@@ -480,7 +483,7 @@ function isUserAuthorized(userName) {
         if (normalizedName === hebrewName) {
             // Check if the corresponding English name is authorized
             for (const authorizedUser of authorizedUsers) {
-                if (authorizedUser.toLowerCase() === englishName.toLowerCase()) {
+                if (authorizedUser && englishName && authorizedUser.toLowerCase() === englishName.toLowerCase()) {
                     return true;
                 }
             }
@@ -495,9 +498,12 @@ function isUserAdmin(userName, userId = null) {
     // First normalize the input name to first name only
     const normalizedName = getFirstName(userName);
     
+    // Safety check for normalizedName
+    if (!normalizedName) return false;
+    
     // Check if user is admin (case-insensitive)
     for (const admin of admins) {
-        if (admin.toLowerCase() === normalizedName.toLowerCase()) {
+        if (admin && normalizedName && admin.toLowerCase() === normalizedName.toLowerCase()) {
             return true;
         }
     }
@@ -507,7 +513,7 @@ function isUserAdmin(userName, userId = null) {
         if (normalizedName === hebrewName) {
             // Check if the corresponding English name is an admin
             for (const admin of admins) {
-                if (admin.toLowerCase() === englishName.toLowerCase()) {
+                if (admin && englishName && admin.toLowerCase() === englishName.toLowerCase()) {
                     return true;
                 }
             }
@@ -660,7 +666,7 @@ function alertAdminsAboutCheating(userId, userName, reason, details) {
     
     // Add chat IDs from authorized users who are admins
     [...authorizedUsers, ...admins].forEach(user => {
-        let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+        let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
         if (userChatId && admins.has(user)) {
             adminChatIdsToNotify.add(userChatId);
         }
@@ -1698,6 +1704,9 @@ function getFirstName(fullName) {
 function translateName(name, userId) {
     const userLang = getUserLanguage(userId);
     if (userLang === 'he') {
+        // Safety check for name
+        if (!name) return '';
+        
         // First try exact match (case-insensitive)
         const lowerName = name.toLowerCase();
         for (const [englishName, hebrewName] of Object.entries(hebrewNames)) {
@@ -1744,10 +1753,10 @@ function createLocalizedButtons(recipientUserId, buttonConfigs) {
 function addRoyalEmoji(userName) {
     // Check if it's an admin first (admins get priority emojis)
     const adminArray = Array.from(admins);
-    if (adminArray.length > 0 && (adminArray[0] === userName || adminArray[0] === userName.toLowerCase())) {
+        if (adminArray.length > 0 && (adminArray[0] === userName || (adminArray[0] && userName && adminArray[0].toLowerCase() === userName.toLowerCase()))) {
         return `${royalEmojis.admin_1} ${userName}`; // King
     }
-    if (adminArray.length > 1 && (adminArray[1] === userName || adminArray[1] === userName.toLowerCase())) {
+        if (adminArray.length > 1 && (adminArray[1] === userName || (adminArray[1] && userName && adminArray[1].toLowerCase() === userName.toLowerCase()))) {
         return `${royalEmojis.admin_2} ${userName}`; // Queen
     }
     
@@ -1759,7 +1768,7 @@ function addRoyalEmoji(userName) {
     // For other authorized users, assign emojis based on their position in authorizedUsers
     const authorizedArray = Array.from(authorizedUsers);
     const userIndex = authorizedArray.findIndex(user => 
-        user === userName || user.toLowerCase() === userName.toLowerCase()
+            user === userName || (user && userName && user.toLowerCase() === userName.toLowerCase())
     );
     
     if (userIndex !== -1) {
@@ -1779,10 +1788,10 @@ function addRoyalEmojiTranslated(userName, userId) {
     
     // Check if it's an admin first (admins get priority emojis)
     const adminArray = Array.from(admins);
-    if (adminArray.length > 0 && (adminArray[0] === userName || adminArray[0] === userName.toLowerCase())) {
+        if (adminArray.length > 0 && (adminArray[0] === userName || (adminArray[0] && userName && adminArray[0].toLowerCase() === userName.toLowerCase()))) {
         return `${royalEmojis.admin_1} ${translatedName}`; // King
     }
-    if (adminArray.length > 1 && (adminArray[1] === userName || adminArray[1] === userName.toLowerCase())) {
+        if (adminArray.length > 1 && (adminArray[1] === userName || (adminArray[1] && userName && adminArray[1].toLowerCase() === userName.toLowerCase()))) {
         return `${royalEmojis.admin_2} ${translatedName}`; // Queen
     }
     
@@ -1794,7 +1803,7 @@ function addRoyalEmojiTranslated(userName, userId) {
     // For other authorized users, assign emojis based on their position in authorizedUsers
     const authorizedArray = Array.from(authorizedUsers);
     const userIndex = authorizedArray.findIndex(user => 
-        user === userName || user.toLowerCase() === userName.toLowerCase()
+            user === userName || (user && userName && user.toLowerCase() === userName.toLowerCase())
     );
     
     if (userIndex !== -1) {
@@ -2033,7 +2042,9 @@ async function handleCommand(chatId, userId, userName, text) {
         if (isAdmin) {
             adminChatIds.add(chatId);
             adminNameToChatId.set(userName, chatId);
-            adminNameToChatId.set(userName.toLowerCase(), chatId);
+            if (userName) {
+                adminNameToChatId.set(userName.toLowerCase(), chatId);
+            }
             console.log(`👨‍💼 Admin ${userName} (${userId}) chat ID ${chatId} added to adminChatIds and adminNameToChatId`);
         }
         
@@ -2269,11 +2280,11 @@ async function handleCommand(chatId, userId, userName, text) {
             // Notify all authorized users and admins in their language
             [...authorizedUsers, ...admins].forEach(user => {
                 // Try to find chat ID for this user
-                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
                 // If not found in userChatIds, check if this user is an admin
                 if (!userChatId && isUserAdmin(user)) {
-                    userChatId = adminNameToChatId.get(user) || adminNameToChatId.get(user.toLowerCase());
+                    userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
                 }
                 
                 if (userChatId && userChatId !== chatId) {
@@ -2372,7 +2383,7 @@ async function handleCommand(chatId, userId, userName, text) {
             // Notify all authorized users and admins in their language
             [...authorizedUsers, ...admins].forEach(user => {
                 // Try to find chat ID for this user
-                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
                 if (userChatId && userChatId !== chatId) {
                     // Get the correct userId for language preference
@@ -2839,7 +2850,7 @@ async function executeSwap(swapRequest, requestId, status) {
     console.log(`🔍 User queue mapping:`, userQueueMapping);
     
     // Find queue positions
-    const fromQueueName = userQueueMapping.get(fromUser) || userQueueMapping.get(fromUser.toLowerCase());
+        const fromQueueName = userQueueMapping.get(fromUser) || (fromUser ? userQueueMapping.get(fromUser.toLowerCase()) : null);
     const fromIndex = queue.indexOf(fromQueueName);
     const toIndex = queue.indexOf(toUser);
     
@@ -2904,7 +2915,7 @@ async function executeSwap(swapRequest, requestId, status) {
         // Notify all other authorized users and admins using userChatIds in their language
         [...authorizedUsers, ...admins].forEach(user => {
             if (user !== fromUser && user !== toUser) {
-                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 if (userChatId) {
                     // Get the correct userId for language preference
                     const recipientUserId = getUserIdFromChatId(userChatId);
@@ -3262,7 +3273,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Add chat IDs from authorized users who are admins
         [...authorizedUsers, ...admins].forEach(user => {
-            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
             if (userChatId) {
                 chatIdsToNotify.add(userChatId);
             }
@@ -3314,7 +3325,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Add chat IDs from authorized users who are admins
         [...authorizedUsers, ...admins].forEach(user => {
-            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
             if (userChatId) {
                 chatIdsToNotify.add(userChatId);
             }
@@ -3349,7 +3360,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 
                 // Send dishwasher alert to all authorized users and admins
                 [...authorizedUsers, ...admins].forEach(user => {
-                    let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                    let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                     if (userChatId) {
                         // Get the correct userId for language preference
                         const recipientUserId = getUserIdFromChatId(userChatId);
@@ -4068,7 +4079,7 @@ async function handleCallback(chatId, userId, userName, data) {
         const targetUserId = queueUserMapping.get(targetUser);
         
         // Get the actual chat ID for the target user
-        const targetChatId = userChatIds.get(targetUserId) || userChatIds.get(targetUserId.toLowerCase());
+        const targetChatId = userChatIds.get(targetUserId) || (targetUserId ? userChatIds.get(targetUserId.toLowerCase()) : null);
         
         if (!targetChatId) {
             sendMessage(chatId, t(userId, 'target_user_not_found', {targetUser: targetUser}));
@@ -4320,7 +4331,7 @@ async function handleCallback(chatId, userId, userName, data) {
             
             // Notify all authorized users and admins
             [...authorizedUsers, ...admins].forEach(user => {
-                let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+                let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
                 if (userChatId && userChatId !== chatId) {
                     // Get the correct userId for language preference
@@ -4449,7 +4460,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Notify all authorized users
         [...authorizedUsers].forEach(user => {
-            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
             if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
                 // Get the correct userId for language preference
                 const recipientUserId = getUserIdFromChatId(userChatId);
@@ -4501,7 +4512,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Notify all authorized users
         [...authorizedUsers].forEach(user => {
-            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
             if (userChatId && userChatId !== chatId && userChatId !== punishmentRequest.fromUserId) {
                 // Get the correct userId for language preference
                 const recipientUserId = getUserIdFromChatId(userChatId);
@@ -4575,7 +4586,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Notify all authorized users
         [...authorizedUsers].forEach(user => {
-            let userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
             if (userChatId && userChatId !== chatId) {
                 // Get the correct userId for language preference
                 const recipientUserId = getUserIdFromChatId(userChatId);
@@ -4656,8 +4667,8 @@ async function getUpdates(offset = 0) {
                             const chatId = update.callback_query.message.chat.id;
                             const userId = update.callback_query.from.id;
                             const fullName = (update.callback_query.from.first_name || '') + 
-                                (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '') || 'Unknown User';
-                            const userName = getFirstName(fullName); // Use first name only
+                                (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
+                            const userName = getFirstName(fullName || 'Unknown User'); // Use first name only
                             
                             // Safety check for userName
                             if (!userName) {
@@ -4816,8 +4827,8 @@ const server = http.createServer(async (req, res) => {
                     const chatId = update.callback_query.message.chat.id;
                     const userId = update.callback_query.from.id;
                     const fullName = (update.callback_query.from.first_name || '') + 
-                        (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '') || 'Unknown User';
-                    const userName = getFirstName(fullName); // Use first name only
+                        (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
+                    const userName = getFirstName(fullName || 'Unknown User'); // Use first name only
                     const data = update.callback_query.data;
                     
                     // Button click deduplication: prevent rapid multiple clicks on same button
@@ -4880,7 +4891,7 @@ function broadcastAnnouncement(announcementText, fromAdmin) {
     
     // Send to all authorized users and admins
     [...authorizedUsers, ...admins].forEach(user => {
-        const userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+        const userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
         
         if (userChatId) {
             // Get the correct userId for language preference
@@ -4907,11 +4918,11 @@ function broadcastMessage(messageText, fromUser, isAnnouncement = false) {
     
     // Send to all authorized users and admins (except sender)
     [...authorizedUsers, ...admins].forEach(user => {
-        if (user === fromUser || user.toLowerCase() === fromUser.toLowerCase()) {
+        if (user === fromUser || (user && fromUser && user.toLowerCase() === fromUser.toLowerCase())) {
             return; // Don't send to sender
         }
         
-        const userChatId = userChatIds.get(user) || userChatIds.get(user.toLowerCase());
+        const userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
         
         if (userChatId) {
             // Get the correct userId for language preference
