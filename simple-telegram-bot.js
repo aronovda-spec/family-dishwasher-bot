@@ -1973,12 +1973,18 @@ async function handleCommand(chatId, userId, userName, text) {
     }
     
     if (command === '/start') {
+        console.log(`🚀 /start command received from ${userName} (${userId}) in chat ${chatId}`);
+        
         // Store chat ID for this user (for notifications)
         userChatIds.set(userName, chatId);
         userChatIds.set(userName.toLowerCase(), chatId);
         
         const isAdmin = isUserAdmin(userName, userId);
         const isAuthorized = isUserAuthorized(userName);
+        
+        console.log(`🔍 User check: isAdmin=${isAdmin}, isAuthorized=${isAuthorized}`);
+        console.log(`🔍 Current admins: ${Array.from(admins)}`);
+        console.log(`🔍 Current authorized users: ${Array.from(authorizedUsers)}`);
         
         // If this user is an admin, store their chat ID for admin notifications
         if (isAdmin) {
@@ -2058,52 +2064,9 @@ async function handleCommand(chatId, userId, userName, text) {
             ];
         }
         
-        const url = `${botUrl}/sendMessage`;
-        const data = JSON.stringify({
-            chat_id: chatId,
-            text: text,
-            reply_markup: {
-                inline_keyboard: buttons
-            }
-        });
-        
-        console.log(`🔘 Sending role-based buttons:`, JSON.stringify(buttons, null, 2));
-        
-        const options = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(data)
-            }
-        };
-        
-        const req = https.request(url, options, (res) => {
-            let responseData = '';
-            res.on('data', (chunk) => {
-                responseData += chunk;
-            });
-            res.on('end', () => {
-                console.log(`📤 Role-based response:`, responseData);
-                try {
-                    const response = JSON.parse(responseData);
-                    if (response.ok) {
-                        console.log(`✅ Buttons sent successfully!`);
-                        if (response.result.reply_markup) {
-                            console.log(`🔘 Reply markup present:`, JSON.stringify(response.result.reply_markup, null, 2));
-                        } else {
-                            console.log(`❌ No reply_markup in response!`);
-                        }
-                    } else {
-                        console.log(`❌ Button error:`, response.description);
-                    }
-                } catch (e) {
-                    console.log(`❌ Error parsing response:`, e.message);
-                }
-            });
-        });
-        
-        req.write(data);
-        req.end();
+        console.log(`🔘 About to send menu: text="${text}", buttons=${JSON.stringify(buttons, null, 2)}`);
+        sendMessageWithButtons(chatId, text, buttons);
+        console.log(`✅ /start command completed for ${userName}`);
         
     } else if (command === '/status' || command === 'status') {
         let statusMessage = `${t(userId, 'dishwasher_queue_status')}\n\n`;
