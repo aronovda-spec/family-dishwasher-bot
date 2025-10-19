@@ -74,6 +74,7 @@ async function saveBotData() {
                 userScores: Object.fromEntries(userScores)
             };
             console.log(`💾 Bot data saved to SQLite and global backup for Render persistence - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
+            console.log(`🔄 Global backup created with timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
         } else {
             console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
         }
@@ -469,8 +470,10 @@ db.db.on('open', () => {
     // On Render, try to load from global backup first
     if (isRender && global.botDataBackup) {
         console.log('🔄 Running on Render - loading from global backup');
+        console.log(`🔄 Global backup timestamp: ${new Date(global.botDataBackup.timestamp).toISOString()}`);
         loadFromGlobalBackup();
     } else {
+        console.log('📂 Loading from SQLite database');
         loadBotData();
     }
 });
@@ -2356,6 +2359,9 @@ async function handleCommand(chatId, userId, userName, text) {
         if (admins.size === 0) {
             // First admin can add themselves or anyone
             admins.add(userToAdd);
+            
+            // Save bot data after adding first admin
+            await saveBotData();
             
             // Note: We don't add chatId here because we don't know the new admin's chat ID yet
             // The new admin's chat ID will be stored when they send /start or interact with the bot
@@ -4663,27 +4669,14 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
         console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
         console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
         
-        // Load persisted bot data
-        console.log('📂 Loading persisted bot data...');
-        await loadBotData();
-        
-        // Save immediately after loading to ensure persistence
-        console.log('💾 Ensuring data persistence...');
-        await saveBotData();
+        // Data is already loaded in db.db.on('open') handler above
+        console.log('✅ Bot startup complete - data already loaded');
 });
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
     
-    // Load persisted bot data for local mode too
-    console.log('📂 Loading persisted bot data...');
-    loadBotData().then(async () => {
-        console.log('✅ Local mode data loaded');
-        // Save immediately after loading to ensure persistence
-        console.log('💾 Ensuring data persistence...');
-        await saveBotData();
-    }).catch(error => {
-        console.error('❌ Error loading local mode data:', error);
-    });
+    // Data is already loaded in db.db.on('open') handler above
+    console.log('✅ Local mode startup complete - data already loaded');
 }
 
 // Set webhook if deploying to Render
