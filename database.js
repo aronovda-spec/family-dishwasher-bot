@@ -356,6 +356,29 @@ class Database {
         });
     }
 
+    // Reset all user scores to 0 (clean database)
+    async resetAllUserScores() {
+        return new Promise((resolve, reject) => {
+            const resetSQL = `
+                DELETE FROM user_scores;
+                INSERT INTO user_scores (user_name, score) VALUES 
+                    ('Eden', 0),
+                    ('Adele', 0),
+                    ('Emma', 0);
+            `;
+            
+            this.db.exec(resetSQL, (err) => {
+                if (err) {
+                    console.error('❌ Error resetting user scores:', err.message);
+                    reject(err);
+                } else {
+                    console.log('🎯 All user scores reset to 0 (clean database)');
+                    resolve();
+                }
+            });
+        });
+    }
+
     async clearAllData() {
         return new Promise((resolve, reject) => {
             const sql = `DELETE FROM users; DELETE FROM bot_state; DELETE FROM user_scores; DELETE FROM queue_mappings; DELETE FROM monthly_stats;`;
