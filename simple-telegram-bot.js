@@ -3011,6 +3011,12 @@ async function executeSwap(swapRequest, requestId, status) {
         [...authorizedUsers, ...admins].forEach(user => {
             if (user !== fromUser && user !== toUser) {
                 let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                
+                // If not found in userChatIds, check if this user is an admin
+                if (!userChatId && isUserAdmin(user)) {
+                    userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                }
+                
                 if (userChatId) {
                     // Get the correct userId for language preference
                     const recipientUserId = getUserIdFromChatId(userChatId);
