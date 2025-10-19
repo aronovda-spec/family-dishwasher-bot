@@ -54,10 +54,35 @@ async function saveBotData() {
             await db.setMonthlyStats(monthKey, statsData);
         }
         
-        // Super2 style: Simple SQLite persistence (no complex backups needed)
+        // Super2 style: Simple SQLite persistence + Render free tier backup
         console.log(`💾 Bot data saved to SQLite database (Super2 style)`);
         console.log(`💾 Database file: ${db.dbPath}`);
-        console.log(`💾 Render persistent file system maintains data across restarts`);
+        
+        // CRITICAL: Render free tier has ephemeral file system!
+        // SQLite database gets deleted on restart/redeploy
+        if (isRender) {
+            console.log(`⚠️ RENDER FREE TIER: Ephemeral file system - SQLite will be lost on restart!`);
+            console.log(`💡 SOLUTION: Upgrade to paid tier for persistent disk OR use external database`);
+            
+            // Save critical data to environment variables as backup
+            try {
+                const criticalData = {
+                    authorizedUsers: Array.from(authorizedUsers),
+                    admins: Array.from(admins),
+                    userScores: Object.fromEntries(userScores),
+                    timestamp: Date.now()
+                };
+                
+                const backupData = JSON.stringify(criticalData);
+                process.env.BOT_CRITICAL_BACKUP = backupData;
+                console.log(`💾 Critical data backed up to environment variable (temporary solution)`);
+            } catch (error) {
+                console.log(`❌ Failed to backup critical data: ${error.message}`);
+            }
+        } else {
+            console.log(`💾 Local deployment: SQLite database persists across restarts`);
+        }
+        
         console.log(`💾 Bot data saved to SQLite - ${authorizedUsers.size} authorized users, ${admins.size} admins, ${queueUserMapping.size} queue mappings`);
     } catch (error) {
         console.error('❌ Error saving bot data to SQLite:', error);
@@ -370,7 +395,35 @@ db.db.on('open', async () => {
     dbReady = true;
     
     // Load bot data from database (Super2 approach - simple and reliable)
-    await loadBotData();
+    // BUT: Render free tier has ephemeral file system - check for backup first
+    if (isRender && process.env.BOT_CRITICAL_BACKUP) {
+        console.log('🔄 RENDER FREE TIER: Loading from environment variable backup');
+        try {
+            const backupData = JSON.parse(process.env.BOT_CRITICAL_BACKUP);
+            console.log(`🔄 Backup timestamp: ${new Date(backupData.timestamp).toISOString()}`);
+            
+            // Restore critical data
+            authorizedUsers.clear();
+            backupData.authorizedUsers.forEach(user => authorizedUsers.add(user));
+            
+            admins.clear();
+            backupData.admins.forEach(admin => admins.add(admin));
+            
+            userScores.clear();
+            Object.entries(backupData.userScores).forEach(([key, value]) => {
+                userScores.set(key, value);
+            });
+            
+            console.log(`✅ Critical data restored from backup: ${authorizedUsers.size} users, ${admins.size} admins`);
+            console.log(`⚠️ RENDER FREE TIER LIMITATION: Only critical data restored, other data lost`);
+            
+        } catch (error) {
+            console.log('❌ Error loading from backup, falling back to SQLite');
+            await loadBotData();
+        }
+    } else {
+        await loadBotData();
+    }
 });
 const originalQueueOrder = ['Eden', 'Adele', 'Emma']; // Default queue order for reset
 
