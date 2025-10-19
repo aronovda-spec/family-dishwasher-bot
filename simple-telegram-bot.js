@@ -42,6 +42,7 @@ async function saveBotData() {
         await db.saveBotState('queueStatistics', Object.fromEntries(queueStatistics));
         await db.saveBotState('punishmentTurns', Object.fromEntries(punishmentTurns));
         await db.saveBotState('userLanguage', Object.fromEntries(userLanguage));
+        await db.saveBotState('chatIdToUserId', Object.fromEntries(chatIdToUserId));
         
         // Save user scores
         for (const [userName, score] of userScores.entries()) {
@@ -95,6 +96,7 @@ async function loadBotData() {
         const queueStatisticsData = await db.getBotState('queueStatistics') || {};
         const punishmentTurnsData = await db.getBotState('punishmentTurns') || {};
         const userLanguageData = await db.getBotState('userLanguage') || {};
+        const chatIdToUserIdData = await db.getBotState('chatIdToUserId') || {};
         
         // Load user scores
         const userScoresData = await db.getAllUserScores();
@@ -189,6 +191,12 @@ async function loadBotData() {
         userLanguage.clear();
         Object.entries(userLanguageData).forEach(([key, value]) => {
             userLanguage.set(key, value);
+        });
+        
+        // Restore chat ID to user ID mapping
+        chatIdToUserId.clear();
+        Object.entries(chatIdToUserIdData).forEach(([key, value]) => {
+            chatIdToUserId.set(key, value);
         });
         
         // Restore monthly statistics
@@ -860,6 +868,7 @@ const ACTION_COOLDOWN = 1000; // 1 second cooldown between same actions
 
 // Language preference storage
 const userLanguage = new Map(); // Map: userId -> 'en' or 'he'
+const chatIdToUserId = new Map(); // Map: chatId -> userId (for notifications)
 
 // Royal emoji mapping for elegant display
 const royalEmojis = {
@@ -1663,6 +1672,11 @@ function getUserLanguage(userId) {
     return userLanguage.get(userId) || 'en'; // Default to English
 }
 
+// Helper function to get userId from chatId for notifications
+function getUserIdFromChatId(chatId) {
+    return chatIdToUserId.get(chatId) || chatId; // Fallback to chatId if not found
+}
+
 // Extract first name only from full names (e.g., "Eden Aronov" -> "Eden")
 function getFirstName(fullName) {
     if (!fullName) return '';
@@ -1952,6 +1966,9 @@ async function handleCommand(chatId, userId, userName, text) {
         // Store chat ID for this user (for notifications)
         userChatIds.set(userName, chatId);
         userChatIds.set(userName.toLowerCase(), chatId);
+        
+        // Store reverse mapping for notifications (chatId -> userId)
+        chatIdToUserId.set(chatId, userId);
         
         const isAdmin = isUserAdmin(userName, userId);
         const isAuthorized = isUserAuthorized(userName);
@@ -3229,9 +3246,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Send alert to each unique chat ID only once
         chatIdsToNotify.forEach(recipientChatId => {
             if (recipientChatId !== chatId) {
+                // Get the correct userId for language preference
+                const recipientUserId = getUserIdFromChatId(recipientChatId);
+                
                 // Create alert message in recipient's language
-                const alertMessage = t(recipientChatId, 'dishwasher_alert_message', {user: translateName(currentUser, recipientChatId), sender: translateName(userName, recipientChatId)});
-                console.log(`🔔 Sending dishwasher alert to chat ID: ${recipientChatId}`);
+                const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentUser, recipientUserId), sender: translateName(userName, recipientUserId)});
+                console.log(`🔔 Sending dishwasher alert to chat ID: ${recipientChatId} (userId: ${recipientUserId})`);
                 sendMessage(recipientChatId, alertMessage);
             }
         });
