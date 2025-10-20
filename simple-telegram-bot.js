@@ -1242,6 +1242,7 @@ const translations = {
         'admin_interventions': 'Admin interventions: {count}',
         'queue_reorders': 'Queue reorders: {count}',
         'no_statistics_available': 'No statistics available yet. Come back after some activity.',
+        'database_issue_work_done': 'Database issue - work was done but not saved',
         'totals': 'TOTALS',
         
         // Swap status messages
@@ -1644,6 +1645,7 @@ const translations = {
         'admin_interventions': 'התערבויות מנהל: {count}',
         'queue_reorders': 'סידורי תור מחדש: {count}',
         'no_statistics_available': 'אין סטטיסטיקות זמינות עדיין. חזרו לאחר פעילות.',
+        'database_issue_work_done': 'בעיית מסד נתונים - העבודה הושלמה אך לא נשמרה',
         'totals': 'סה"כ',
         
         // Swap status messages
@@ -1861,13 +1863,54 @@ function getUserName(userId) {
     return userId.toString();
 }
 
+// Database retry helper for /done operations
+async function retryDatabaseOperation(operation, maxRetries = 2) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            await operation();
+            return true; // Success
+        } catch (error) {
+            console.log(`❌ Database operation attempt ${attempt} failed:`, error.message);
+            if (attempt === maxRetries) {
+                return false; // All attempts failed
+            }
+            // Wait 500ms before retry
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+    return false;
+}
+
+// Send database error notification to all users
+function notifyDatabaseError(chatId, userId, userName, isAdmin) {
+    const errorMessage = t(userId, 'database_issue_work_done');
+    
+    // Send to the user who pressed /done
+    sendMessage(chatId, errorMessage);
+    
+    // Notify all authorized users and admins
+    [...authorizedUsers, ...admins].forEach(user => {
+        let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+        
+        if (!userChatId && isUserAdmin(user)) {
+            userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+        }
+        
+        if (userChatId && userChatId !== chatId) {
+            const recipientUserId = getUserIdFromChatId(userChatId);
+            const localizedError = t(recipientUserId, 'database_issue_work_done');
+            sendMessage(userChatId, localizedError);
+        }
+    });
+}
+
 // Send message to Telegram
 function sendMessage(chatId, text) {
     const url = `${botUrl}/sendMessage`;
     
     const send = (payload) => {
         const data = JSON.stringify(payload);
-        const options = {
+    const options = {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -2344,24 +2387,7 @@ async function handleCommand(chatId, userId, userName, text) {
                 }
             }
             
-            // Increment the score for the user who actually completed the turn (currentUser)
-            await incrementUserScore(currentUser);
-            
-            // Clear the assignment if it was assigned
-            if (originalUser !== currentUser) {
-                turnAssignments.delete(originalUser);
-            }
-            
-            // Update statistics for the user who completed their turn
-            updateUserStatistics(currentUser);
-            
-            // Save bot data after score changes
-            await saveBotData();
-            
-            // Track admin completion for monthly report
-            trackMonthlyAction('admin_completion', currentUser, userName);
-            
-            // Get next user for display
+            // OPTIMISTIC: Send notifications immediately (work is physically done)
             const nextUser = getCurrentTurnUser();
             
             const adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
@@ -2370,24 +2396,20 @@ async function handleCommand(chatId, userId, userName, text) {
                 `${t(userId, 'next_turn', {user: translateName(nextUser, userId)})}` +
                 `\n\n${t(userId, 'admin_can_apply_punishment', {user: translateName(currentUser, userId)})}`;
             
-            // Send confirmation to admin
+            // Send confirmation to admin immediately
             sendMessage(chatId, adminDoneMessage);
             
-            // Notify all authorized users and admins in their language
+            // Notify all authorized users and admins immediately
             [...authorizedUsers, ...admins].forEach(user => {
-                // Try to find chat ID for this user
                 let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
-                // If not found in userChatIds, check if this user is an admin
                 if (!userChatId && isUserAdmin(user)) {
                     userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
                 }
                 
                 if (userChatId && userChatId !== chatId) {
-                    // Get the correct userId for language preference
                     const recipientUserId = getUserIdFromChatId(userChatId);
                     
-                    // Create message in recipient's language
                     const userDoneMessage = `${t(recipientUserId, 'admin_intervention')}\n\n` +
                         `${t(recipientUserId, 'admin_completed_duty', {admin: translateName(userName, recipientUserId)})}\n` +
                         `${t(recipientUserId, 'helped_user', {user: translateName(currentUser, recipientUserId)})}\n` +
@@ -2400,6 +2422,31 @@ async function handleCommand(chatId, userId, userName, text) {
                     console.log(`🔔 No chat ID found for ${user} (admin: ${isUserAdmin(user)})`);
                 }
             });
+            
+            // BACKGROUND: Retry database operations
+            const dbSuccess = await retryDatabaseOperation(async () => {
+                // Increment the score for the user who actually completed the turn (currentUser)
+                await incrementUserScore(currentUser);
+                
+                // Clear the assignment if it was assigned
+                if (originalUser !== currentUser) {
+                    turnAssignments.delete(originalUser);
+                }
+                
+                // Update statistics for the user who completed their turn
+                updateUserStatistics(currentUser);
+                
+                // Save bot data after score changes
+                await saveBotData();
+                
+                // Track admin completion for monthly report
+                trackMonthlyAction('admin_completion', currentUser, userName);
+            });
+            
+            // If database operations failed, notify everyone
+            if (!dbSuccess) {
+                notifyDatabaseError(chatId, userId, userName, true);
+            }
             
             // Mark that dishwasher was completed (cancel auto-alert)
             global.dishwasherCompleted = true;
@@ -2451,45 +2498,27 @@ async function handleCommand(chatId, userId, userName, text) {
                 }
             }
             
-            // Increment the score for the user who actually completed the turn (currentUser)
-            await incrementUserScore(currentUser);
-            
-            // Clear the assignment if it was assigned
-            if (originalUser !== currentUser) {
-                turnAssignments.delete(originalUser);
-            }
-            
-            // Update statistics for the user who completed their turn
-            updateUserStatistics(currentUser);
-            
-            // Save bot data after score changes
-            await saveBotData();
-            
-            // Get next user for display
+            // OPTIMISTIC: Send notifications immediately (work is physically done)
             const nextUser = getCurrentTurnUser();
             
             const doneMessage = `${t(userId, 'turn_completed')}\n\n` +
                 `${t(userId, 'completed_by', {user: translateName(currentUser, userId)})}\n` +
                 `${t(userId, 'next_turn', {user: translateName(nextUser, userId)})}`;
             
-            // Send confirmation to user
+            // Send confirmation to user immediately
             sendMessage(chatId, doneMessage);
             
-            // Notify all authorized users and admins in their language
+            // Notify all authorized users and admins immediately
             [...authorizedUsers, ...admins].forEach(user => {
-                // Try to find chat ID for this user
                 let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
-                // If not found in userChatIds, check if this user is an admin
                 if (!userChatId && isUserAdmin(user)) {
                     userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
                 }
                 
                 if (userChatId && userChatId !== chatId) {
-                    // Get the correct userId for language preference
                     const recipientUserId = getUserIdFromChatId(userChatId);
                     
-                    // Create message in recipient's language
                     const userDoneMessage = `${t(recipientUserId, 'turn_completed')}\n\n` +
                         `${t(recipientUserId, 'completed_by', {user: translateName(currentUser, recipientUserId)})}\n` +
                         `${t(recipientUserId, 'next_turn', {user: translateName(nextUser, recipientUserId)})}`;
@@ -2500,6 +2529,28 @@ async function handleCommand(chatId, userId, userName, text) {
                     console.log(`🔔 No chat ID found for ${user} (admin: ${isUserAdmin(user)})`);
                 }
             });
+            
+            // BACKGROUND: Retry database operations
+            const dbSuccess = await retryDatabaseOperation(async () => {
+                // Increment the score for the user who actually completed the turn (currentUser)
+                await incrementUserScore(currentUser);
+                
+                // Clear the assignment if it was assigned
+                if (originalUser !== currentUser) {
+                    turnAssignments.delete(originalUser);
+                }
+                
+                // Update statistics for the user who completed their turn
+                updateUserStatistics(currentUser);
+                
+                // Save bot data after score changes
+                await saveBotData();
+            });
+            
+            // If database operations failed, notify everyone
+            if (!dbSuccess) {
+                notifyDatabaseError(chatId, userId, userName, false);
+            }
             
             // Mark that dishwasher was completed (cancel auto-alert)
             global.dishwasherCompleted = true;
