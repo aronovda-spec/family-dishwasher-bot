@@ -1893,6 +1893,42 @@ function sendMessage(chatId, text) {
     send({ chat_id: chatId, text, parse_mode: 'Markdown' });
 }
 
+// Send plain text (no formatting) to avoid Markdown/HTML parse errors
+function sendMessagePlain(chatId, text) {
+    const url = `${botUrl}/sendMessage`;
+    const payload = { chat_id: chatId, text: typeof text === 'string' ? text : String(text) };
+    const data = JSON.stringify(payload);
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data)
+        }
+    };
+    const req = https.request(url, options, (res) => {
+        let responseData = '';
+        res.on('data', (chunk) => responseData += chunk);
+        res.on('end', () => {
+            try {
+                const response = JSON.parse(responseData || '{}');
+                if (response && response.ok) {
+                    console.log(`📤 Sent message to ${chatId}`);
+                } else {
+                    const desc = response && response.description ? response.description : 'Unknown error';
+                    console.log(`❌ Telegram sendMessage (plain) error: ${desc}`);
+                }
+            } catch (e) {
+                console.log(`❌ Error parsing Telegram response (plain): ${e.message}`);
+            }
+        });
+    });
+    req.on('error', (err) => {
+        console.log(`❌ HTTPS error sending message (plain): ${err.message}`);
+    });
+    req.write(data);
+    req.end();
+}
+
 // Send message with buttons
 function sendMessageWithButtons(chatId, text, buttons) {
     const url = `${botUrl}/sendMessage`;
@@ -3869,11 +3905,14 @@ async function handleCallback(chatId, userId, userName, data) {
         // Show queue statistics
         let statsMessage = t(userId, 'queue_statistics_title');
         
+        // Sanitize helper: removes Telegram Markdown special chars to avoid parse errors
+        const sanitize = (s) => typeof s === 'string' ? s.replace(/[_*\[\]()~`>#+\-=|{}.!]/g, '') : s;
+        
         // Current tie-breaker priority order (only authorized users)
         statsMessage += t(userId, 'tie_breaker_priority_order');
         Array.from(authorizedUsers).forEach((user, index) => {
             const emoji = addRoyalEmoji(user);
-            statsMessage += `${index + 1}. ${emoji}\n`;
+            statsMessage += `${index + 1}. ${sanitize(emoji)}\n`;
         });
         
         // If there are no authorized users yet, show a friendly message and exit early
@@ -3893,21 +3932,21 @@ async function handleCallback(chatId, userId, userName, data) {
                 const score = await db.getUserScore(user) || 0;
             const relativeScore = relativeScores.get(user) || 0;
             const emoji = addRoyalEmoji(user);
-            statsMessage += `${emoji}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+            statsMessage += `${sanitize(emoji)}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
             }
         }
         
         // Current turn and next 3 turns
         const currentUser = getCurrentTurnUser();
         const nextThreeTurns = getNextThreeTurns();
-        statsMessage += `\n${t(userId, 'current_turn')} ${addRoyalEmojiTranslated(currentUser, userId)}\n`;
-        statsMessage += `${t(userId, 'next_3_turns')} ${nextThreeTurns.map(user => addRoyalEmojiTranslated(user, userId)).join(' → ')}\n`;
+        statsMessage += `\n${t(userId, 'current_turn')} ${sanitize(addRoyalEmojiTranslated(currentUser, userId))}\n`;
+        statsMessage += `${t(userId, 'next_3_turns')} ${nextThreeTurns.map(user => sanitize(addRoyalEmojiTranslated(user, userId))).join(' → ')}\n`;
         
         // Suspended users
         if (suspendedUsers.size > 0) {
             statsMessage += `\n${t(userId, 'suspended_users')}`;
             for (const [user, suspension] of suspendedUsers.entries()) {
-                const emoji = addRoyalEmojiTranslated(user, userId);
+                const emoji = sanitize(addRoyalEmojiTranslated(user, userId));
                 const daysLeft = Math.ceil((suspension.suspendedUntil - new Date()) / (1000 * 60 * 60 * 24));
                 const daysText = daysLeft > 1 ? t(userId, 'days_left_plural') : t(userId, 'days_left');
                 statsMessage += `${emoji}: ${daysLeft} ${daysText}\n`;
@@ -3918,8 +3957,8 @@ async function handleCallback(chatId, userId, userName, data) {
         if (turnAssignments.size > 0) {
             statsMessage += `\n${t(userId, 'active_turn_assignments')}`;
             for (const [originalUser, assignedTo] of turnAssignments.entries()) {
-                const originalEmoji = addRoyalEmojiTranslated(originalUser, userId);
-                const assignedEmoji = addRoyalEmojiTranslated(assignedTo, userId);
+                const originalEmoji = sanitize(addRoyalEmojiTranslated(originalUser, userId));
+                const assignedEmoji = sanitize(addRoyalEmojiTranslated(assignedTo, userId));
                 statsMessage += `${originalEmoji} → ${assignedEmoji}\n`;
             }
         }
@@ -3930,7 +3969,8 @@ async function handleCallback(chatId, userId, userName, data) {
             statsMessage += `\n${t(userId, 'no_statistics_available') || 'No statistics recorded yet for this month.'}`;
         }
         
-        sendMessage(chatId, statsMessage);
+        // Send as plain text to fully avoid Markdown parsing issues
+        sendMessagePlain(chatId, statsMessage);
         
     } else if (data === 'suspend_user_menu') {
         // Select user to suspend (show all users in originalQueue)
