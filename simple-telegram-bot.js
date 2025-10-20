@@ -1848,26 +1848,49 @@ function getUserName(userId) {
 // Send message to Telegram
 function sendMessage(chatId, text) {
     const url = `${botUrl}/sendMessage`;
-    const data = JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'Markdown'
-    });
-    
-    const options = {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(data)
-        }
+
+    const send = (payload) => {
+        const data = JSON.stringify(payload);
+        const options = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(data)
+            }
+        };
+        const req = https.request(url, options, (res) => {
+            let responseData = '';
+            res.on('data', (chunk) => responseData += chunk);
+            res.on('end', () => {
+                try {
+                    const response = JSON.parse(responseData || '{}');
+                    if (response && response.ok) {
+                        console.log(`📤 Sent message to ${chatId}`);
+                    } else {
+                        const desc = response && response.description ? response.description : 'Unknown error';
+                        console.log(`❌ Telegram sendMessage error: ${desc}`);
+                        // Fallback: retry without parse_mode on formatting errors
+                        if (payload.parse_mode && /parse|entity|markdown/i.test(desc)) {
+                            const fallback = { chat_id: chatId, text: text };
+                            const trimmed = typeof text === 'string' ? text.trim() : text;
+                            fallback.text = trimmed;
+                            send(fallback);
+                        }
+                    }
+                } catch (e) {
+                    console.log(`❌ Error parsing Telegram response: ${e.message}`);
+                }
+            });
+        });
+        req.on('error', (err) => {
+            console.log(`❌ HTTPS error sending message: ${err.message}`);
+        });
+        req.write(data);
+        req.end();
     };
-    
-    const req = https.request(url, options, (res) => {
-        console.log(`📤 Sent message to ${chatId}`);
-    });
-    
-    req.write(data);
-    req.end();
+
+    // Try Markdown first; will auto-fallback if Telegram rejects formatting
+    send({ chat_id: chatId, text, parse_mode: 'Markdown' });
 }
 
 // Send message with buttons
@@ -3858,7 +3881,7 @@ async function handleCallback(chatId, userId, userName, data) {
             sendMessage(chatId, `${statsMessage}\n${t(userId, 'no_statistics_available') || 'No statistics available yet. Come back after some activity.'}`);
             return;
         }
-
+        
         // Current scores (only for authorized users) - fetch from database for accuracy
         statsMessage += `\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
@@ -3906,7 +3929,7 @@ async function handleCallback(chatId, userId, userName, data) {
         if (!hasMonthlyStats || (typeof monthData === 'undefined')) {
             statsMessage += `\n${t(userId, 'no_statistics_available') || 'No statistics recorded yet for this month.'}`;
         }
-
+        
         sendMessage(chatId, statsMessage);
         
     } else if (data === 'suspend_user_menu') {
