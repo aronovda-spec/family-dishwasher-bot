@@ -1694,7 +1694,8 @@ const translations = {
 
 // Get user's language preference
 function getUserLanguage(userId) {
-    return userLanguage.get(userId) || 'en'; // Default to English
+    const key = String(userId);
+    return userLanguage.get(key) || 'en'; // Default to English
 }
 
 // Helper function to get userId from chatId for notifications
@@ -2063,11 +2064,12 @@ async function handleCommand(chatId, userId, userName, text) {
         chatIdToUserId.set(chatId, userId);
         
         // Set default language for new users (if not already set)
-        if (!userLanguage.has(userId)) {
-            userLanguage.set(userId, 'en'); // Default to English
+        const langKey = String(userId);
+        if (!userLanguage.has(langKey)) {
+            userLanguage.set(langKey, 'en'); // Default to English
             console.log(`🌐 Set default language (English) for new user ${userName} (${userId})`);
         } else {
-            console.log(`🌐 User ${userName} (${userId}) already has language preference: ${userLanguage.get(userId)}`);
+            console.log(`🌐 User ${userName} (${userId}) already has language preference: ${userLanguage.get(langKey)}`);
         }
         
         const isAdmin = isUserAdmin(userName, userId);
@@ -4260,7 +4262,7 @@ async function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'language_switch') {
         const currentLang = getUserLanguage(userId);
         const newLang = currentLang === 'en' ? 'he' : 'en';
-        userLanguage.set(userId, newLang);
+        userLanguage.set(String(userId), newLang);
         
         // Save language preference to database immediately
         await saveBotData();
