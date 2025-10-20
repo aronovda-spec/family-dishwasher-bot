@@ -3911,8 +3911,8 @@ async function handleCallback(chatId, userId, userName, data) {
         // Current tie-breaker priority order (only authorized users)
         statsMessage += t(userId, 'tie_breaker_priority_order');
         Array.from(authorizedUsers).forEach((user, index) => {
-            const emoji = addRoyalEmoji(user);
-            statsMessage += `${index + 1}. ${sanitize(emoji)}\n`;
+            const nameTranslated = addRoyalEmojiTranslated(user, userId);
+            statsMessage += `${index + 1}. ${sanitize(nameTranslated)}\n`;
         });
         
         // If there are no authorized users yet, show a friendly message and exit early
@@ -3930,9 +3930,9 @@ async function handleCallback(chatId, userId, userName, data) {
             if (authorizedUsers.has(user)) {
                 // Fetch score directly from database to ensure accuracy
                 const score = await db.getUserScore(user) || 0;
-            const relativeScore = relativeScores.get(user) || 0;
-            const emoji = addRoyalEmoji(user);
-            statsMessage += `${sanitize(emoji)}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+                const relativeScore = relativeScores.get(user) || 0;
+                const nameTranslated = addRoyalEmojiTranslated(user, userId);
+                statsMessage += `${sanitize(nameTranslated)}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
             }
         }
         
