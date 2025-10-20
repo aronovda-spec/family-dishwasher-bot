@@ -1142,6 +1142,12 @@ const translations = {
         'position_3': '3️⃣ Position 3 (Third)',
         'queue_reordered': '✅ Queue reordered successfully!',
         'new_queue_order_is': 'New queue order:',
+        // Queue statistics labels (ensure English keys exist)
+        'tie_breaker_priority_order': '📋 Tie-breaker priority order:\n',
+        'next_3_turns': '📅 Next 3 turns: ',
+        'suspended_users': '✈️ Suspended users:\n',
+        'days_left': 'day left',
+        'days_left_plural': 'days left',
         'select_user_to_suspend': 'Select user to suspend:',
         'select_suspension_duration': 'Select suspension duration for {user}:',
         'duration_1_day': '1️⃣ 1 Day',
