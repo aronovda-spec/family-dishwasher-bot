@@ -1226,6 +1226,7 @@ const translations = {
         'total_dishes_completed': 'Total dishes completed: {count}',
         'admin_interventions': 'Admin interventions: {count}',
         'queue_reorders': 'Queue reorders: {count}',
+        'no_statistics_available': 'No statistics available yet. Come back after some activity.',
         'totals': 'TOTALS',
         
         // Swap status messages
@@ -1627,6 +1628,7 @@ const translations = {
         'total_dishes_completed': 'סה"כ כלים שהושלמו: {count}',
         'admin_interventions': 'התערבויות מנהל: {count}',
         'queue_reorders': 'סידורי תור מחדש: {count}',
+        'no_statistics_available': 'אין סטטיסטיקות זמינות עדיין. חזרו לאחר פעילות.',
         'totals': 'סה"כ',
         
         // Swap status messages
@@ -3851,6 +3853,12 @@ async function handleCallback(chatId, userId, userName, data) {
             statsMessage += `${index + 1}. ${emoji}\n`;
         });
         
+        // If there are no authorized users yet, show a friendly message and exit early
+        if (authorizedUsers.size === 0) {
+            sendMessage(chatId, `${statsMessage}\n${t(userId, 'no_statistics_available') || 'No statistics available yet. Come back after some activity.'}`);
+            return;
+        }
+
         // Current scores (only for authorized users) - fetch from database for accuracy
         statsMessage += `\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
@@ -3893,6 +3901,12 @@ async function handleCallback(chatId, userId, userName, data) {
             }
         }
         
+        // If monthly stats are empty, append a friendly note
+        const hasMonthlyStats = typeof db.getAllMonthlyStats === 'function' ? true : false;
+        if (!hasMonthlyStats || (typeof monthData === 'undefined')) {
+            statsMessage += `\n${t(userId, 'no_statistics_available') || 'No statistics recorded yet for this month.'}`;
+        }
+
         sendMessage(chatId, statsMessage);
         
     } else if (data === 'suspend_user_menu') {
