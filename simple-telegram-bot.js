@@ -1,5 +1,14 @@
 // Simple Telegram Dishwasher Bot (no external dependencies)
 const https = require('https');
+
+// Global HTTPS keep-alive agent for Telegram requests (guarded by env flag)
+const ENABLE_KEEP_ALIVE = String(process.env.ENABLE_KEEP_ALIVE || 'true').toLowerCase() === 'true';
+const telegramHttpsAgent = ENABLE_KEEP_ALIVE ? new https.Agent({
+    keepAlive: true,
+    maxSockets: 50,
+    keepAliveMsecs: 15000,
+    timeout: 15000
+}) : undefined;
 const fs = require('fs');
 const path = require('path');
 const SupabaseDatabase = require('./supabase-db.js');
@@ -1855,24 +1864,25 @@ function getUserName(userId) {
 // Send message to Telegram
 function sendMessage(chatId, text) {
     const url = `${botUrl}/sendMessage`;
-
+    
     const send = (payload) => {
         const data = JSON.stringify(payload);
         const options = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(data)
-            }
-        };
-        const req = https.request(url, options, (res) => {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data)
+            },
+            agent: telegramHttpsAgent
+    };
+    const req = https.request(url, options, (res) => {
             let responseData = '';
             res.on('data', (chunk) => responseData += chunk);
             res.on('end', () => {
                 try {
                     const response = JSON.parse(responseData || '{}');
                     if (response && response.ok) {
-                        console.log(`📤 Sent message to ${chatId}`);
+        console.log(`📤 Sent message to ${chatId}`);
                     } else {
                         const desc = response && response.description ? response.description : 'Unknown error';
                         console.log(`❌ Telegram sendMessage error: ${desc}`);
@@ -1905,12 +1915,13 @@ function sendMessagePlain(chatId, text) {
     const url = `${botUrl}/sendMessage`;
     const payload = { chat_id: chatId, text: typeof text === 'string' ? text : String(text) };
     const data = JSON.stringify(payload);
-    const options = {
+        const options = {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data)
-        }
+            },
+            agent: telegramHttpsAgent
     };
     const req = https.request(url, options, (res) => {
         let responseData = '';
@@ -3938,7 +3949,7 @@ async function handleCallback(chatId, userId, userName, data) {
             if (authorizedUsers.has(user)) {
                 // Fetch score directly from database to ensure accuracy
                 const score = await db.getUserScore(user) || 0;
-                const relativeScore = relativeScores.get(user) || 0;
+            const relativeScore = relativeScores.get(user) || 0;
                 const nameTranslated = addRoyalEmojiTranslated(user, userId);
                 statsMessage += `${sanitize(nameTranslated)}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
             }
@@ -5061,7 +5072,7 @@ async function getUpdates(offset = 0) {
                                 }
                             };
                             
-                            const answerReq = https.request(answerUrl, answerOptions);
+    const answerReq = https.request(answerUrl, { ...answerOptions, agent: telegramHttpsAgent });
                             answerReq.write(answerData);
                             answerReq.end();
                         }
@@ -5343,7 +5354,7 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
         }
     };
     
-    const webhookReq = https.request(`${botUrl}/setWebhook`, webhookOptions, (res) => {
+    const webhookReq = https.request(`${botUrl}/setWebhook`, { ...webhookOptions, agent: telegramHttpsAgent }, (res) => {
         let responseData = '';
         res.on('data', (chunk) => {
             responseData += chunk;
