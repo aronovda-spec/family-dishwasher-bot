@@ -491,6 +491,10 @@ async function incrementUserScore(userName) {
     userScores.set(userName, newScore);
     console.log(`📊 ${userName} score incremented: ${currentScore} → ${newScore}`);
     
+    // PHASE 2: Track change for future batching (keep immediate save as fallback)
+    pendingScoreChanges.set(userName, newScore);
+    isDirty = true;
+    
     // Immediately save to database to prevent score mismatch
     await db.setUserScore(userName, newScore);
     
@@ -868,6 +872,12 @@ function trackMonthlyAction(type, userName, adminName = null, count = 1) {
     const monthKey = getCurrentMonthKey();
     initializeMonthlyStats(monthKey);
     const monthData = monthlyStats.get(monthKey);
+    
+    // PHASE 2: Track monthly stats changes for future batching
+    if (!pendingMonthlyStats[monthKey]) {
+        pendingMonthlyStats[monthKey] = JSON.parse(JSON.stringify(monthData)); // Deep copy
+    }
+    isDirty = true;
     
     switch (type) {
         case 'punishment_received':
@@ -2580,6 +2590,10 @@ async function handleCommand(chatId, userId, userName, text) {
                 // Clear the assignment if it was assigned
                 if (originalUser !== currentUser) {
                     turnAssignments.delete(originalUser);
+                    
+                    // PHASE 2: Track bot state changes
+                    dirtyKeys.add('turnAssignments');
+                    isDirty = true;
                 }
                 
                 // Update statistics for the user who completed their turn
@@ -2687,6 +2701,10 @@ async function handleCommand(chatId, userId, userName, text) {
                 // Clear the assignment if it was assigned
                 if (originalUser !== currentUser) {
                     turnAssignments.delete(originalUser);
+                    
+                    // PHASE 2: Track bot state changes
+                    dirtyKeys.add('turnAssignments');
+                    isDirty = true;
                 }
                 
                 // Update statistics for the user who completed their turn
@@ -3073,6 +3091,11 @@ async function handleCommand(chatId, userId, userName, text) {
                 if (queueMember) {
                     // Store only the canonical name (first name only)
                     authorizedUsers.add(userToAuth);
+                    
+                    // PHASE 2: Track bot state changes
+                    dirtyKeys.add('authorizedUsers');
+                    isDirty = true;
+                    
                     userQueueMapping.set(userToAuth, queueMember);
                     queueUserMapping.set(queueMember, userToAuth);
                     
