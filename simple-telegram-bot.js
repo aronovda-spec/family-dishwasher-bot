@@ -4289,7 +4289,7 @@ async function handleCallback(chatId, userId, userName, data) {
         // If monthly stats are empty, append a friendly note
         const hasMonthlyStats = typeof db.getAllMonthlyStats === 'function' ? true : false;
         if (!hasMonthlyStats || (typeof monthData === 'undefined')) {
-            statsMessage += `\n${t(userId, 'no_statistics_available') || 'No statistics recorded yet for this month.'}`;
+            statsMessage += `\n${t(userId, 'no_statistics_recorded_this_month') || 'No statistics recorded yet for this month.'}`;
         }
         
         // Send as plain text to fully avoid Markdown parsing issues
