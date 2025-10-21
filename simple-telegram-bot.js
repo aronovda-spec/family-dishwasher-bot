@@ -2498,14 +2498,20 @@ async function handleCommand(chatId, userId, userName, text) {
         statusMessage += `\n\n${t(userId, 'current_scores')}`;
         const relativeScores = getRelativeScores();
         
+        // OPTIMIZATION: Parallel database reads for better performance
+        const authorizedUsersArray = Array.from(authorizedUsers);
+        const scorePromises = authorizedUsersArray.map(user => db.getUserScore(user));
+        const scores = await Promise.all(scorePromises);
+        
         // Display scores in originalQueue order for consistency
         for (const user of originalQueue) {
             if (authorizedUsers.has(user)) {
-                // Fetch score directly from database to ensure accuracy
-                const score = await db.getUserScore(user) || 0;
-            const relativeScore = relativeScores.get(user) || 0;
-            const royalName = addRoyalEmojiTranslated(user, userId);
-            statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
+                // Get score from parallel fetch results
+                const userIndex = authorizedUsersArray.indexOf(user);
+                const score = scores[userIndex] || 0;
+                const relativeScore = relativeScores.get(user) || 0;
+                const royalName = addRoyalEmojiTranslated(user, userId);
+                statusMessage += `• ${royalName}: ${score} (${relativeScore >= 0 ? '+' : ''}${relativeScore})\n`;
             }
         }
         
