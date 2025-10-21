@@ -1442,6 +1442,7 @@ const translations = {
         'admin_interventions': 'Admin interventions: {count}',
         'queue_reorders': 'Queue reorders: {count}',
         'no_statistics_available': 'No statistics available yet. Come back after some activity.',
+        'no_statistics_recorded_this_month': 'No statistics recorded yet for this month.',
         'database_issue_work_done': 'Database issue - work was done but not saved',
         'totals': 'TOTALS',
         
@@ -1846,6 +1847,7 @@ const translations = {
         'admin_interventions': 'התערבויות מנהל: {count}',
         'queue_reorders': 'סידורי תור מחדש: {count}',
         'no_statistics_available': 'אין סטטיסטיקות זמינות עדיין. חזרו לאחר פעילות.',
+        'no_statistics_recorded_this_month': 'אין סטטיסטיקות שנרשמו החודש עדיין.',
         'database_issue_work_done': 'בעיית מסד נתונים - העבודה הושלמה אך לא נשמרה',
         'totals': 'סה"כ',
         
