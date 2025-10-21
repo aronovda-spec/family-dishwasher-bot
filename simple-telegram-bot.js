@@ -77,6 +77,138 @@ async function saveBotData() {
     }
 }
 
+// ===== BATCH SAVE FUNCTIONS (Phase 1) =====
+// These functions will be used in Phase 2 to replace immediate saves
+
+async function savePendingScores() {
+    if (pendingScoreChanges.size === 0) return;
+    
+    try {
+        console.log(`📊 Batch saving ${pendingScoreChanges.size} score changes`);
+        const startTime = Date.now();
+        
+        // Save all pending score changes
+        for (const [userName, score] of pendingScoreChanges) {
+            await db.saveUserScore(userName, score);
+        }
+        
+        const duration = Date.now() - startTime;
+        console.log(`✅ Batch score save completed in ${duration}ms`);
+        
+        // Clear pending changes
+        pendingScoreChanges.clear();
+    } catch (error) {
+        console.error('❌ Error in batch score save:', error);
+        throw error;
+    }
+}
+
+async function savePendingMonthlyStats() {
+    if (Object.keys(pendingMonthlyStats).length === 0) return;
+    
+    try {
+        console.log(`📊 Batch saving monthly stats for ${Object.keys(pendingMonthlyStats).length} months`);
+        const startTime = Date.now();
+        
+        // Save all pending monthly stats
+        for (const [month, stats] of Object.entries(pendingMonthlyStats)) {
+            await db.saveMonthlyStats(month, stats);
+        }
+        
+        const duration = Date.now() - startTime;
+        console.log(`✅ Batch monthly stats save completed in ${duration}ms`);
+        
+        // Clear pending changes
+        Object.keys(pendingMonthlyStats).forEach(key => delete pendingMonthlyStats[key]);
+    } catch (error) {
+        console.error('❌ Error in batch monthly stats save:', error);
+        throw error;
+    }
+}
+
+async function saveDirtyBotState() {
+    if (dirtyKeys.size === 0) return;
+    
+    try {
+        console.log(`📊 Batch saving ${dirtyKeys.size} dirty bot state keys: ${Array.from(dirtyKeys).join(', ')}`);
+        const startTime = Date.now();
+        
+        // Save only the keys that have changed
+        for (const key of dirtyKeys) {
+            switch (key) {
+                case 'authorizedUsers':
+                    await db.saveBotState('authorizedUsers', Array.from(authorizedUsers));
+                    break;
+                case 'admins':
+                    await db.saveBotState('admins', Array.from(admins));
+                    break;
+                case 'userChatIds':
+                    await db.saveBotState('userChatIds', Object.fromEntries(userChatIds));
+                    break;
+                case 'adminChatIds':
+                    await db.saveBotState('adminChatIds', Array.from(adminChatIds));
+                    break;
+                case 'adminNameToChatId':
+                    await db.saveBotState('adminNameToChatId', Object.fromEntries(adminNameToChatId));
+                    break;
+                case 'turnOrder':
+                    await db.saveBotState('turnOrder', Array.from(turnOrder));
+                    break;
+                case 'currentTurnIndex':
+                    await db.saveBotState('currentTurnIndex', currentTurnIndex);
+                    break;
+                case 'originalQueue':
+                    await db.saveBotState('originalQueue', originalQueue);
+                    break;
+                case 'suspendedUsers':
+                    await db.saveBotState('suspendedUsers', Object.fromEntries(suspendedUsers));
+                    break;
+                case 'turnAssignments':
+                    await db.saveBotState('turnAssignments', Object.fromEntries(turnAssignments));
+                    break;
+                case 'swapTimestamps':
+                    await db.saveBotState('swapTimestamps', Object.fromEntries(swapTimestamps));
+                    break;
+                case 'doneTimestamps':
+                    await db.saveBotState('doneTimestamps', Object.fromEntries(doneTimestamps));
+                    break;
+                case 'gracePeriods':
+                    await db.saveBotState('gracePeriods', Object.fromEntries(gracePeriods));
+                    break;
+                case 'queueStatistics':
+                    await db.saveBotState('queueStatistics', Object.fromEntries(queueStatistics));
+                    break;
+                case 'punishmentTurns':
+                    await db.saveBotState('punishmentTurns', Object.fromEntries(punishmentTurns));
+                    break;
+                case 'userLanguage':
+                    await db.saveBotState('userLanguage', Object.fromEntries(userLanguage));
+                    break;
+                case 'chatIdToUserId':
+                    await db.saveBotState('chatIdToUserId', Object.fromEntries(chatIdToUserId));
+                    break;
+            }
+        }
+        
+        const duration = Date.now() - startTime;
+        console.log(`✅ Batch bot state save completed in ${duration}ms`);
+        
+        // Clear dirty keys
+        dirtyKeys.clear();
+    } catch (error) {
+        console.error('❌ Error in batch bot state save:', error);
+        throw error;
+    }
+}
+
+function clearPendingChanges() {
+    dirtyKeys.clear();
+    pendingScoreChanges.clear();
+    Object.keys(pendingMonthlyStats).forEach(key => delete pendingMonthlyStats[key]);
+    isDirty = false;
+    console.log('🧹 Cleared all pending changes');
+}
+
 // Supabase persistence - no complex backup functions needed
 
 async function loadBotData() {
@@ -238,7 +370,16 @@ async function loadBotData() {
 
 // Auto-save every 5 minutes
 setInterval(async () => {
+    const saveStartTime = Date.now();
+    const pendingChangesCount = dirtyKeys.size + pendingScoreChanges.size + Object.keys(pendingMonthlyStats).length;
+    
+    console.log(`💾 Starting auto-save cycle - ${pendingChangesCount} pending changes tracked`);
+    console.log(`📊 Pending: ${dirtyKeys.size} dirty keys, ${pendingScoreChanges.size} score changes, ${Object.keys(pendingMonthlyStats).length} monthly stats`);
+    
     await saveBotData();
+    
+    const saveDuration = Date.now() - saveStartTime;
+    console.log(`✅ Auto-save cycle completed in ${saveDuration}ms`);
 }, 5 * 60 * 1000);
 
 console.log('💾 File-based persistence system initialized');
@@ -428,6 +569,14 @@ const queueStatistics = new Map(); // userName -> { totalCompletions: number, mo
 
 // Check if running on Render
 const isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HOSTNAME;
+
+// ===== INCREMENTAL SAVE SYSTEM (Phase 1) =====
+// Change tracking for incremental saves
+const dirtyKeys = new Set(); // Track which bot state keys have changed
+const pendingScoreChanges = new Map(); // Accumulate user score changes
+const pendingMonthlyStats = {}; // Accumulate monthly statistics
+let isDirty = false; // Quick flag for any changes
+let lastSaveTime = Date.now(); // Track save timing
 
 // Initialize Supabase database after global variables are declared
 db = new SupabaseDatabase();
