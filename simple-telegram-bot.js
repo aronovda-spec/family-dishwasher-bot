@@ -4581,8 +4581,12 @@ async function handleCallback(chatId, userId, userName, data) {
         const newLang = currentLang === 'en' ? 'he' : 'en';
         userLanguage.set(String(userId), newLang);
         
-        // Save language preference to database immediately
-        await saveBotData();
+        // PHASE 2: Track bot state changes for future batching
+        dirtyKeys.add('userLanguage');
+        isDirty = true;
+        
+        // PHASE 3: Trigger non-blocking critical save for immediate persistence
+        await saveCriticalData();
         
         const switchMessage = newLang === 'he' ? 
             `🇮🇱 **שפה שונתה לעברית!** ✅\n\nהבוט יציג כעת הכל בעברית.\nשלח /start כדי לראות את התפריט החדש! 🎯` :
