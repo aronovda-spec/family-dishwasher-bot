@@ -1466,6 +1466,7 @@ const translations = {
         'help_admin_features': '👨‍💼 **Admin Features:**\n',
         'help_admin_explanation': '• **Force Swap** - Force swap turns\n• **Apply Punishment** - Apply direct punishment\n• **Suspend/Reactivate** - Suspend and reactivate users\n• **Reset Scores** - Reset scores (all, individual, or normalize)\n• **Reorder Queue** - Change tie-breaker order\n• **Queue Statistics** - Detailed statistics\n• **Monthly Report** - Detailed monthly report\n• **User Management** - Remove users from bot\n• **Data Reset** - Reset all bot data with confirmation\n\n',
         'help_tie_breaker': '🎯 **Tie-breaker Order:** {Eden} → {Adele} → {Emma}\n\n',
+        'help_basic_info': '\n💡 **Basic Information:**\n• This bot manages dishwasher turns for authorized users\n• Contact an admin to get authorized for queue commands\n• Use `/start` to begin using the bot\n\n',
         'help_tip': '💡 **Tip:** Use buttons for easier navigation!\n\n🔧 **New Admin Commands:**\n• `/removeuser @username` - Remove user from bot\n• `/resetbot` - Reset all bot data\n• `/leave` or `/quit` - Remove yourself from bot\n\n🚨 **Debt Protection:**\n• Users with low scores cannot leave to prevent debt reset\n• 24-hour grace period for legitimate leaves\n• Score preserved during grace period',
         
         // Debt protection messages
@@ -1869,6 +1870,7 @@ const translations = {
         'help_admin_features': '👨‍💼 **תכונות מנהל:**\n',
         'help_admin_explanation': '• **החלפה בכוח** - החלפת תור בכוח\n• **הפעלת עונש** - הפעלת עונש ישיר\n• **השעיה/הפעלה מחדש** - השעיה והפעלה מחדש של משתמשים\n• **איפוס ניקודים** - איפוס ניקודים (כולם, יחיד, או נרמול)\n• **סידור תור מחדש** - שינוי סדר הקביעות\n• **סטטיסטיקות תור** - סטטיסטיקות מפורטות\n• **דוח חודשי** - דוח חודשי מפורט\n• **ניהול משתמשים** - הסרת משתמשים מהבוט\n• **איפוס נתונים** - איפוס כל נתוני הבוט עם אישור\n\n',
         'help_tie_breaker': '🎯 **סדר קביעות:** {Eden} → {Adele} → {Emma}\n\n',
+        'help_basic_info': '\n💡 **מידע בסיסי:**\n• הבוט מנהל תורות מדיח כלים למשתמשים מורשים\n• פנה למנהל כדי לקבל הרשאה לפקודות התור\n• השתמש ב-`/start` כדי להתחיל להשתמש בבוט\n\n',
         // Debt protection messages
         'debt_warning': '🚨 **אזהרה: יש לך {debtAmount} תורות להשלים לפני העזיבה!**\n\n📊 **הניקוד שלך:** {userScore}\n📊 **הניקוד הגבוה ביותר:** {maxScore}\n\n❌ **לא ניתן לעזוב עם חובות פתוחים**\n\n💡 **השלם את התורות שלך או בקש ממנהל להסיר אותך**',
         'leave_confirmation': '⚠️ **האם אתה בטוח שברצונך לעזוב את הבוט?**\n\n📊 **הניקוד הנוכחי שלך:** {userScore}\n\nזה יגרום ל:\n• הסרה מכל התורים\n• התחלת תקופת חסד של 24 שעות\n• תוכל להצטרף מחדש תוך 24 שעות עם אותו ניקוד\n• אחרי 24 שעות, הניקוד יתאפס ל-0\n\nהאם אתה בטוח?',
@@ -2778,21 +2780,45 @@ async function handleCommand(chatId, userId, userName, text) {
         }
         
     } else if (command === '/help' || command === 'help') {
-        const helpMessage = t(userId, 'help_title') +
-            t(userId, 'help_scoring_system') + t(userId, 'help_scoring_explanation', {
-                Eden: translateName('Eden', userId),
-                Adele: translateName('Adele', userId),
-                Emma: translateName('Emma', userId)
-            }) +
-            t(userId, 'help_queue_commands') + t(userId, 'help_queue_explanation') +
-            t(userId, 'help_swapping') + t(userId, 'help_swapping_explanation') +
-            t(userId, 'help_punishment') + t(userId, 'help_punishment_explanation') +
-            t(userId, 'help_admin_features') + t(userId, 'help_admin_explanation') +
-            t(userId, 'help_tie_breaker', {
-                Eden: translateName('Eden', userId),
-                Adele: translateName('Adele', userId),
-                Emma: translateName('Emma', userId)
-            }) + t(userId, 'help_tip');
+        // Role-based help content
+        const userName = getUserName(userId);
+        const isAdmin = isUserAdmin(userName, userId);
+        const isAuthorized = isUserAuthorized(userName);
+        
+        let helpMessage = t(userId, 'help_title');
+        
+        // Basic content for everyone
+        helpMessage += t(userId, 'help_scoring_system') + t(userId, 'help_scoring_explanation', {
+            Eden: translateName('Eden', userId),
+            Adele: translateName('Adele', userId),
+            Emma: translateName('Emma', userId)
+        });
+        
+        if (isAdmin) {
+            // Admin gets everything
+            helpMessage += t(userId, 'help_queue_commands') + t(userId, 'help_queue_explanation') +
+                          t(userId, 'help_swapping') + t(userId, 'help_swapping_explanation') +
+                          t(userId, 'help_punishment') + t(userId, 'help_punishment_explanation') +
+                          t(userId, 'help_admin_features') + t(userId, 'help_admin_explanation') +
+                          t(userId, 'help_tie_breaker', {
+                              Eden: translateName('Eden', userId),
+                              Adele: translateName('Adele', userId),
+                              Emma: translateName('Emma', userId)
+                          }) + t(userId, 'help_tip');
+        } else if (isAuthorized) {
+            // Authorized users get queue commands but no admin features
+            helpMessage += t(userId, 'help_queue_commands') + t(userId, 'help_queue_explanation') +
+                          t(userId, 'help_swapping') + t(userId, 'help_swapping_explanation') +
+                          t(userId, 'help_punishment') + t(userId, 'help_punishment_explanation') +
+                          t(userId, 'help_tie_breaker', {
+                              Eden: translateName('Eden', userId),
+                              Adele: translateName('Adele', userId),
+                              Emma: translateName('Emma', userId)
+                          });
+        } else {
+            // Non-authorized users get basic info only
+            helpMessage += t(userId, 'help_basic_info') || '\n💡 **Basic Information:**\n• This bot manages dishwasher turns for authorized users\n• Contact an admin to get authorized for queue commands\n• Use `/start` to begin using the bot\n\n';
+        }
         
         sendMessage(chatId, helpMessage);
         
