@@ -209,6 +209,32 @@ function clearPendingChanges() {
     console.log('🧹 Cleared all pending changes');
 }
 
+// PHASE 3: Non-blocking save for critical operations
+async function saveCriticalData() {
+    if (!isDirty) return;
+    
+    // Use setImmediate to make save non-blocking
+    setImmediate(async () => {
+        try {
+            console.log('🚀 Non-blocking critical save started');
+            const startTime = Date.now();
+            
+            await Promise.all([
+                savePendingScores(),
+                savePendingMonthlyStats(),
+                saveDirtyBotState()
+            ]);
+            
+            const duration = Date.now() - startTime;
+            console.log(`✅ Non-blocking critical save completed in ${duration}ms`);
+            clearPendingChanges();
+            
+        } catch (error) {
+            console.error('❌ Error in non-blocking critical save:', error);
+        }
+    });
+}
+
 // Supabase persistence - no complex backup functions needed
 
 async function loadBotData() {
@@ -368,19 +394,37 @@ async function loadBotData() {
     }
 }
 
-// Auto-save every 5 minutes
+// Auto-save every 10 minutes (optimized from 5 minutes)
 setInterval(async () => {
     const saveStartTime = Date.now();
     const pendingChangesCount = dirtyKeys.size + pendingScoreChanges.size + Object.keys(pendingMonthlyStats).length;
     
-    console.log(`💾 Starting auto-save cycle - ${pendingChangesCount} pending changes tracked`);
+    console.log(`💾 Starting optimized auto-save cycle - ${pendingChangesCount} pending changes tracked`);
     console.log(`📊 Pending: ${dirtyKeys.size} dirty keys, ${pendingScoreChanges.size} score changes, ${Object.keys(pendingMonthlyStats).length} monthly stats`);
     
-    await saveBotData();
-    
-    const saveDuration = Date.now() - saveStartTime;
-    console.log(`✅ Auto-save cycle completed in ${saveDuration}ms`);
-}, 5 * 60 * 1000);
+    // PHASE 3: Use batch saves instead of full saveBotData
+    try {
+        // Save pending changes in parallel for better performance
+        await Promise.all([
+            savePendingScores(),
+            savePendingMonthlyStats(),
+            saveDirtyBotState()
+        ]);
+        
+        const saveDuration = Date.now() - saveStartTime;
+        console.log(`✅ Optimized auto-save cycle completed in ${saveDuration}ms`);
+        
+        // Clear pending changes after successful save
+        clearPendingChanges();
+        
+    } catch (error) {
+        console.error('❌ Error in optimized auto-save cycle:', error);
+        // Fallback to full save if batch save fails
+        console.log('🔄 Falling back to full save...');
+        await saveBotData();
+        clearPendingChanges();
+    }
+}, 10 * 60 * 1000); // 10 minutes instead of 5
 
 console.log('💾 File-based persistence system initialized');
 
@@ -491,12 +535,9 @@ async function incrementUserScore(userName) {
     userScores.set(userName, newScore);
     console.log(`📊 ${userName} score incremented: ${currentScore} → ${newScore}`);
     
-    // PHASE 2: Track change for future batching (keep immediate save as fallback)
+    // PHASE 3: Track change for batch saving (immediate save removed for performance)
     pendingScoreChanges.set(userName, newScore);
     isDirty = true;
-    
-    // Immediately save to database to prevent score mismatch
-    await db.setUserScore(userName, newScore);
     
     // Check if normalization is needed (when scores get too high)
     normalizeScoresIfNeeded();
@@ -2609,6 +2650,9 @@ async function handleCommand(chatId, userId, userName, text) {
             // If database operations failed, notify everyone
             if (!dbSuccess) {
                 notifyDatabaseError(chatId, userId, userName, true);
+            } else {
+                // PHASE 3: Trigger non-blocking critical save for immediate persistence
+                await saveCriticalData();
             }
             
             // Mark that dishwasher was completed (cancel auto-alert)
@@ -3101,6 +3145,9 @@ async function handleCommand(chatId, userId, userName, text) {
                     
                     // Save bot data after authorization
                     await saveBotData();
+                    
+                    // PHASE 3: Trigger non-blocking critical save for immediate persistence
+                    await saveCriticalData();
                     
                     // Store chat ID for notifications (we'll need to get this from the user when they interact)
                     // For now, we'll store it when they send /start
