@@ -4232,10 +4232,7 @@ async function handleCallback(chatId, userId, userName, data) {
         const sanitize = (s) => typeof s === 'string' ? s.replace(/[_*\[\]()~`>#+\-=|{}.!]/g, '') : s;
         
         // If there are no authorized users yet, show a friendly message and exit early
-        console.log(`🔍 DEBUG: authorizedUsers.size = ${authorizedUsers.size}`);
-        console.log(`🔍 DEBUG: authorizedUsers = ${Array.from(authorizedUsers).join(', ')}`);
         if (authorizedUsers.size === 0) {
-            console.log(`🔍 DEBUG: Showing no statistics message`);
             sendMessage(chatId, `${statsMessage}\n${t(userId, 'no_statistics_available') || 'No statistics available yet. Come back after some activity.'}`);
             return;
         }
@@ -4290,8 +4287,9 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // If monthly stats are empty, append a friendly note
-        const hasMonthlyStats = typeof db.getAllMonthlyStats === 'function' ? true : false;
-        if (!hasMonthlyStats || (typeof monthData === 'undefined')) {
+        const currentMonthKey = getCurrentMonthKey();
+        const hasMonthlyStats = monthlyStats.has(currentMonthKey);
+        if (!hasMonthlyStats) {
             statsMessage += `\n${t(userId, 'no_statistics_recorded_this_month') || 'No statistics recorded yet for this month.'}`;
         }
         
