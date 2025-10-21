@@ -4231,18 +4231,18 @@ async function handleCallback(chatId, userId, userName, data) {
         // Sanitize helper: removes Telegram Markdown special chars to avoid parse errors
         const sanitize = (s) => typeof s === 'string' ? s.replace(/[_*\[\]()~`>#+\-=|{}.!]/g, '') : s;
         
+        // If there are no authorized users yet, show a friendly message and exit early
+        if (authorizedUsers.size === 0) {
+            sendMessage(chatId, `${statsMessage}\n${t(userId, 'no_statistics_available') || 'No statistics available yet. Come back after some activity.'}`);
+            return;
+        }
+        
         // Current tie-breaker priority order (only authorized users)
         statsMessage += t(userId, 'tie_breaker_priority_order');
         Array.from(authorizedUsers).forEach((user, index) => {
             const nameTranslated = addRoyalEmojiTranslated(user, userId);
             statsMessage += `${index + 1}. ${sanitize(nameTranslated)}\n`;
         });
-        
-        // If there are no authorized users yet, show a friendly message and exit early
-        if (authorizedUsers.size === 0) {
-            sendMessage(chatId, `${statsMessage}\n${t(userId, 'no_statistics_available') || 'No statistics available yet. Come back after some activity.'}`);
-            return;
-        }
         
         // Current scores (only for authorized users) - fetch from database for accuracy
         statsMessage += `\n${t(userId, 'current_scores')}`;
