@@ -4232,7 +4232,10 @@ async function handleCallback(chatId, userId, userName, data) {
         const sanitize = (s) => typeof s === 'string' ? s.replace(/[_*\[\]()~`>#+\-=|{}.!]/g, '') : s;
         
         // If there are no authorized users yet, show a friendly message and exit early
+        console.log(`🔍 DEBUG: authorizedUsers.size = ${authorizedUsers.size}`);
+        console.log(`🔍 DEBUG: authorizedUsers = ${Array.from(authorizedUsers).join(', ')}`);
         if (authorizedUsers.size === 0) {
+            console.log(`🔍 DEBUG: Showing no statistics message`);
             sendMessage(chatId, `${statsMessage}\n${t(userId, 'no_statistics_available') || 'No statistics available yet. Come back after some activity.'}`);
             return;
         }
