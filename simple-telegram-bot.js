@@ -471,9 +471,9 @@ function getCurrentTurnUser(checkAssignments = true) {
     
     // Only check assignments if requested (for current turn)
     if (checkAssignments) {
-        const assignedTo = turnAssignments.get(currentUser);
-        if (assignedTo) {
-            return assignedTo; // Return the assigned user instead
+    const assignedTo = turnAssignments.get(currentUser);
+    if (assignedTo) {
+        return assignedTo; // Return the assigned user instead
         }
     }
     
@@ -1446,6 +1446,10 @@ const translations = {
         'no_statistics_available': 'No statistics available yet. Come back after some activity.',
         'no_statistics_recorded_this_month': 'No statistics recorded yet for this month.',
         'database_issue_work_done': 'Database issue - work was done but not saved',
+        'database_updated_turn_completion': '✅ **Database Updated:** Turn completion successfully saved!',
+        'database_error_turn_completion': '❌ **Database Error:** Turn completion still not saved. Contact support if issue persists.',
+        'database_updated_admin_completion': '✅ **Database Updated:** Admin completion successfully saved!',
+        'database_error_admin_completion': '❌ **Database Error:** Admin completion still not saved. Contact support if issue persists.',
         'totals': 'TOTALS',
         
         // Swap status messages
@@ -1851,6 +1855,10 @@ const translations = {
         'no_statistics_available': 'אין סטטיסטיקות זמינות עדיין. חזרו לאחר פעילות.',
         'no_statistics_recorded_this_month': 'אין סטטיסטיקות שנרשמו החודש עדיין.',
         'database_issue_work_done': 'בעיית מסד נתונים - העבודה הושלמה אך לא נשמרה',
+        'database_updated_turn_completion': '✅ **מסד הנתונים עודכן:** השלמת התור נשמרה בהצלחה!',
+        'database_error_turn_completion': '❌ **שגיאת מסד נתונים:** השלמת התור עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
+        'database_updated_admin_completion': '✅ **מסד הנתונים עודכן:** השלמת המנהל נשמרה בהצלחה!',
+        'database_error_admin_completion': '❌ **שגיאת מסד נתונים:** השלמת המנהל עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
         'totals': 'סה"כ',
         
         // Swap status messages
@@ -2088,25 +2096,26 @@ async function retryDatabaseOperation(operation, maxRetries = 2) {
     return false;
 }
 
-// Send database error notification to all users
+// Send database error notification to admins only
 function notifyDatabaseError(chatId, userId, userName, isAdmin) {
     const errorMessage = t(userId, 'database_issue_work_done');
     
     // Send to the user who pressed /done
     sendMessage(chatId, errorMessage);
     
-    // Notify all authorized users and admins
-    [...authorizedUsers, ...admins].forEach(user => {
-        let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+    // Notify only admins (they can actually do something about database issues)
+    [...admins].forEach(admin => {
+        let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
         
-        if (!userChatId && isUserAdmin(user)) {
-            userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+        if (!adminChatId) {
+            adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
         }
         
-        if (userChatId && userChatId !== chatId) {
-            const recipientUserId = getUserIdFromChatId(userChatId);
+        if (adminChatId && adminChatId !== chatId) {
+            const recipientUserId = getUserIdFromChatId(adminChatId);
             const localizedError = t(recipientUserId, 'database_issue_work_done');
-            sendMessage(userChatId, localizedError);
+            console.log(`🔔 Sending database error notification to admin: ${admin} (${adminChatId})`);
+            sendMessage(adminChatId, localizedError);
         }
     });
 }
@@ -2660,9 +2669,75 @@ async function handleCommand(chatId, userId, userName, text) {
                 trackMonthlyAction('admin_completion', currentUser, userName);
             });
             
-            // If database operations failed, notify everyone
+            // If database operations failed, notify admins only
             if (!dbSuccess) {
-                notifyDatabaseError(chatId, userId, userName, true);
+                // Notify only admins about database issue
+                [...admins].forEach(admin => {
+                    let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                    
+                    if (!adminChatId) {
+                        adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                    }
+                    
+                    if (adminChatId && adminChatId !== chatId) {
+                        const recipientUserId = getUserIdFromChatId(adminChatId);
+                        const localizedError = t(recipientUserId, 'database_issue_work_done');
+                        console.log(`🔔 Sending database error notification to admin: ${admin} (${adminChatId})`);
+                        sendMessage(adminChatId, localizedError);
+                    }
+                });
+                
+                // Schedule retry after 5 seconds
+                setTimeout(async () => {
+                    console.log('🔄 Retrying admin /done database save...');
+                    const retrySuccess = await retryDatabaseOperation(async () => {
+                        await incrementUserScore(currentUser);
+                        
+                        // Clear the assignment if it was assigned
+                        if (originalUser !== currentUser) {
+                            turnAssignments.delete(originalUser);
+                            dirtyKeys.add('turnAssignments');
+                            isDirty = true;
+                        }
+                        
+                        updateUserStatistics(currentUser);
+                        await saveBotData();
+                        trackMonthlyAction('admin_completion', currentUser, userName);
+                    });
+                    
+                    if (retrySuccess) {
+                        console.log('✅ Admin /done database save succeeded on retry');
+                        // Notify only admins about success
+                        [...admins].forEach(admin => {
+                            let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                            
+                            if (!adminChatId) {
+                                adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                            }
+                            
+                            if (adminChatId && adminChatId !== chatId) {
+                                const recipientUserId = getUserIdFromChatId(adminChatId);
+                                sendMessage(adminChatId, t(recipientUserId, 'database_updated_admin_completion'));
+                            }
+                        });
+                    } else {
+                        console.log('❌ Admin /done database save failed on retry');
+                        // Notify both user and admins about final failure
+                        sendMessage(chatId, t(userId, 'database_error_admin_completion'));
+                        [...admins].forEach(admin => {
+                            let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                            
+                            if (!adminChatId) {
+                                adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                            }
+                            
+                            if (adminChatId && adminChatId !== chatId) {
+                                const recipientUserId = getUserIdFromChatId(adminChatId);
+                                sendMessage(adminChatId, t(recipientUserId, 'database_error_admin_completion'));
+                            }
+                        });
+                    }
+                }, 5000);
             } else {
                 // PHASE 3: Trigger non-blocking critical save for immediate persistence
                 await saveCriticalData();
@@ -2771,9 +2846,74 @@ async function handleCommand(chatId, userId, userName, text) {
                 await saveBotData();
             });
             
-            // If database operations failed, notify everyone
+            // If database operations failed, notify admins only
             if (!dbSuccess) {
-                notifyDatabaseError(chatId, userId, userName, false);
+                // Notify only admins about database issue
+                [...admins].forEach(admin => {
+                    let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                    
+                    if (!adminChatId) {
+                        adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                    }
+                    
+                    if (adminChatId && adminChatId !== chatId) {
+                        const recipientUserId = getUserIdFromChatId(adminChatId);
+                        const localizedError = t(recipientUserId, 'database_issue_work_done');
+                        console.log(`🔔 Sending database error notification to admin: ${admin} (${adminChatId})`);
+                        sendMessage(adminChatId, localizedError);
+                    }
+                });
+                
+                // Schedule retry after 5 seconds
+                setTimeout(async () => {
+                    console.log('🔄 Retrying user /done database save...');
+                    const retrySuccess = await retryDatabaseOperation(async () => {
+                        await incrementUserScore(currentUser);
+                        
+                        // Clear the assignment if it was assigned
+                        if (originalUser !== currentUser) {
+                            turnAssignments.delete(originalUser);
+                            dirtyKeys.add('turnAssignments');
+                            isDirty = true;
+                        }
+                        
+                        updateUserStatistics(currentUser);
+                        await saveBotData();
+                    });
+                    
+                    if (retrySuccess) {
+                        console.log('✅ User /done database save succeeded on retry');
+                        // Notify only admins about success
+                        [...admins].forEach(admin => {
+                            let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                            
+                            if (!adminChatId) {
+                                adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                            }
+                            
+                            if (adminChatId && adminChatId !== chatId) {
+                                const recipientUserId = getUserIdFromChatId(adminChatId);
+                                sendMessage(adminChatId, t(recipientUserId, 'database_updated_turn_completion'));
+                            }
+                        });
+                    } else {
+                        console.log('❌ User /done database save failed on retry');
+                        // Notify both user and admins about final failure
+                        sendMessage(chatId, t(userId, 'database_error_turn_completion'));
+                        [...admins].forEach(admin => {
+                            let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                            
+                            if (!adminChatId) {
+                                adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                            }
+                            
+                            if (adminChatId && adminChatId !== chatId) {
+                                const recipientUserId = getUserIdFromChatId(adminChatId);
+                                sendMessage(adminChatId, t(recipientUserId, 'database_error_turn_completion'));
+                            }
+                        });
+                    }
+                }, 5000);
             }
             
             // Mark that dishwasher was completed (cancel auto-alert)
