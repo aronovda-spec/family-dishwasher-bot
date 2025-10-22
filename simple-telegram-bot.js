@@ -2614,7 +2614,14 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             // OPTIMISTIC: Send notifications immediately (work is physically done)
+            // Temporarily increment score to calculate correct next turn
+            const currentScore = userScores.get(currentUser) || 0;
+            userScores.set(currentUser, currentScore + 1);
+            
             const nextUser = getCurrentTurnUser(false);
+            
+            // Revert the temporary score increment (will be properly incremented in background)
+            userScores.set(currentUser, currentScore);
             
             const adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
                 `${t(userId, 'admin_completed_duty', {admin: translateName(userName, userId)})}\n` +
@@ -2798,7 +2805,14 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             // OPTIMISTIC: Send notifications immediately (work is physically done)
+            // Temporarily increment score to calculate correct next turn
+            const currentScore = userScores.get(currentUser) || 0;
+            userScores.set(currentUser, currentScore + 1);
+            
             const nextUser = getCurrentTurnUser(false);
+            
+            // Revert the temporary score increment (will be properly incremented in background)
+            userScores.set(currentUser, currentScore);
             
             const doneMessage = `${t(userId, 'turn_completed')}\n\n` +
                 `${t(userId, 'completed_by', {user: translateName(currentUser, userId)})}\n` +
