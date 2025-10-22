@@ -442,7 +442,7 @@ originalQueue.forEach(user => {
 });
 
 // Score-based turn selection functions
-function getCurrentTurnUser() {
+function getCurrentTurnUser(checkAssignments = true) {
     // Find user with lowest score, using original queue order as tie-breaker
     let lowestScore = Infinity;
     let currentUser = null;
@@ -469,10 +469,12 @@ function getCurrentTurnUser() {
         }
     }
     
-    // Check if this user has been assigned to someone else
-    const assignedTo = turnAssignments.get(currentUser);
-    if (assignedTo) {
-        return assignedTo; // Return the assigned user instead
+    // Only check assignments if requested (for current turn)
+    if (checkAssignments) {
+        const assignedTo = turnAssignments.get(currentUser);
+        if (assignedTo) {
+            return assignedTo; // Return the assigned user instead
+        }
     }
     
     return currentUser;
@@ -2599,7 +2601,7 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             // OPTIMISTIC: Send notifications immediately (work is physically done)
-            const nextUser = getCurrentTurnUser();
+            const nextUser = getCurrentTurnUser(false);
             
             const adminDoneMessage = `${t(userId, 'admin_intervention')}\n\n` +
                 `${t(userId, 'admin_completed_duty', {admin: translateName(userName, userId)})}\n` +
@@ -2717,7 +2719,7 @@ async function handleCommand(chatId, userId, userName, text) {
             }
             
             // OPTIMISTIC: Send notifications immediately (work is physically done)
-            const nextUser = getCurrentTurnUser();
+            const nextUser = getCurrentTurnUser(false);
             
             const doneMessage = `${t(userId, 'turn_completed')}\n\n` +
                 `${t(userId, 'completed_by', {user: translateName(currentUser, userId)})}\n` +
