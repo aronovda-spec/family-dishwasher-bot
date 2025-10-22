@@ -32,17 +32,21 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 ### 📱 Telegram Integration
 - **Direct Integration**: All interactions happen directly in Telegram chats
 - **Instant Replies**: Users and admins get immediate confirmation of actions
+- **Multilingual Support**: Full English and Hebrew language support for all notifications
 - **Bot Token Authentication**: Secure setup with Telegram bot token
 
 ### 💾 Data Persistence
 - **Supabase Integration**: All bot data automatically saved to Supabase PostgreSQL database
 - **Optimized Auto-Save**: Data saved every 10 minutes with batch operations for better performance
+- **Enhanced Error Handling**: Automatic retry mechanisms with smart notifications for database failures
 - **Server Restart Survival**: Bot state preserved across server restarts and deployments
 - **No Reauthorization**: Users and admins remain authorized after restarts
 - **Turn Order Preservation**: Queue order and scores maintained across restarts
 
 ### ⚡ Performance Optimizations
-- **Optimistic UI**: `/done` commands provide instant feedback with background database operations
+- **Optimistic UI**: `/done` and force swap commands provide instant feedback with background database operations
+- **Database Retry Mechanism**: Automatic retry attempts (2 attempts + 5-second scheduled retry) for failed database saves
+- **Smart Error Notifications**: Only admins get technical error details; affected users get final failure notifications
 - **Batch Database Operations**: Reduces database load by ~70% through intelligent batching
 - **Parallel Database Reads**: `/status` command uses parallel reads for ~60% faster responses
 - **Non-blocking Saves**: Critical operations save immediately without blocking user interactions
@@ -125,6 +129,7 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 #### Information
 - `admins` - List all admins
 - `help` - Show all available commands
+- `language_switch` - Switch between English and Hebrew (if supported)
 
 ## Setup Guide
 
@@ -217,6 +222,8 @@ Dishwasher2/
    - Check Supabase connection and credentials
    - Ensure SUPABASE_URL and SUPABASE_ANON_KEY environment variables are set
    - Verify Supabase database is accessible and tables exist
+   - Bot automatically retries failed database saves (2 attempts + 5-second retry)
+   - Admins receive notifications about database issues; users get final failure notifications
 
 4. **Persistence Issues**:
    - Check Supabase connection status in console logs
