@@ -1450,6 +1450,8 @@ const translations = {
         'database_error_turn_completion': '❌ **Database Error:** Turn completion still not saved. Contact support if issue persists.',
         'database_updated_admin_completion': '✅ **Database Updated:** Admin completion successfully saved!',
         'database_error_admin_completion': '❌ **Database Error:** Admin completion still not saved. Contact support if issue persists.',
+        'database_updated_force_swap': '✅ **Database Updated:** Force swap successfully saved!',
+        'database_error_force_swap': '❌ **Database Error:** Force swap still not saved. Contact support if issue persists.',
         'totals': 'TOTALS',
         
         // Swap status messages
@@ -1859,6 +1861,8 @@ const translations = {
         'database_error_turn_completion': '❌ **שגיאת מסד נתונים:** השלמת התור עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
         'database_updated_admin_completion': '✅ **מסד הנתונים עודכן:** השלמת המנהל נשמרה בהצלחה!',
         'database_error_admin_completion': '❌ **שגיאת מסד נתונים:** השלמת המנהל עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
+        'database_updated_force_swap': '✅ **מסד הנתונים עודכן:** החלפה כפויה נשמרה בהצלחה!',
+        'database_error_force_swap': '❌ **שגיאת מסד נתונים:** החלפה כפויה עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
         'totals': 'סה"כ',
         
         // Swap status messages
@@ -5084,20 +5088,16 @@ async function handleCallback(chatId, userId, userName, data) {
                 console.log(`🚨 RAPID SWAPS DETECTED: ${userName} (${userId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
             }
             
-            // In score-based system: force swap just reassigns the turn
-            // No score changes - the assigned user will complete the turn later
+            // OPTIMISTIC: Update in-memory state immediately
             turnAssignments.set(firstUser, secondUser);
             
             // Track admin force swap for monthly report
             trackMonthlyAction('admin_force_swap', firstUser, userName);
             
-            // Save to database
-            await saveBotData();
-            
-            // Get current turn user for display
+            // OPTIMISTIC: Send notifications immediately (swap is logically done)
             const currentTurnUser = getCurrentTurnUser();
             
-            // Notify all authorized users and admins
+            // Notify all authorized users and admins immediately
             [...authorizedUsers, ...admins].forEach(user => {
                 let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
                 
@@ -5119,7 +5119,75 @@ async function handleCallback(chatId, userId, userName, data) {
                 }
             });
             
+            // Send confirmation to admin
             sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(secondUser, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(firstUser, userId)} ${t(userId, 'turn')}**\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`);
+            
+            // BACKGROUND: Retry database operations
+            const dbSuccess = await retryDatabaseOperation(async () => {
+                // PHASE 1: Track bot state changes
+                dirtyKeys.add('turnAssignments');
+                isDirty = true;
+                
+                // PHASE 2: Save to database
+                await saveBotData();
+            });
+            
+            if (!dbSuccess) {
+                // Notify admins only after 2 failed attempts
+                notifyDatabaseError(chatId, userId, userName, true);
+                
+                // Schedule retry after 5 seconds
+                setTimeout(async () => {
+                    console.log('🔄 Retrying force swap database save...');
+                    const retrySuccess = await retryDatabaseOperation(async () => {
+                        // PHASE 1: Track bot state changes
+                        dirtyKeys.add('turnAssignments');
+                        isDirty = true;
+                        
+                        // PHASE 2: Save to database
+                        await saveBotData();
+                    });
+                    
+                    if (retrySuccess) {
+                        // Notify admins about success
+                        [...admins].forEach(admin => {
+                            let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                            if (!adminChatId && isUserAdmin(admin)) {
+                                adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                            }
+                            if (adminChatId && adminChatId !== chatId) {
+                                const recipientUserId = getUserIdFromChatId(adminChatId);
+                                sendMessage(adminChatId, t(recipientUserId, 'database_updated_force_swap'));
+                            }
+                        });
+                    } else {
+                        console.log('❌ Force swap database save failed on retry');
+                        // Notify both affected users and admins about final failure
+                        sendMessage(chatId, t(userId, 'database_error_force_swap'));
+                        
+                        // Notify both affected users
+                        [firstUser, secondUser].forEach(affectedUser => {
+                            let affectedUserChatId = userChatIds.get(affectedUser) || (affectedUser ? userChatIds.get(affectedUser.toLowerCase()) : null);
+                            if (affectedUserChatId && affectedUserChatId !== chatId) {
+                                const affectedUserId = getUserIdFromChatId(affectedUserChatId);
+                                sendMessage(affectedUserChatId, t(affectedUserId, 'database_error_force_swap'));
+                            }
+                        });
+                        
+                        // Notify admins
+                        [...admins].forEach(admin => {
+                            let adminChatId = userChatIds.get(admin) || (admin ? userChatIds.get(admin.toLowerCase()) : null);
+                            if (!adminChatId && isUserAdmin(admin)) {
+                                adminChatId = adminNameToChatId.get(admin) || (admin ? adminNameToChatId.get(admin.toLowerCase()) : null);
+                            }
+                            if (adminChatId && adminChatId !== chatId) {
+                                const recipientUserId = getUserIdFromChatId(adminChatId);
+                                sendMessage(adminChatId, t(recipientUserId, 'database_error_force_swap'));
+                            }
+                        });
+                    }
+                }, 5000);
+            }
         } else {
             sendMessage(chatId, t(userId, 'error_users_not_found'));
         }
