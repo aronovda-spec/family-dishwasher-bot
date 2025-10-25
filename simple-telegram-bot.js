@@ -3142,7 +3142,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Send confirmation message
         const timeString = new Date().toLocaleString();
-        const nextUser = getCurrentTurnUser();
+        const nextUser = getCurrentTurnUser(false);
         const assistMessage = t(userId, 'assist_logged', {
             description: description,
             admin: translateName(userName, userId),
