@@ -4278,7 +4278,6 @@ async function handleCallback(chatId, userId, userName, data) {
         // Check if dishwasher is already running and not completed
         if (global.dishwasherStarted && !global.dishwasherCompleted) {
             // Show confirmation dialog
-            console.log(`⚠️ Dishwasher already running - showing confirmation dialog to ${userName}`);
             const buttons = [
                 [{ text: t(userId, 'yes_reset_timer'), callback_data: 'confirm_reset_dishwasher' }],
                 [{ text: t(userId, 'cancel'), callback_data: 'cancel_reset_dishwasher' }]
@@ -4287,11 +4286,8 @@ async function handleCallback(chatId, userId, userName, data) {
             const confirmMessage = t(userId, 'dishwasher_already_running');
             
             sendMessageWithButtons(chatId, confirmMessage, buttons);
-            console.log(`⚠️ Confirmation dialog sent - RETURNING without sending notifications`);
             return; // Don't proceed with normal logic
         }
-        
-        console.log(`✅ Dishwasher not running or completed - proceeding with normal start`);
         
         // Get current user doing the dishes using score-based system
         const currentUser = getCurrentTurnUser();
@@ -4302,8 +4298,6 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Track admin announcement for monthly report
         trackMonthlyAction('admin_announcement', null, userName);
-        
-        console.log(`📢 SENDING dishwasher started notifications to all users - current user: ${currentUser}, admin: ${userName}`);
         
         // Collect all unique chat IDs to avoid duplicates
         const chatIdsToNotify = new Set();
