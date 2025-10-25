@@ -3123,6 +3123,10 @@ async function handleCommand(chatId, userId, userName, text) {
         // Track the assist action for monthly statistics
         trackMonthlyAction('admin_assist', null, userName);
         
+        // Update global dishwasher completion timestamp for anti-cheating mechanism
+        // Since /assist represents actual physical dishwasher work done by admin
+        global.lastDishwasherDone = Date.now();
+        
         // Save bot data after tracking
         await saveBotData();
         
