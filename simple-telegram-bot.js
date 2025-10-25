@@ -1211,7 +1211,7 @@ const translations = {
         // Done command messages
         'admin_intervention': '✅ **ADMIN INTERVENTION!**',
         'admin_completed_duty': '👨‍💼 **Admin:** {admin} completed dishwasher duty',
-        'helped_user': '👤 **Helped user:** {user}',
+        'helped_user': '👤 **On behalf of:** {user}',
         'next_turn': '🔄 **Next turn:** {user}',
         'punishment_turns_remaining': '⚡ **Punishment turns remaining:** {count}',
         'admin_can_apply_punishment': '💡 **Admin can manually apply punishment to {user} if needed**',
@@ -1622,7 +1622,7 @@ const translations = {
         // Done command messages
         'admin_intervention': '✅ **התערבות מנהל!**',
         'admin_completed_duty': '👨‍💼 **מנהל:** {admin} השלים את חובת הכלים',
-        'helped_user': '👤 **עזר למשתמש:** {user}',
+        'helped_user': '👤 **בשם:** {user}',
         'next_turn': '🔄 **התור הבא:** {user}',
         'punishment_turns_remaining': '⚡ **תורות עונש נותרו:** {count}',
         'admin_can_apply_punishment': '💡 **מנהל יכול להפעיל עונש על {user} במידת הצורך**',
