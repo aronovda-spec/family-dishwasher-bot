@@ -1326,7 +1326,7 @@ const translations = {
         'announcement_sent': 'Announcement sent successfully!',
         
         // Message system (Admin + Users)
-        'send_message': 'Send Message',
+        'send_message': '💬 Send Message',
         'type_your_message': 'Type your message:',
         'message_preview': 'Preview',
         'message_from': 'Message from',
@@ -1735,7 +1735,7 @@ const translations = {
         'announcement_sent': 'ההודעה הרשמית נשלחה בהצלחה!',
         
         // Message system (Admin + Users)
-        'send_message': 'שלח הודעה',
+        'send_message': '💬 שלח הודעה',
         'type_your_message': 'הקלד את ההודעה שלך:',
         'message_preview': 'תצוגה מקדימה',
         'message_from': 'הודעה מאת',
