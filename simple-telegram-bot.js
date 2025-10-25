@@ -1156,9 +1156,7 @@ const translations = {
         // Common messages
         'not_authorized': '❌ **Not authorized!**',
         'admin_access_required': '❌ **Admin access required!**',
-        'assist_command_usage': 'Usage: /assist <description>\nExample: /assist Dishwasher cleaned by admin',
         'assist_logged': '✅ **Assist Logged!**\n\n🤝 **Action:** {description}\n👨‍💼 **Admin:** {admin}\n📅 **Time:** {time}\n\n📊 **Note:** This action does not affect the queue order.',
-        'assist_description_required': '❌ **Description Required**\n\n💡 **Usage:** /assist <description>\n\n**Example:** /assist Dishwasher cleaned by admin',
         'not_your_turn': '❌ **Not your turn!**',
         'current_turn_user': '🔄 **Current turn:**',
         'your_queue_position': '👤 **Your queue position:**',
@@ -1569,9 +1567,7 @@ const translations = {
         // Common messages
         'not_authorized': '❌ **לא מורשה!**',
         'admin_access_required': '❌ **נדרשת גישת מנהל!**',
-        'assist_command_usage': 'שימוש: /assist <תיאור>\nדוגמה: /assist מדיח נוקה על ידי מנהל',
         'assist_logged': '✅ **עזרה נרשמה!**\n\n🤝 **פעולה:** {description}\n👨‍💼 **מנהל:** {admin}\n📅 **זמן:** {time}\n\n📊 **הערה:** פעולה זו לא משפיעה על סדר התור.',
-        'assist_description_required': '❌ **נדרש תיאור**\n\n💡 **שימוש:** /assist <תיאור>\n\n**דוגמה:** /assist מדיח נוקה על ידי מנהל',
         'not_your_turn': '❌ **לא התור שלך!**',
         'current_turn_user': '🔄 **התור הנוכחי:**',
         'your_queue_position': '👤 **המיקום שלך בתור:**',
@@ -3123,65 +3119,6 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Use default description
         const description = "Dishwasher cleaned by admin";
-        
-        // Track the assist action for monthly statistics
-        trackMonthlyAction('admin_assist', null, userName);
-        
-        // Save bot data after tracking
-        await saveBotData();
-        
-        // Send confirmation message
-        const timeString = new Date().toLocaleString();
-        const assistMessage = t(userId, 'assist_logged', {
-            description: description,
-            admin: translateName(userName, userId),
-            time: timeString
-        });
-        
-        // Send confirmation to admin immediately
-        sendMessage(chatId, assistMessage);
-        
-        // Notify all authorized users and admins immediately
-        [...authorizedUsers, ...admins].forEach(user => {
-            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
-            
-            // If not found in userChatIds, check if this user is an admin
-            if (!userChatId && isUserAdmin(user)) {
-                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
-            }
-            
-            if (userChatId && userChatId !== chatId) {
-                const recipientUserId = getUserIdFromChatId(userChatId);
-                
-                // Translate description to recipient's language
-                const translatedDescription = translateDescription(description, recipientUserId);
-                
-                const userAssistMessage = t(recipientUserId, 'assist_logged', {
-                    description: translatedDescription,
-                    admin: translateName(userName, recipientUserId),
-                    time: timeString
-                });
-                
-                console.log(`🔔 Sending admin assist notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
-                sendMessage(userChatId, userAssistMessage);
-            }
-        });
-        
-        console.log(`🤝 Admin assist logged: ${userName} - ${description}`);
-        
-    } else if (command && command.startsWith('/assist ')) {
-        // Admin assist command - logs action without affecting queue
-        const isAdmin = isUserAdmin(userName, userId);
-        if (!isAdmin) {
-            sendMessage(chatId, t(userId, 'admin_access_required'));
-            return;
-        }
-        
-        const description = command.replace('/assist ', '').trim();
-        if (!description) {
-            sendMessage(chatId, t(userId, 'assist_description_required'));
-            return;
-        }
         
         // Track the assist action for monthly statistics
         trackMonthlyAction('admin_assist', null, userName);
