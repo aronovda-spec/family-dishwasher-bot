@@ -3713,7 +3713,8 @@ async function executeSwap(swapRequest, requestId, status) {
 
 // Handle callback queries (button presses)
 async function handleCallback(chatId, userId, userName, data) {
-    console.log(`🔘 Button pressed: "${data}" by ${userName}`);
+    try {
+        console.log(`🔘 Button pressed: "${data}" by ${userName}`);
     
     if (data === 'test') {
         sendMessage(chatId, t(userId, 'test_button_works', {user: userName, userId: userId, data: data}));
@@ -5767,6 +5768,10 @@ async function handleCallback(chatId, userId, userName, data) {
         
     } else {
         sendMessage(chatId, '❌ Unknown button action. Please use the main menu.');
+    }
+    } catch (error) {
+        console.error('❌ Error in handleCallback:', error);
+        sendMessage(chatId, t(userId, 'error_occurred'));
     }
 }
 
