@@ -5388,28 +5388,77 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
     } else if (data === 'assist_menu') {
-        // Assist menu - placeholder for future functionality
+        // Assist menu - execute /assist command functionality
         const isAdmin = isUserAdmin(userName, userId);
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
         }
         
-        const assistMessage = `🤝 **Assist Feature**\n\n` +
-            `🚧 **Coming Soon!**\n\n` +
-            `💡 **Planned functionality:**\n` +
-            `• Admin can personally handle a duty\n` +
-            `• Without changing the queue order\n` +
-            `• Useful for urgent situations\n\n` +
-            `📋 **Current status:** Under development`;
+        // Execute the same logic as /assist command
+        const description = "Dishwasher cleaned by admin";
         
-        const assistButtons = [
-            [
-                { text: t(userId, 'back_to_admin_menu'), callback_data: "start" }
-            ]
-        ];
+        // Check for rapid ASSIST activity (30 minutes) - global tracking
+        const now = Date.now();
+        const lastGlobalDone = global.lastDishwasherDone;
         
-        sendMessageWithButtons(chatId, assistMessage, assistButtons);
+        if (lastGlobalDone && (now - lastGlobalDone) < 30 * 60 * 1000) { // 30 minutes
+            const lastDoneTime = new Date(lastGlobalDone).toLocaleString();
+            // Send alert for ANY ASSIST within 30 minutes of last dishwasher completion
+            alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+            console.log(`🚨 RAPID ASSIST DETECTED: ${userName} (${userId}) - Last dishwasher done: ${lastDoneTime}`);
+        }
+        
+        // Update global dishwasher completion timestamp
+        global.lastDishwasherDone = now;
+        
+        // Track the assist action for monthly statistics
+        trackMonthlyAction('admin_assist', null, userName);
+        
+        // Save bot data after tracking
+        await saveBotData();
+        
+        // Send confirmation message
+        const timeString = new Date().toLocaleString();
+        const currentUser = getCurrentTurnUser();
+        const assistMessage = t(userId, 'assist_logged', {
+            description: description,
+            admin: translateName(userName, userId),
+            time: timeString,
+            currentUser: translateName(currentUser, userId)
+        });
+        
+        // Send confirmation to admin immediately
+        sendMessage(chatId, assistMessage);
+        
+        // Notify all authorized users and admins immediately
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+            
+            // If not found in userChatIds, check if this user is an admin
+            if (!userChatId && isUserAdmin(user)) {
+                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+            }
+            
+            if (userChatId && userChatId !== chatId) {
+                const recipientUserId = getUserIdFromChatId(userChatId);
+                
+                // Translate description to recipient's language
+                const translatedDescription = translateDescription(description, recipientUserId);
+                
+                const userAssistMessage = t(recipientUserId, 'assist_logged', {
+                    description: translatedDescription,
+                    admin: translateName(userName, recipientUserId),
+                    time: timeString,
+                    currentUser: translateName(currentUser, recipientUserId)
+                });
+                
+                console.log(`🔔 Sending admin assist notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
+                sendMessage(userChatId, userAssistMessage);
+            }
+        });
+        
+        console.log(`🤝 Admin assist logged: ${userName} - ${description}`);
         
     } else if (data === 'request_punishment_menu') {
         const isAuthorized = isUserAuthorized(userName);
