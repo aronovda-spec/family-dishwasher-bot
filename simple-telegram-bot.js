@@ -1523,7 +1523,14 @@ const translations = {
         'last_admin_cannot_leave': '❌ **Cannot leave - You are the last admin!**\n\n🚨 **Bot management requires at least one admin**\n\n💡 **Options:**\n• Add another admin first\n• Use admin controls to remove yourself\n• Transfer admin privileges to another user',
         
         // Queue Statistics (missing in English)
-        'current_scores': '📊 Current Scores:\n'
+        'current_scores': '📊 Current Scores:\n',
+        
+        // Dishwasher confirmation dialog
+        'dishwasher_already_running': '⚠️ Dishwasher is already running!\n\nPressing again will:\n• Reset the 3-hour timer\n• Send new notifications to everyone\n• Cancel the current timer\n\nAre you sure you want to reset?',
+        'yes_reset_timer': 'Yes, Reset Timer',
+        'cancel': 'Cancel',
+        'reset_cancelled': 'Reset cancelled. Dishwasher timer remains unchanged.',
+        'error_occurred': '❌ An error occurred. Please try again.'
     },
     he: {
         // Menu titles
@@ -1935,6 +1942,13 @@ const translations = {
         'danger_zone_warning': '🚨 **אזור סכנה** - פעולות אלה אינן הפיכות!\n\n• **הסר משתמש** - הסר משתמשים מהבוט\n• **אפס בוט** - איפוס מלא של נתוני הבוט\n• **עזוב בוט** - הסר את עצמך עם תקופת חסד\n\n⚠️ **השתמש בזהירות רבה!**',
         'back_to_admin_menu': '🔙 חזור לתפריט מנהל',
         'last_admin_cannot_leave': '❌ **לא ניתן לעזוב - אתה המנהל האחרון!**\n\n🚨 **ניהול הבוט דורש לפחות מנהל אחד**\n\n💡 **אפשרויות:**\n• הוסף מנהל נוסף קודם\n• השתמש בפקדי מנהל להסרת עצמך\n• העבר הרשאות מנהל למשתמש אחר',
+        
+        // Dishwasher confirmation dialog
+        'dishwasher_already_running': '⚠️ המדיח כבר פועל!\n\nלחיצה שוב תגרום ל:\n• איפוס טיימר של 3 שעות\n• שליחת התראות חדשות לכולם\n• ביטול הטיימר הנוכחי\n\nהאם אתה בטוח שברצונך לאפס?',
+        'yes_reset_timer': 'כן, אפס טיימר',
+        'cancel': 'ביטול',
+        'reset_cancelled': 'האיפוס בוטל. טיימר המדיח נותר ללא שינוי.',
+        'error_occurred': '❌ אירעה שגיאה. אנא נסה שוב.'
     }
 };
 
@@ -4026,6 +4040,170 @@ async function handleCallback(chatId, userId, userName, data) {
     } else if (data === 'cancel_leave') {
         sendMessage(chatId, t(userId, 'leave_cancelled'));
         
+    } else if (data === 'confirm_reset_dishwasher') {
+        // User confirmed reset - execute normal dishwasher started logic
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        // Get current user doing the dishes using score-based system
+        const currentUser = getCurrentTurnUser();
+        if (!currentUser) {
+            sendMessage(chatId, t(userId, 'no_one_in_queue'));
+            return;
+        }
+        
+        // Track admin announcement for monthly report
+        trackMonthlyAction('admin_announcement', null, userName);
+        
+        // Collect all unique chat IDs to avoid duplicates
+        const chatIdsToNotify = new Set();
+        
+        // Add adminChatIds
+        adminChatIds.forEach(chatId => chatIdsToNotify.add(chatId));
+        
+        // Add chat IDs from authorized users who are admins
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+            
+            // If not found in userChatIds, check if this user is an admin
+            if (!userChatId && isUserAdmin(user)) {
+                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+            }
+            
+            if (userChatId) {
+                chatIdsToNotify.add(userChatId);
+            }
+        });
+        
+        // Send notification to each unique chat ID only once
+        chatIdsToNotify.forEach(recipientChatId => {
+            if (recipientChatId !== chatId) {
+                // Get the correct userId for language preference
+                const recipientUserId = getUserIdFromChatId(recipientChatId);
+                
+                // Create started message in recipient's language
+                const startedMessage = t(recipientUserId, 'dishwasher_started_message', {user: translateName(currentUser, recipientUserId), sender: translateName(userName, recipientUserId)});
+                console.log(`🔔 Sending dishwasher started notification to chat ID: ${recipientChatId} (userId: ${recipientUserId})`);
+                sendMessage(recipientChatId, startedMessage);
+            }
+        });
+        
+        // Clear any existing auto-alert timer
+        if (global.dishwasherAutoAlertTimer) {
+            clearTimeout(global.dishwasherAutoAlertTimer);
+            global.dishwasherAutoAlertTimer = null;
+        }
+        
+        // Set up auto-alert timer (3 hours)
+        const autoAlertTimeout = setTimeout(() => {
+            // Check if we should still send the auto-alert
+            if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
+                // Get the CURRENT turn user (in case there was a swap)
+                const currentTurnUser = getCurrentTurnUser();
+                
+                // Check Israeli time for night hours restriction (11pm-7am)
+                const israeliHour = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric'}));
+                const israeliMinute = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+                const israeliTime = israeliHour + (israeliMinute / 60);
+                
+                // Check if it's night hours (11pm-7am Israeli time)
+                if (israeliTime >= 23 || israeliTime < 7) {
+                    // Night hours - reschedule for 7:00 AM Israeli time
+                    const now = new Date();
+                    const israeliNow = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'}));
+                    const next7AM = new Date(israeliNow);
+                    next7AM.setHours(7, 0, 0, 0);
+                    
+                    // If it's already past 7 AM today, schedule for tomorrow 7 AM
+                    if (next7AM <= israeliNow) {
+                        next7AM.setDate(next7AM.getDate() + 1);
+                    }
+                    
+                    const timeUntil7AM = next7AM.getTime() - now.getTime();
+                    
+                    console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:00 AM Israeli time`);
+                    
+                    // Reschedule for 7:00 AM Israeli time
+                    const rescheduledTimeout = setTimeout(() => {
+                        // Check again if we should still send the auto-alert
+                        if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
+                            console.log(`⏰ Auto-alert triggered after night hours delay for ${currentTurnUser}`);
+                            
+                            // Send dishwasher alert to all authorized users and admins
+                            [...authorizedUsers, ...admins].forEach(user => {
+                                let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                                
+                                // If not found in userChatIds, check if this user is an admin
+                                if (!userChatId && isUserAdmin(user)) {
+                                    userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                                }
+                                
+                                if (userChatId) {
+                                    // Get the correct userId for language preference
+                                    const recipientUserId = getUserIdFromChatId(userChatId);
+                                    
+                                    const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentTurnUser, recipientUserId), sender: t(recipientUserId, 'auto_timer')});
+                                    console.log(`🔔 Sending delayed auto dishwasher alert to ${user} (${userChatId}, userId: ${recipientUserId})`);
+                                    sendMessage(userChatId, alertMessage);
+                                }
+                            });
+                            
+                            // Mark alert as sent
+                            global.dishwasherAlertSent = true;
+                        }
+                    }, timeUntil7AM);
+                    
+                    // Store rescheduled timer reference for potential cleanup
+                    global.dishwasherAutoAlertTimer = rescheduledTimeout;
+                    
+                    return; // Don't send now
+                }
+                
+                // Day hours - send immediately
+                console.log(`⏰ Auto-alert triggered after 3 hours for ${currentTurnUser}`);
+                
+                // Send dishwasher alert to all authorized users and admins
+                [...authorizedUsers, ...admins].forEach(user => {
+                    let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                    
+                    // If not found in userChatIds, check if this user is an admin
+                    if (!userChatId && isUserAdmin(user)) {
+                        userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                    }
+                    
+                    if (userChatId) {
+                        // Get the correct userId for language preference
+                        const recipientUserId = getUserIdFromChatId(userChatId);
+                        
+                        const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentTurnUser, recipientUserId), sender: t(recipientUserId, 'auto_timer')});
+                        console.log(`🔔 Sending auto dishwasher alert to ${user} (${userChatId}, userId: ${recipientUserId})`);
+                        sendMessage(userChatId, alertMessage);
+                    }
+                });
+                
+                // Mark alert as sent
+                global.dishwasherAlertSent = true;
+            }
+        }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
+        
+        // Store timer reference for potential cleanup
+        global.dishwasherAutoAlertTimer = autoAlertTimeout;
+        
+        // Mark dishwasher as started
+        global.dishwasherStarted = true;
+        global.dishwasherAlertSent = false;
+        global.dishwasherCompleted = false;
+        
+        // Send confirmation to admin
+        sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${translateName(currentUser, userId)}\n${t(userId, 'sent_to_all')}`);
+        
+    } else if (data === 'cancel_reset_dishwasher') {
+        // User cancelled reset - do nothing
+        sendMessage(chatId, t(userId, 'reset_cancelled'));
+        
     } else if (data === 'dishwasher_alert') {
         // Check if this is an admin
         const isAdmin = isUserAdmin(userName, userId);
@@ -4095,6 +4273,20 @@ async function handleCallback(chatId, userId, userName, data) {
         if (!isAdmin) {
             sendMessage(chatId, t(userId, 'admin_access_required'));
             return;
+        }
+        
+        // Check if dishwasher is already running and not completed
+        if (global.dishwasherStarted && !global.dishwasherCompleted) {
+            // Show confirmation dialog
+            const buttons = [
+                [{ text: t(userId, 'yes_reset_timer'), callback_data: 'confirm_reset_dishwasher' }],
+                [{ text: t(userId, 'cancel'), callback_data: 'cancel_reset_dishwasher' }]
+            ];
+            
+            const confirmMessage = t(userId, 'dishwasher_already_running');
+            
+            sendMessageWithButtons(chatId, confirmMessage, buttons);
+            return; // Don't proceed with normal logic
         }
         
         // Get current user doing the dishes using score-based system
