@@ -3113,6 +3113,62 @@ async function handleCommand(chatId, userId, userName, text) {
             sendMessage(chatId, userList);
         }
         
+    } else if (command === '/assist') {
+        // Admin assist command - logs action without affecting queue (no description needed)
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        // Use default description
+        const description = "Dishwasher cleaned by admin";
+        
+        // Track the assist action for monthly statistics
+        trackMonthlyAction('admin_assist', null, userName);
+        
+        // Save bot data after tracking
+        await saveBotData();
+        
+        // Send confirmation message
+        const timeString = new Date().toLocaleString();
+        const assistMessage = t(userId, 'assist_logged', {
+            description: description,
+            admin: translateName(userName, userId),
+            time: timeString
+        });
+        
+        // Send confirmation to admin immediately
+        sendMessage(chatId, assistMessage);
+        
+        // Notify all authorized users and admins immediately
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+            
+            // If not found in userChatIds, check if this user is an admin
+            if (!userChatId && isUserAdmin(user)) {
+                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+            }
+            
+            if (userChatId && userChatId !== chatId) {
+                const recipientUserId = getUserIdFromChatId(userChatId);
+                
+                // Translate description to recipient's language
+                const translatedDescription = translateDescription(description, recipientUserId);
+                
+                const userAssistMessage = t(recipientUserId, 'assist_logged', {
+                    description: translatedDescription,
+                    admin: translateName(userName, recipientUserId),
+                    time: timeString
+                });
+                
+                console.log(`🔔 Sending admin assist notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
+                sendMessage(userChatId, userAssistMessage);
+            }
+        });
+        
+        console.log(`🤝 Admin assist logged: ${userName} - ${description}`);
+        
     } else if (command && command.startsWith('/assist ')) {
         // Admin assist command - logs action without affecting queue
         const isAdmin = isUserAdmin(userName, userId);
