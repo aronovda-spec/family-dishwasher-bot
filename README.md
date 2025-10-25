@@ -28,6 +28,15 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - **User Authorization**: Control who can use queue commands
 - **Request Processing**: Approve/reject punishment and skip requests
 - **Statistics**: View punishment statistics and history
+- **Intuitive Menu Design**: 6-row logical menu structure with functional grouping
+- **Assist Feature**: Admin can personally handle duties without disrupting queue (coming soon)
+
+### 🌙 Smart Notifications
+- **Night Hours Restriction**: Automatic dishwasher alerts blocked during 11pm-7am Israeli time
+- **Intelligent Rescheduling**: Blocked alerts automatically rescheduled for 7:00 AM Israeli time
+- **Timezone Awareness**: Uses Asia/Jerusalem timezone for accurate time handling
+- **Preserved Functionality**: Manual alerts, /done commands, and monthly reports work 24/7
+- **Admin Flexibility**: Admins abroad receive notifications at their local time (minor inconvenience)
 
 ### 📱 Telegram Integration
 - **Direct Integration**: All interactions happen directly in Telegram chats
@@ -125,6 +134,17 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - `reject punishment <id>` - Reject a punishment request
 - `approve skip <user>` - Approve a skip request
 - `reject skip <user>` - Reject a skip request
+
+#### Admin Menu Interface
+- **6-Row Logical Structure**: Organized by function type for better UX
+  - **Row 1**: Core Operations (Status, Done)
+  - **Row 2**: Queue Control (Force Swap, Assist)
+  - **Row 3**: Dishwasher Activity (Started, Alert)
+  - **Row 4**: Administrative Actions (Apply Punishment, Maintenance)
+  - **Row 5**: Communication Tools (Broadcast, Send Message)
+  - **Row 6**: Utility & Settings (Help, Language Switch)
+- **Broadcast Feature**: Renamed from "Create Announcement" for clarity
+- **Assist Feature**: Coming soon - admin can handle duties without disrupting queue
 
 #### Information
 - `admins` - List all admins
