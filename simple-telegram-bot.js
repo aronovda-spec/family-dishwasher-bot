@@ -1993,6 +1993,33 @@ function translateName(name, userId) {
     return getFirstName(name); // Return first name only for English or unknown names
 }
 
+// Translate description based on user's language preference
+function translateDescription(description, userId) {
+    const userLang = getUserLanguage(userId);
+    
+    // For now, return description as-is since we don't have a translation system for descriptions
+    // In the future, this could be enhanced with a description translation dictionary
+    // or integration with a translation service
+    
+    // Simple approach: if description contains Hebrew characters, assume it's Hebrew
+    // and if user prefers English, we could add basic translations here
+    
+    if (userLang === 'en') {
+        // Basic Hebrew to English translations for common assist descriptions
+        const commonTranslations = {
+            'מדיח נוקה על ידי מנהל': 'Dishwasher cleaned by admin',
+            'עזרה במטבח': 'Kitchen help',
+            'ניקיון כללי': 'General cleaning',
+            'תחזוקת מדיח': 'Dishwasher maintenance',
+            'עזרה דחופה': 'Emergency help'
+        };
+        
+        return commonTranslations[description] || description;
+    }
+    
+    return description; // Return original description
+}
+
 // Get translated text
 function t(userId, key, replacements = {}) {
     const lang = getUserLanguage(userId);
@@ -3129,8 +3156,11 @@ async function handleCommand(chatId, userId, userName, text) {
             if (userChatId && userChatId !== chatId) {
                 const recipientUserId = getUserIdFromChatId(userChatId);
                 
+                // Translate description to recipient's language
+                const translatedDescription = translateDescription(description, recipientUserId);
+                
                 const userAssistMessage = t(recipientUserId, 'assist_logged', {
-                    description: description,
+                    description: translatedDescription,
                     admin: translateName(userName, recipientUserId),
                     time: timeString
                 });
