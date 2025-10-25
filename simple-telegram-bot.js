@@ -89,7 +89,7 @@ async function savePendingScores() {
         
         // Save all pending score changes
         for (const [userName, score] of pendingScoreChanges) {
-            await db.saveUserScore(userName, score);
+            await db.setUserScore(userName, score);
         }
         
         const duration = Date.now() - startTime;
