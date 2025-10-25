@@ -1156,7 +1156,7 @@ const translations = {
         // Common messages
         'not_authorized': '❌ **Not authorized!**',
         'admin_access_required': '❌ **Admin access required!**',
-        'assist_logged': '✅ **Assist Logged!**\n\n🤝 **Action:** {description}\n👨‍💼 **Admin:** {admin}\n📅 **Time:** {time}\n🔄 **Next turn:** {nextUser}\n\n📊 **Note:** This action does not affect the queue order.',
+        'assist_logged': '✅ **Assist Logged!**\n\n🤝 **Action:** {description}\n👨‍💼 **Admin:** {admin}\n📅 **Time:** {time}\n🔄 **Current turn:** {currentUser}\n\n📊 **Note:** This action does not affect the queue order.',
         'not_your_turn': '❌ **Not your turn!**',
         'current_turn_user': '🔄 **Current turn:**',
         'your_queue_position': '👤 **Your queue position:**',
@@ -1567,7 +1567,7 @@ const translations = {
         // Common messages
         'not_authorized': '❌ **לא מורשה!**',
         'admin_access_required': '❌ **נדרשת גישת מנהל!**',
-        'assist_logged': '✅ **עזרה נרשמה!**\n\n🤝 **פעולה:** {description}\n👨‍💼 **מנהל:** {admin}\n📅 **זמן:** {time}\n🔄 **התור הבא:** {nextUser}\n\n📊 **הערה:** פעולה זו לא משפיעה על סדר התור.',
+        'assist_logged': '✅ **עזרה נרשמה!**\n\n🤝 **פעולה:** {description}\n👨‍💼 **מנהל:** {admin}\n📅 **זמן:** {time}\n🔄 **התור הנוכחי:** {currentUser}\n\n📊 **הערה:** פעולה זו לא משפיעה על סדר התור.',
         'not_your_turn': '❌ **לא התור שלך!**',
         'current_turn_user': '🔄 **התור הנוכחי:**',
         'your_queue_position': '👤 **המיקום שלך בתור:**',
@@ -3142,12 +3142,12 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Send confirmation message
         const timeString = new Date().toLocaleString();
-        const nextUser = getCurrentTurnUser(false);
+        const currentUser = getCurrentTurnUser();
         const assistMessage = t(userId, 'assist_logged', {
             description: description,
             admin: translateName(userName, userId),
             time: timeString,
-            nextUser: translateName(nextUser, userId)
+            currentUser: translateName(currentUser, userId)
         });
         
         // Send confirmation to admin immediately
@@ -3172,7 +3172,7 @@ async function handleCommand(chatId, userId, userName, text) {
                     description: translatedDescription,
                     admin: translateName(userName, recipientUserId),
                     time: timeString,
-                    nextUser: translateName(nextUser, recipientUserId)
+                    currentUser: translateName(currentUser, recipientUserId)
                 });
                 
                 console.log(`🔔 Sending admin assist notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
