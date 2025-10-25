@@ -112,7 +112,7 @@ async function savePendingMonthlyStats() {
         
         // Save all pending monthly stats
         for (const [month, stats] of Object.entries(pendingMonthlyStats)) {
-            await db.saveMonthlyStats(month, stats);
+            await db.setMonthlyStats(month, stats);
         }
         
         const duration = Date.now() - startTime;
