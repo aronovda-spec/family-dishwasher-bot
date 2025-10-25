@@ -3114,7 +3114,32 @@ async function handleCommand(chatId, userId, userName, text) {
             time: timeString
         });
         
+        // Send confirmation to admin immediately
         sendMessage(chatId, assistMessage);
+        
+        // Notify all authorized users and admins immediately
+        [...authorizedUsers, ...admins].forEach(user => {
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+            
+            // If not found in userChatIds, check if this user is an admin
+            if (!userChatId && isUserAdmin(user)) {
+                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+            }
+            
+            if (userChatId && userChatId !== chatId) {
+                const recipientUserId = getUserIdFromChatId(userChatId);
+                
+                const userAssistMessage = t(recipientUserId, 'assist_logged', {
+                    description: description,
+                    admin: translateName(userName, recipientUserId),
+                    time: timeString
+                });
+                
+                console.log(`🔔 Sending admin assist notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
+                sendMessage(userChatId, userAssistMessage);
+            }
+        });
+        
         console.log(`🤝 Admin assist logged: ${userName} - ${description}`);
         
     } else if (command && command.startsWith('/addadmin ')) {
