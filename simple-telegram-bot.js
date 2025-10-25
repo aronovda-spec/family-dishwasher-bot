@@ -1317,6 +1317,8 @@ const translations = {
         
         // Announcement system (Admin only)
         'create_announcement': 'Create Announcement',
+        'broadcast': '📢 Broadcast',
+        'assist': '🤝 Assist',
         'type_announcement_message': 'Type your announcement message:',
         'announcement_preview': 'Preview',
         'announcement': 'Announcement',
@@ -1724,6 +1726,8 @@ const translations = {
         
         // Announcement system (Admin only)
         'create_announcement': 'צור הודעה רשמית',
+        'broadcast': '📢 שידור',
+        'assist': '🤝 עזרה',
         'type_announcement_message': 'הקלד את ההודעה הרשמית שלך:',
         'announcement_preview': 'תצוגה מקדימה',
         'announcement': 'הודעה רשמית',
@@ -2418,29 +2422,34 @@ async function handleCommand(chatId, userId, userName, text) {
         if (isAdmin) {
             text += t(userId, 'admin_menu');
             buttons = [
+                // Row 1: Core Operations
                 [
                     { text: t(userId, 'status'), callback_data: "status" },
                     { text: t(userId, 'done'), callback_data: "done" }
                 ],
+                // Row 2: Queue Control
                 [
                     { text: t(userId, 'force_swap'), callback_data: "force_swap_menu" },
-                    { text: t(userId, 'apply_punishment'), callback_data: "apply_punishment_menu" }
+                    { text: t(userId, 'assist'), callback_data: "assist_menu" }
                 ],
+                // Row 3: Dishwasher Activity
                 [
                     { text: t(userId, 'dishwasher_started'), callback_data: "dishwasher_started" },
                     { text: t(userId, 'dishwasher_alert'), callback_data: "dishwasher_alert" }
                 ],
+                // Row 4: Administrative Actions
                 [
-                    { text: t(userId, 'create_announcement'), callback_data: "create_announcement" },
-                    { text: t(userId, 'send_message'), callback_data: "send_user_message" }
-                ],
-                [
+                    { text: t(userId, 'apply_punishment'), callback_data: "apply_punishment_menu" },
                     { text: t(userId, 'maintenance'), callback_data: "maintenance_menu" }
                 ],
+                // Row 5: Communication Tools
                 [
-                    { text: t(userId, 'help'), callback_data: "help" }
+                    { text: t(userId, 'broadcast'), callback_data: "create_announcement" },
+                    { text: t(userId, 'send_message'), callback_data: "send_user_message" }
                 ],
+                // Row 6: Utility & Settings
                 [
+                    { text: t(userId, 'help'), callback_data: "help" },
                     { text: t(userId, 'language_switch'), callback_data: "language_switch" }
                 ]
             ];
@@ -4019,6 +4028,66 @@ async function handleCallback(chatId, userId, userName, data) {
             if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
                 // Get the CURRENT turn user (in case there was a swap)
                 const currentTurnUser = getCurrentTurnUser();
+                
+                // Check Israeli time for night hours restriction (11pm-7am)
+                const israeliHour = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric'}));
+                const israeliMinute = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+                const israeliTime = israeliHour + (israeliMinute / 60);
+                
+                // Check if it's night hours (11pm-7am Israeli time)
+                if (israeliTime >= 23 || israeliTime < 7) {
+                    // Night hours - reschedule for 7:00 AM Israeli time
+                    const now = new Date();
+                    const israeliNow = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'}));
+                    const next7AM = new Date(israeliNow);
+                    next7AM.setHours(7, 0, 0, 0);
+                    
+                    // If it's already past 7 AM today, schedule for tomorrow 7 AM
+                    if (next7AM <= israeliNow) {
+                        next7AM.setDate(next7AM.getDate() + 1);
+                    }
+                    
+                    const timeUntil7AM = next7AM.getTime() - now.getTime();
+                    
+                    console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:00 AM Israeli time`);
+                    
+                    // Reschedule for 7:00 AM Israeli time
+                    const rescheduledTimeout = setTimeout(() => {
+                        // Check again if we should still send the auto-alert
+                        if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
+                            console.log(`⏰ Auto-alert triggered after night hours delay for ${currentTurnUser}`);
+                            
+                            // Send dishwasher alert to all authorized users and admins
+                            [...authorizedUsers, ...admins].forEach(user => {
+                                let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                                
+                                // If not found in userChatIds, check if this user is an admin
+                                if (!userChatId && isUserAdmin(user)) {
+                                    userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                                }
+                                
+                                if (userChatId) {
+                                    // Get the correct userId for language preference
+                                    const recipientUserId = getUserIdFromChatId(userChatId);
+                                    
+                                    const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentTurnUser, recipientUserId), sender: t(recipientUserId, 'auto_timer')});
+                                    console.log(`🔔 Sending delayed auto dishwasher alert to ${user} (${userChatId}, userId: ${recipientUserId})`);
+                                    sendMessage(userChatId, alertMessage);
+                                }
+                            });
+                            
+                            // Mark alert as sent
+                            global.dishwasherAlertSent = true;
+                        }
+                    }, timeUntil7AM);
+                    
+                    // Store rescheduled timer reference for potential cleanup
+                    global.dishwasherAutoAlertTimer = rescheduledTimeout;
+                    
+                    return; // Don't send now
+                }
+                
+                // Day hours - send immediately
                 console.log(`⏰ Auto-alert triggered after 3 hours for ${currentTurnUser}`);
                 
                 // Send dishwasher alert to all authorized users and admins
@@ -5205,6 +5274,30 @@ async function handleCallback(chatId, userId, userName, data) {
         } else {
             sendMessage(chatId, t(userId, 'error_users_not_found'));
         }
+        
+    } else if (data === 'assist_menu') {
+        // Assist menu - placeholder for future functionality
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const assistMessage = `🤝 **Assist Feature**\n\n` +
+            `🚧 **Coming Soon!**\n\n` +
+            `💡 **Planned functionality:**\n` +
+            `• Admin can personally handle a duty\n` +
+            `• Without changing the queue order\n` +
+            `• Useful for urgent situations\n\n` +
+            `📋 **Current status:** Under development`;
+        
+        const assistButtons = [
+            [
+                { text: t(userId, 'back_to_admin_menu'), callback_data: "start" }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, assistMessage, assistButtons);
         
     } else if (data === 'request_punishment_menu') {
         const isAuthorized = isUserAuthorized(userName);
