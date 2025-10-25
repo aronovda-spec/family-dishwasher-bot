@@ -945,28 +945,35 @@ function trackMonthlyAction(type, userName, adminName = null, count = 1) {
             break;
         case 'admin_completion':
             if (!monthData.admins[adminName]) {
-                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0, assists: 0 };
             }
             monthData.admins[adminName].completions++;
             monthData.totals.adminInterventions++;
             break;
         case 'admin_punishment':
             if (!monthData.admins[adminName]) {
-                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0, assists: 0 };
             }
             monthData.admins[adminName].punishmentsApplied++;
             break;
         case 'admin_force_swap':
             if (!monthData.admins[adminName]) {
-                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0, assists: 0 };
             }
             monthData.admins[adminName].forceSwaps++;
             break;
         case 'admin_announcement':
             if (!monthData.admins[adminName]) {
-                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0 };
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0, assists: 0 };
             }
             monthData.admins[adminName].announcements++;
+            break;
+        case 'admin_assist':
+            if (!monthData.admins[adminName]) {
+                monthData.admins[adminName] = { completions: 0, punishmentsApplied: 0, forceSwaps: 0, announcements: 0, assists: 0 };
+            }
+            monthData.admins[adminName].assists++;
+            monthData.totals.adminInterventions++;
             break;
         case 'queue_reorder':
             monthData.totals.queueReorders++;
@@ -1017,7 +1024,8 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
             report += `  ✅ ${t(userId, 'completions_helped', {count: stats.completions})}\n`;
             report += `  ⚡ ${t(userId, 'punishments_applied', {count: stats.punishmentsApplied})}\n`;
             report += `  🔄 ${t(userId, 'force_swaps_executed', {count: stats.forceSwaps})}\n`;
-            report += `  📢 ${t(userId, 'announcements_sent', {count: stats.announcements})}\n\n`;
+            report += `  📢 ${t(userId, 'announcements_sent', {count: stats.announcements})}\n`;
+            report += `  🤝 ${t(userId, 'assists_provided', {count: stats.assists})}\n\n`;
         });
     }
     
@@ -1148,6 +1156,9 @@ const translations = {
         // Common messages
         'not_authorized': '❌ **Not authorized!**',
         'admin_access_required': '❌ **Admin access required!**',
+        'assist_command_usage': 'Usage: /assist <description>\nExample: /assist Dishwasher cleaned by admin',
+        'assist_logged': '✅ **Assist Logged!**\n\n🤝 **Action:** {description}\n👨‍💼 **Admin:** {admin}\n📅 **Time:** {time}\n\n📊 **Note:** This action does not affect the queue order.',
+        'assist_description_required': '❌ **Description Required**\n\n💡 **Usage:** /assist <description>\n\n**Example:** /assist Dishwasher cleaned by admin',
         'not_your_turn': '❌ **Not your turn!**',
         'current_turn_user': '🔄 **Current turn:**',
         'your_queue_position': '👤 **Your queue position:**',
@@ -1442,6 +1453,7 @@ const translations = {
         'punishments_applied': 'Punishments applied: {count}',
         'force_swaps_executed': 'Force swaps: {count}',
         'announcements_sent': 'Announcements: {count}',
+        'assists_provided': 'Assists provided: {count}',
         'total_dishes_completed': 'Total dishes completed: {count}',
         'admin_interventions': 'Admin interventions: {count}',
         'queue_reorders': 'Queue reorders: {count}',
@@ -1557,6 +1569,9 @@ const translations = {
         // Common messages
         'not_authorized': '❌ **לא מורשה!**',
         'admin_access_required': '❌ **נדרשת גישת מנהל!**',
+        'assist_command_usage': 'שימוש: /assist <תיאור>\nדוגמה: /assist מדיח נוקה על ידי מנהל',
+        'assist_logged': '✅ **עזרה נרשמה!**\n\n🤝 **פעולה:** {description}\n👨‍💼 **מנהל:** {admin}\n📅 **זמן:** {time}\n\n📊 **הערה:** פעולה זו לא משפיעה על סדר התור.',
+        'assist_description_required': '❌ **נדרש תיאור**\n\n💡 **שימוש:** /assist <תיאור>\n\n**דוגמה:** /assist מדיח נוקה על ידי מנהל',
         'not_your_turn': '❌ **לא התור שלך!**',
         'current_turn_user': '🔄 **התור הנוכחי:**',
         'your_queue_position': '👤 **המיקום שלך בתור:**',
@@ -1855,6 +1870,7 @@ const translations = {
         'punishments_applied': 'עונשים שהוחלו: {count}',
         'force_swaps_executed': 'החלפות בכוח: {count}',
         'announcements_sent': 'הודעות רשמיות: {count}',
+        'assists_provided': 'עזרות שסופקו: {count}',
         'total_dishes_completed': 'סה"כ כלים שהושלמו: {count}',
         'admin_interventions': 'התערבויות מנהל: {count}',
         'queue_reorders': 'סידורי תור מחדש: {count}',
@@ -3069,6 +3085,37 @@ async function handleCommand(chatId, userId, userName, text) {
             userList += `\n📝 **Note:** Maximum 3 authorized users allowed.`;
             sendMessage(chatId, userList);
         }
+        
+    } else if (command && command.startsWith('/assist ')) {
+        // Admin assist command - logs action without affecting queue
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const description = command.replace('/assist ', '').trim();
+        if (!description) {
+            sendMessage(chatId, t(userId, 'assist_description_required'));
+            return;
+        }
+        
+        // Track the assist action for monthly statistics
+        trackMonthlyAction('admin_assist', null, userName);
+        
+        // Save bot data after tracking
+        await saveBotData();
+        
+        // Send confirmation message
+        const timeString = new Date().toLocaleString();
+        const assistMessage = t(userId, 'assist_logged', {
+            description: description,
+            admin: translateName(userName, userId),
+            time: timeString
+        });
+        
+        sendMessage(chatId, assistMessage);
+        console.log(`🤝 Admin assist logged: ${userName} - ${description}`);
         
     } else if (command && command.startsWith('/addadmin ')) {
         const userToAdd = getFirstName(command.replace('/addadmin ', '').trim()); // Normalize to first name only
