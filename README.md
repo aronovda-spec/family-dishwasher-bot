@@ -29,7 +29,7 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - **Request Processing**: Approve/reject punishment and skip requests
 - **Statistics**: View punishment statistics and history
 - **Intuitive Menu Design**: 6-row logical menu structure with functional grouping
-- **Assist Feature**: Admin can personally handle duties without disrupting queue (coming soon)
+- **Assist Feature**: Admin can personally handle duties without disrupting queue
 
 ### 🌙 Smart Notifications
 - **Night Hours Restriction**: Automatic dishwasher alerts blocked during 11pm-7am Israeli time
@@ -60,6 +60,14 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - **Parallel Database Reads**: `/status` command uses parallel reads for ~60% faster responses
 - **Non-blocking Saves**: Critical operations save immediately without blocking user interactions
 - **HTTP Keep-Alive**: Maintains persistent connections to Telegram API for better performance
+
+### 🚨 Anti-Cheating System
+- **Rapid Activity Detection**: Monitors `/done` and `/assist` commands for suspicious patterns
+- **30-Minute Rule**: Dishwasher cannot be completed twice within 30 minutes (physical impossibility)
+- **Admin Alerts**: All admins receive immediate notifications about suspicious activity
+- **Command Tracking**: Both user `/done` and admin `/assist` commands are monitored equally
+- **No Blocking**: Commands still execute but admins are alerted to investigate
+- **Global Tracking**: System-wide monitoring prevents rapid completions by any user
 
 ### 🚨 Debt Protection System
 - **Debt Detection**: Users with significantly lower scores cannot leave the bot
@@ -102,6 +110,7 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - `remove` - Remove yourself from the queue  
 - `done` - Complete your current turn
 - `status` - Show current queue status
+- `assist` - Admin command to handle dishwasher without affecting queue
 
 #### Turn Flexibility
 - `swap @username` - Request to swap positions with another user
@@ -144,7 +153,7 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
   - **Row 5**: Communication Tools (Broadcast, Send Message)
   - **Row 6**: Utility & Settings (Help, Language Switch)
 - **Broadcast Feature**: Renamed from "Create Announcement" for clarity
-- **Assist Feature**: Coming soon - admin can handle duties without disrupting queue
+- **Assist Feature**: Admin can handle duties without disrupting queue (`/assist` command)
 
 #### Information
 - `admins` - List all admins
