@@ -3134,6 +3134,13 @@ async function handleCommand(chatId, userId, userName, text) {
         // Update global dishwasher completion timestamp
         global.lastDishwasherDone = now;
         
+        // Mark that dishwasher was completed (cancel auto-alert)
+        global.dishwasherCompleted = true;
+        if (global.dishwasherAutoAlertTimer) {
+            clearTimeout(global.dishwasherAutoAlertTimer);
+            global.dishwasherAutoAlertTimer = null;
+        }
+        
         // Track the assist action for monthly statistics
         trackMonthlyAction('admin_assist', null, userName);
         
@@ -3714,7 +3721,7 @@ async function executeSwap(swapRequest, requestId, status) {
 // Handle callback queries (button presses)
 async function handleCallback(chatId, userId, userName, data) {
     try {
-        console.log(`🔘 Button pressed: "${data}" by ${userName}`);
+    console.log(`🔘 Button pressed: "${data}" by ${userName}`);
     
     if (data === 'test') {
         sendMessage(chatId, t(userId, 'test_button_works', {user: userName, userId: userId, data: data}));
@@ -4074,8 +4081,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Send confirmation to admin
         sendMessage(chatId, `${t(userId, 'dishwasher_alert_sent')}\n\n${t(userId, 'alerted_user')} ${translateName(currentUser, userId)}\n${t(userId, 'sent_to_all')}`);
         
-        // Mark that manual alert was sent (cancel auto-alert)
+        // Mark that manual alert was sent and clear auto-alert timer
         global.dishwasherAlertSent = true;
+        if (global.dishwasherAutoAlertTimer) {
+            clearTimeout(global.dishwasherAutoAlertTimer);
+            global.dishwasherAutoAlertTimer = null;
+        }
         
     } else if (data === 'dishwasher_started') {
         // Check if this is an admin
@@ -5412,6 +5423,13 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Update global dishwasher completion timestamp
         global.lastDishwasherDone = now;
+        
+        // Mark that dishwasher was completed (cancel auto-alert)
+        global.dishwasherCompleted = true;
+        if (global.dishwasherAutoAlertTimer) {
+            clearTimeout(global.dishwasherAutoAlertTimer);
+            global.dishwasherAutoAlertTimer = null;
+        }
         
         // Track the assist action for monthly statistics
         trackMonthlyAction('admin_assist', null, userName);
