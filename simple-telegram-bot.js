@@ -3120,12 +3120,22 @@ async function handleCommand(chatId, userId, userName, text) {
         // Use default description
         const description = "Dishwasher cleaned by admin";
         
+        // Check for rapid ASSIST activity (30 minutes) - global tracking
+        const now = Date.now();
+        const lastGlobalDone = global.lastDishwasherDone;
+        
+        if (lastGlobalDone && (now - lastGlobalDone) < 30 * 60 * 1000) { // 30 minutes
+            const lastDoneTime = new Date(lastGlobalDone).toLocaleString();
+            // Send alert for ANY ASSIST within 30 minutes of last dishwasher completion
+            alertAdminsAboutCheating(userId, userName, 'rapid_done', { lastDone: lastDoneTime });
+            console.log(`🚨 RAPID ASSIST DETECTED: ${userName} (${userId}) - Last dishwasher done: ${lastDoneTime}`);
+        }
+        
+        // Update global dishwasher completion timestamp
+        global.lastDishwasherDone = now;
+        
         // Track the assist action for monthly statistics
         trackMonthlyAction('admin_assist', null, userName);
-        
-        // Update global dishwasher completion timestamp for anti-cheating mechanism
-        // Since /assist represents actual physical dishwasher work done by admin
-        global.lastDishwasherDone = Date.now();
         
         // Save bot data after tracking
         await saveBotData();
