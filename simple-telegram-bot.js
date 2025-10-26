@@ -4105,14 +4105,16 @@ async function handleCallback(chatId, userId, userName, data) {
                 const currentTurnUser = getCurrentTurnUser();
                 
                 // Check Israeli time for night hours restriction (11pm-7am)
-                const israeliHour = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric'}));
-                const israeliMinute = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+                const now = new Date();
+                const israeliHour = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric', hour12: false}));
+                const israeliMinute = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
                 const israeliTime = israeliHour + (israeliMinute / 60);
+                
+                console.log(`🌙 Auto-alert time check: Israeli time is ${israeliHour}:${israeliMinute.toString().padStart(2, '0')} (${israeliTime}), isNight: ${israeliTime >= 23 || israeliTime < 7}`);
                 
                 // Check if it's night hours (11pm-7am Israeli time)
                 if (israeliTime >= 23 || israeliTime < 7) {
                     // Night hours - reschedule for 7:00 AM Israeli time
-                    const now = new Date();
                     const israeliNow = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'}));
                     const next7AM = new Date(israeliNow);
                     next7AM.setHours(7, 0, 0, 0);
@@ -4346,14 +4348,16 @@ async function handleCallback(chatId, userId, userName, data) {
                 const currentTurnUser = getCurrentTurnUser();
                 
                 // Check Israeli time for night hours restriction (11pm-7am)
-                const israeliHour = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric'}));
-                const israeliMinute = parseInt(new Date().toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+                const now = new Date();
+                const israeliHour = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric', hour12: false}));
+                const israeliMinute = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
                 const israeliTime = israeliHour + (israeliMinute / 60);
+                
+                console.log(`🌙 Auto-alert time check: Israeli time is ${israeliHour}:${israeliMinute.toString().padStart(2, '0')} (${israeliTime}), isNight: ${israeliTime >= 23 || israeliTime < 7}`);
                 
                 // Check if it's night hours (11pm-7am Israeli time)
                 if (israeliTime >= 23 || israeliTime < 7) {
                     // Night hours - reschedule for 7:00 AM Israeli time
-                    const now = new Date();
                     const israeliNow = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'}));
                     const next7AM = new Date(israeliNow);
                     next7AM.setHours(7, 0, 0, 0);
