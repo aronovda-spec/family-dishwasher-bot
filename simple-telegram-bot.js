@@ -6390,11 +6390,16 @@ getUpdates();
 // Automatic monthly report system
 function checkAndSendMonthlyReport() {
     const now = new Date();
+    
+    // Check Israeli time for consistency
+    const israeliHour = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric', hour12: false}));
+    const israeliMinute = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+    
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const isLastDayOfMonth = now.getDate() === lastDayOfMonth;
-    const isMorningTime = now.getHours() === 10 && now.getMinutes() >= 0 && now.getMinutes() < 5; // Between 10:00-10:04
+    const isMorningTime = israeliHour === 10 && israeliMinute >= 0 && israeliMinute < 5; // Between 10:00-10:04 Israeli time
     
-    console.log(`📅 Monthly report check: ${now.toISOString()} - Last day: ${isLastDayOfMonth}, Morning time: ${isMorningTime}`);
+    console.log(`📅 Monthly report check: ${now.toISOString()} - Last day: ${isLastDayOfMonth}, Morning time (Israeli): ${israeliHour}:${israeliMinute.toString().padStart(2, '0')}, isMorningTime: ${isMorningTime}`);
     
     if (isLastDayOfMonth && isMorningTime) {
         console.log('📊 Sending automatic monthly report...');
