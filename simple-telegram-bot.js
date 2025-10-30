@@ -4114,12 +4114,12 @@ async function handleCallback(chatId, userId, userName, data) {
                 
                 // Check if it's night hours (11pm-7am Israeli time)
                 if (israeliTime >= 23 || israeliTime < 7) {
-                    // Night hours - reschedule for 7:00 AM Israeli time
+                    // Night hours - reschedule for 7:15 AM Israeli time
                     const israeliNow = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'}));
                     const next7AM = new Date(israeliNow);
-                    next7AM.setHours(7, 0, 0, 0);
+                    next7AM.setHours(7, 15, 0, 0);
                     
-                    // If it's already past 7 AM today, schedule for tomorrow 7 AM
+                    // If it's already past 7:15 AM today, schedule for tomorrow 7:15 AM
                     if (next7AM <= israeliNow) {
                         next7AM.setDate(next7AM.getDate() + 1);
                     }
@@ -4127,9 +4127,9 @@ async function handleCallback(chatId, userId, userName, data) {
                     // Use Israeli-local timestamps on both sides to avoid server timezone offset skew
                     const timeUntil7AM = next7AM.getTime() - israeliNow.getTime();
                     
-                    console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:00 AM Israeli time`);
+                    console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:15 AM Israeli time`);
                     
-                    // Reschedule for 7:00 AM Israeli time
+                    // Reschedule for 7:15 AM Israeli time
                     const rescheduledTimeout = setTimeout(() => {
                         // Check again if we should still send the auto-alert
                         if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
@@ -4358,12 +4358,12 @@ async function handleCallback(chatId, userId, userName, data) {
                 
                 // Check if it's night hours (11pm-7am Israeli time)
                 if (israeliTime >= 23 || israeliTime < 7) {
-                    // Night hours - reschedule for 7:00 AM Israeli time
+                    // Night hours - reschedule for 7:15 AM Israeli time
                     const israeliNow = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'}));
                     const next7AM = new Date(israeliNow);
-                    next7AM.setHours(7, 0, 0, 0);
+                    next7AM.setHours(7, 15, 0, 0);
                     
-                    // If it's already past 7 AM today, schedule for tomorrow 7 AM
+                    // If it's already past 7:15 AM today, schedule for tomorrow 7:15 AM
                     if (next7AM <= israeliNow) {
                         next7AM.setDate(next7AM.getDate() + 1);
                     }
@@ -4371,9 +4371,9 @@ async function handleCallback(chatId, userId, userName, data) {
                     // Use Israeli-local timestamps on both sides to avoid server timezone offset skew
                     const timeUntil7AM = next7AM.getTime() - israeliNow.getTime();
                     
-                    console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:00 AM Israeli time`);
+                    console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:15 AM Israeli time`);
                     
-                    // Reschedule for 7:00 AM Israeli time
+                    // Reschedule for 7:15 AM Israeli time
                     const rescheduledTimeout = setTimeout(() => {
                         // Check again if we should still send the auto-alert
                         if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
