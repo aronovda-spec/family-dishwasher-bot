@@ -4124,7 +4124,8 @@ async function handleCallback(chatId, userId, userName, data) {
                         next7AM.setDate(next7AM.getDate() + 1);
                     }
                     
-                    const timeUntil7AM = next7AM.getTime() - now.getTime();
+                    // Use Israeli-local timestamps on both sides to avoid server timezone offset skew
+                    const timeUntil7AM = next7AM.getTime() - israeliNow.getTime();
                     
                     console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:00 AM Israeli time`);
                     
@@ -4367,7 +4368,8 @@ async function handleCallback(chatId, userId, userName, data) {
                         next7AM.setDate(next7AM.getDate() + 1);
                     }
                     
-                    const timeUntil7AM = next7AM.getTime() - now.getTime();
+                    // Use Israeli-local timestamps on both sides to avoid server timezone offset skew
+                    const timeUntil7AM = next7AM.getTime() - israeliNow.getTime();
                     
                     console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:00 AM Israeli time`);
                     
