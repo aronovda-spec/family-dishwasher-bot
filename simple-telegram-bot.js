@@ -3797,17 +3797,18 @@ async function executeSwap(swapRequest, requestId, status) {
     }
     
     // OPTIMISTIC: Send notifications immediately (swap is logically done)
-    const currentTurnUser = getCurrentTurnUser();
-    
+    // After the swap, the current turn is performed by toUser (or actualTurnHolder if swap-back)
+    const currentTurnUser = (toUser === actualTurnHolder) ? actualTurnHolder : toUser;
+
     // Notify both users in their language
     let fromUserMessage;
     let toUserMessage;
     if (toUser === actualTurnHolder) {
-        // Swap back
+        // Swap back - actualTurnHolder performs their own turn
         fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'turn')}** (Swap back)\n\n🎯 **${t(fromUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserId)}`;
         toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'turn')}** (Swap back)\n\n🎯 **${t(toUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserId)}`;
     } else {
-        // Regular swap
+        // Regular swap - toUser is now performing the turn
         fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, fromUserId)} ${t(fromUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'turn')}**\n\n🎯 **${t(fromUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserId)}`;
         toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, toUserId)} ${t(toUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'turn')}**\n\n🎯 **${t(toUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserId)}`;
     }
@@ -5686,7 +5687,8 @@ async function handleCallback(chatId, userId, userName, data) {
             trackMonthlyAction('admin_force_swap', actualTurnHolder, userName);
             
             // OPTIMISTIC: Send notifications immediately (swap is logically done)
-            const currentTurnUser = getCurrentTurnUser();
+            // After the swap, the current turn is performed by secondUser (or actualTurnHolder if swap-back)
+            const currentTurnUser = (secondUser === actualTurnHolder) ? actualTurnHolder : secondUser;
             
             // Notify all authorized users and admins immediately
             [...authorizedUsers, ...admins].forEach(user => {
@@ -5704,10 +5706,10 @@ async function handleCallback(chatId, userId, userName, data) {
                     // Create message in recipient's language
                     let message;
                     if (secondUser === actualTurnHolder) {
-                        // Swap back - assignment removed
+                        // Swap back - assignment removed, actualTurnHolder performs their own turn
                         message = `⚡ **${t(recipientUserId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(actualTurnHolder, recipientUserId)} ${t(recipientUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, recipientUserId)} ${t(recipientUserId, 'turn')}** (Swap back)\n\n🎯 **${t(recipientUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, recipientUserId)}`;
                     } else {
-                        // Regular swap
+                        // Regular swap - secondUser is now performing the turn
                         message = `⚡ **${t(recipientUserId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(secondUser, recipientUserId)} ${t(recipientUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, recipientUserId)} ${t(recipientUserId, 'turn')}**\n\n🎯 **${t(recipientUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, recipientUserId)}`;
                     }
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
@@ -5720,10 +5722,10 @@ async function handleCallback(chatId, userId, userName, data) {
             // Send confirmation to admin
             let confirmationMessage;
             if (secondUser === actualTurnHolder) {
-                // Swap back
+                // Swap back - actualTurnHolder performs their own turn
                 confirmationMessage = `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(actualTurnHolder, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(actualTurnHolder, userId)} ${t(userId, 'turn')}** (Swap back)\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`;
             } else {
-                // Regular swap
+                // Regular swap - secondUser is now performing the turn
                 confirmationMessage = `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(secondUser, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(actualTurnHolder, userId)} ${t(userId, 'turn')}**\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`;
             }
             sendMessage(chatId, confirmationMessage);
