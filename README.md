@@ -11,9 +11,16 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - **Queue Status**: Real-time queue status with current turn indicator
 
 ### 🔄 Turn Flexibility
-- **Position Swapping**: Users can request to switch places in the queue
+- **Turn Swapping**: Users can request to swap their turn with another user
+  - **Assignment System**: Other user performs your turn (you owe them a favor)
+  - **Score System**: Only the performing user's score increases (+1)
+  - **Consecutive Swaps**: Users performing a turn can swap it to someone else
+  - **Swap Back**: Can swap back to original turn holder (cancels assignment)
 - **Approval System**: The other person must approve before the swap happens
+  - **Expiration**: Swap requests expire if turn changes before approval
+  - **Notifications**: Admins are notified about swap requests and rejections
 - **Skip Requests**: Users can request to skip their turn (requires admin approval)
+- **Force Swap** (Admin): Instant turn swap without approval (same assignment logic)
 
 ### ⚡ Punishment System
 - **Punishment Requests**: Any user can submit punishment requests (e.g., +3 extra turns) with a reason
@@ -113,9 +120,14 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - `assist` - Admin command to handle dishwasher without affecting queue
 
 #### Turn Flexibility
-- `swap @username` - Request to swap positions with another user
-- `approve <request_id>` - Approve a swap request
-- `reject <request_id>` - Reject a swap request
+- `swap @username` - Request to swap your turn with another user
+  - **Who can swap:** Only the person whose turn it is (current turn holder or performing user)
+  - **How it works:** Other user performs your turn (you owe them a favor)
+  - **Score:** Only the performing user's score increases (+1)
+  - **Consecutive swaps:** Users performing a turn can swap it to someone else
+  - **Swap back:** Can swap back to original turn holder
+- `approve <request_id>` - Approve a swap request (target user only)
+- `reject <request_id>` - Reject a swap request (target user only)
 - `skip [reason]` - Request to skip your turn
 
 #### Punishments
