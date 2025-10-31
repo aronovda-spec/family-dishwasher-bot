@@ -3786,6 +3786,23 @@ async function executeSwap(swapRequest, requestId, status) {
     }
     
     // OPTIMISTIC: Update in-memory state immediately
+    // CRITICAL: Prevent circular assignments - clear any conflicting assignments first
+    // Check if toUser is already assigned to perform someone's turn
+    for (const [existingHolder, existingAssignee] of turnAssignments.entries()) {
+        if (existingAssignee === toUser && existingHolder !== actualTurnHolder) {
+            // toUser is already performing someone else's turn - clear it to prevent circular assignment
+            console.log(`🔄 Clearing conflicting assignment: ${existingHolder} -> ${toUser} (to prevent circular assignment)`);
+            turnAssignments.delete(existingHolder);
+        }
+    }
+    // Also clear if toUser is the key (someone is performing toUser's turn, and we're assigning toUser elsewhere)
+    if (turnAssignments.has(toUser) && turnAssignments.get(toUser) !== actualTurnHolder) {
+        // toUser has their turn assigned to someone else, and we're assigning actualTurnHolder to toUser
+        // This would create a circular assignment, so clear the existing one
+        console.log(`🔄 Clearing conflicting assignment: ${toUser} -> ${turnAssignments.get(toUser)} (to prevent circular assignment)`);
+        turnAssignments.delete(toUser);
+    }
+    
     // Handle swap-back: if swapping back to the original turn holder, clear the assignment
     if (toUser === actualTurnHolder) {
         // Swapping back to original holder - remove assignment
@@ -5680,6 +5697,23 @@ async function handleCallback(chatId, userId, userName, data) {
             }
             
             // OPTIMISTIC: Update in-memory state immediately
+            // CRITICAL: Prevent circular assignments - clear any conflicting assignments first
+            // Check if secondUser is already assigned to perform someone's turn
+            for (const [existingHolder, existingAssignee] of turnAssignments.entries()) {
+                if (existingAssignee === secondUser && existingHolder !== actualTurnHolder) {
+                    // secondUser is already performing someone else's turn - clear it to prevent circular assignment
+                    console.log(`🔄 Clearing conflicting assignment: ${existingHolder} -> ${secondUser} (to prevent circular assignment)`);
+                    turnAssignments.delete(existingHolder);
+                }
+            }
+            // Also clear if secondUser is the key (someone is performing secondUser's turn, and we're assigning secondUser elsewhere)
+            if (turnAssignments.has(secondUser) && turnAssignments.get(secondUser) !== actualTurnHolder) {
+                // secondUser has their turn assigned to someone else, and we're assigning actualTurnHolder to secondUser
+                // This would create a circular assignment, so clear the existing one
+                console.log(`🔄 Clearing conflicting assignment: ${secondUser} -> ${turnAssignments.get(secondUser)} (to prevent circular assignment)`);
+                turnAssignments.delete(secondUser);
+            }
+            
             // Handle swap-back: if swapping back to the original turn holder, clear the assignment
             if (secondUser === actualTurnHolder) {
                 // Swapping back to original holder - remove assignment
