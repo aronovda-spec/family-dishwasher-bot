@@ -2099,7 +2099,14 @@ function t(userId, key, replacements = {}) {
     
     // Replace placeholders like {user}, {admin}, {count}
     for (const [placeholder, value] of Object.entries(replacements)) {
-        text = text.replace(new RegExp(`{${placeholder}}`, 'g'), value);
+        const replacement = value || ''; // Ensure replacement is never undefined/null
+        text = text.replace(new RegExp(`{${placeholder}}`, 'g'), replacement);
+    }
+    
+    // Ensure we always return a non-empty string
+    if (!text || text.trim().length === 0) {
+        console.log(`⚠️ Empty translation for key: ${key}, userId: ${userId}`);
+        return key; // Return the key itself as fallback
     }
     
     return text;
@@ -2245,6 +2252,12 @@ function notifyDatabaseError(chatId, userId, userName, isAdmin) {
 
 // Send message to Telegram
 function sendMessage(chatId, text) {
+    // Validate text before sending
+    if (!text || (typeof text === 'string' && text.trim().length === 0)) {
+        console.log(`⚠️ Skipping empty message to ${chatId}`);
+        return;
+    }
+    
     const url = `${botUrl}/sendMessage`;
     
     const send = (payload) => {
@@ -3710,15 +3723,26 @@ async function executeSwap(swapRequest, requestId, status) {
         console.log(`❌ Swap request expired: ${fromUser} is no longer the current turn`);
         // Notify both users that the swap request is no longer valid
         const requesterUserId = getUserIdFromChatId(fromUserId);
-        sendMessage(fromUserId, t(requesterUserId, 'swap_request_expired_requester', {
-            toUser: translateName(toUser, requesterUserId),
-            currentUser: translateName(currentPerformingUser, requesterUserId)
-        }));
+        const requesterToUser = translateName(toUser, requesterUserId) || toUser;
+        const requesterCurrentUser = translateName(currentPerformingUser, requesterUserId) || currentPerformingUser;
+        const requesterMessage = t(requesterUserId, 'swap_request_expired_requester', {
+            toUser: requesterToUser,
+            currentUser: requesterCurrentUser
+        });
+        if (requesterMessage && requesterMessage.trim().length > 0) {
+            sendMessage(fromUserId, requesterMessage);
+        }
+        
         const targetUserId = getUserIdFromChatId(toUserId);
-        sendMessage(toUserId, t(targetUserId, 'swap_request_expired_target', {
-            fromUser: translateName(fromUser, targetUserId),
-            currentUser: translateName(currentPerformingUser, targetUserId)
-        }));
+        const targetFromUser = translateName(fromUser, targetUserId) || fromUser;
+        const targetCurrentUser = translateName(currentPerformingUser, targetUserId) || currentPerformingUser;
+        const targetMessage = t(targetUserId, 'swap_request_expired_target', {
+            fromUser: targetFromUser,
+            currentUser: targetCurrentUser
+        });
+        if (targetMessage && targetMessage.trim().length > 0) {
+            sendMessage(toUserId, targetMessage);
+        }
         // Remove the expired request
         pendingSwaps.delete(requestId);
         return;
