@@ -1255,6 +1255,11 @@ const translations = {
         'error_users_not_found': '❌ **Error:** Could not find users in queue.',
         'error_queue_position': '❌ **Error:** Could not find your queue position.',
         'error_not_original_turn_holder': '❌ **Cannot force swap!**\n\n👤 **{firstUser}** is not the original turn holder.\n\n🎯 **Original turn holder:** {originalUser}\n💡 Only the original turn holder can be force swapped.',
+        'error_cannot_swap': '❌ **Cannot swap!**\n\n👤 **{userName}** is not the current turn.\n\n🎯 **Current turn:** {currentUser}\n💡 Only the person whose turn it is can request a swap.',
+        'error_cannot_force_swap': '❌ **Cannot force swap!**\n\n👤 **{firstUser}** is not the current turn.\n\n🎯 **Current turn:** {currentUser}\n💡 Only the person whose turn it is can be force swapped.',
+        'swap_request_expired': '❌ **Swap request expired or invalid!**\n\n🔄 The swap request is no longer valid.',
+        'swap_request_expired_requester': '❌ **Swap request expired!**\n\n🔄 The swap request with {toUser} is no longer valid.\n\n🎯 **Current turn:** {currentUser}\n💡 Only the person whose turn it is can be swapped.',
+        'swap_request_expired_target': '❌ **Swap request expired!**\n\n🔄 The swap request from {fromUser} is no longer valid.\n\n🎯 **Current turn:** {currentUser}\n💡 The turn has changed since the request was made.',
         'punishment_request_expired': '❌ **Punishment request not found or expired!**',
         'not_your_punishment': '❌ **This punishment request is not yours!**',
         'not_your_swap': '❌ **This swap request is not for you!**',
@@ -1674,6 +1679,11 @@ const translations = {
         'error_users_not_found': '❌ **שגיאה:** לא ניתן למצוא משתמשים בתור.',
         'error_queue_position': '❌ **שגיאה:** לא ניתן למצוא את מיקומך בתור.',
         'error_not_original_turn_holder': '❌ **לא ניתן לבצע החלפה בכוח!**\n\n👤 **{firstUser}** אינו מחזיק התור המקורי.\n\n🎯 **מחזיק התור המקורי:** {originalUser}\n💡 רק מחזיק התור המקורי יכול להיות מוחלף בכוח.',
+        'error_cannot_swap': '❌ **לא ניתן להחליף!**\n\n👤 **{userName}** אינו במהלך התור שלו.\n\n🎯 **התור הנוכחי:** {currentUser}\n💡 רק מי שבמהלך התור שלו יכול לבקש החלפה.',
+        'error_cannot_force_swap': '❌ **לא ניתן לבצע החלפה בכוח!**\n\n👤 **{firstUser}** אינו במהלך התור שלו.\n\n🎯 **התור הנוכחי:** {currentUser}\n💡 רק מי שבמהלך התור שלו יכול להיות מוחלף בכוח.',
+        'swap_request_expired': '❌ **בקשת החלפה פגה תוקפה או לא תקינה!**\n\n🔄 בקשת החלפה כבר לא תקפה.',
+        'swap_request_expired_requester': '❌ **בקשת החלפה פגה!**\n\n🔄 בקשת החלפה עם {toUser} כבר לא תקפה.\n\n🎯 **התור הנוכחי:** {currentUser}\n💡 רק מי שבמהלך התור שלו יכול להיות מוחלף.',
+        'swap_request_expired_target': '❌ **בקשת החלפה פגה!**\n\n🔄 בקשת החלפה מ-{fromUser} כבר לא תקפה.\n\n🎯 **התור הנוכחי:** {currentUser}\n💡 התור השתנה מאז שהבקשה נעשתה.',
         'punishment_request_expired': '❌ **בקשת עונש לא נמצאה או פגה תוקפה!**',
         'not_your_punishment': '❌ **בקשת עונש זו לא שלך!**',
         'not_your_swap': '❌ **בקשת החלפה זו לא מיועדת לך!**',
@@ -3699,9 +3709,16 @@ async function executeSwap(swapRequest, requestId, status) {
     if (fromUser !== originalTurnHolder && fromUser !== currentPerformingUser) {
         console.log(`❌ Swap request expired: ${fromUser} is no longer the current turn`);
         // Notify both users that the swap request is no longer valid
-        sendMessage(fromUserId, `❌ **Swap request expired!**\n\n🔄 The swap request with ${translateName(toUser, fromUserId)} is no longer valid.\n\n🎯 **Current turn:** ${translateName(currentPerformingUser, fromUserId)}\n💡 Only the person whose turn it is can be swapped.`);
+        const requesterUserId = getUserIdFromChatId(fromUserId);
+        sendMessage(fromUserId, t(requesterUserId, 'swap_request_expired_requester', {
+            toUser: translateName(toUser, requesterUserId),
+            currentUser: translateName(currentPerformingUser, requesterUserId)
+        }));
         const targetUserId = getUserIdFromChatId(toUserId);
-        sendMessage(toUserId, `❌ **Swap request expired!**\n\n🔄 The swap request from ${translateName(fromUser, targetUserId)} is no longer valid.\n\n🎯 **Current turn:** ${translateName(currentPerformingUser, targetUserId)}\n💡 The turn has changed since the request was made.`);
+        sendMessage(toUserId, t(targetUserId, 'swap_request_expired_target', {
+            fromUser: translateName(fromUser, targetUserId),
+            currentUser: translateName(currentPerformingUser, targetUserId)
+        }));
         // Remove the expired request
         pendingSwaps.delete(requestId);
         return;
@@ -5275,7 +5292,10 @@ async function handleCallback(chatId, userId, userName, data) {
         if (userName !== originalTurnHolder && userName !== currentPerformingUser) {
             const royalUserName = addRoyalEmojiTranslated(userName, userId);
             const royalCurrentUser = addRoyalEmojiTranslated(currentPerformingUser, userId);
-            sendMessage(chatId, `❌ **Cannot swap!**\n\n👤 **${royalUserName}** is not the current turn.\n\n🎯 **Current turn:** ${royalCurrentUser}\n💡 Only the person whose turn it is can request a swap.`);
+            sendMessage(chatId, t(userId, 'error_cannot_swap', {
+                userName: royalUserName,
+                currentUser: royalCurrentUser
+            }));
             console.log(`⚠️ Swap request rejected: ${userName} is neither the original turn holder (${originalTurnHolder}) nor the performing user (${currentPerformingUser})`);
             return;
         }
@@ -5562,7 +5582,10 @@ async function handleCallback(chatId, userId, userName, data) {
         if (firstUser !== originalTurnHolder && firstUser !== currentPerformingUser) {
             const royalFirstUser = addRoyalEmojiTranslated(firstUser, userId);
             const royalCurrentUser = addRoyalEmojiTranslated(currentPerformingUser, userId);
-            sendMessage(chatId, `❌ **Cannot force swap!**\n\n👤 **${royalFirstUser}** is not the current turn.\n\n🎯 **Current turn:** ${royalCurrentUser}\n💡 Only the person whose turn it is can be force swapped.`);
+            sendMessage(chatId, t(userId, 'error_cannot_force_swap', {
+                firstUser: royalFirstUser,
+                currentUser: royalCurrentUser
+            }));
             console.log(`⚠️ Force swap rejected: ${firstUser} is neither the original turn holder (${originalTurnHolder}) nor the performing user (${currentPerformingUser})`);
             return;
         }
