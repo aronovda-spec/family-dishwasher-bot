@@ -474,15 +474,27 @@ function getCurrentTurnUser(checkAssignments = true) {
         // Follow assignment chain recursively
         let finalUser = currentUser;
         const visited = new Set(); // Prevent infinite loops
+        const chain = [finalUser]; // Track the chain for circular detection
         
         while (turnAssignments.has(finalUser)) {
             if (visited.has(finalUser)) {
-                // Circular assignment detected - break the loop
-                console.log(`⚠️ Circular assignment detected for ${finalUser}`);
-                break;
+                // Circular assignment detected - break the loop and clear it
+                console.log(`⚠️ Circular assignment detected for ${finalUser} - chain: ${chain.join(' -> ')}`);
+                // Clear the last assignment in the chain that created the circle
+                if (chain.length >= 2) {
+                    const userToClear = chain[chain.length - 2]; // The user whose assignment creates the circle
+                    const assignedTo = chain[chain.length - 1]; // Who they're assigned to (the duplicate)
+                    console.log(`🔄 Auto-fixing circular assignment by clearing: ${userToClear} -> ${assignedTo}`);
+                    turnAssignments.delete(userToClear); // Clear the assignment that created the circle
+                    dirtyKeys.add('turnAssignments');
+                    isDirty = true;
+                }
+                // Return the last user before the circle
+                return chain.length >= 2 ? chain[chain.length - 2] : currentUser;
             }
             visited.add(finalUser);
             finalUser = turnAssignments.get(finalUser);
+            chain.push(finalUser);
         }
         
         return finalUser; // Return the final assigned user in the chain
@@ -3787,7 +3799,8 @@ async function executeSwap(swapRequest, requestId, status) {
     
     // OPTIMISTIC: Update in-memory state immediately
     // CRITICAL: Prevent circular assignments - clear any conflicting assignments first
-    // Check if toUser is already assigned to perform someone's turn
+    // Clear ALL assignments that could create circular references:
+    // 1. If toUser is already assigned to perform someone's turn
     for (const [existingHolder, existingAssignee] of turnAssignments.entries()) {
         if (existingAssignee === toUser && existingHolder !== actualTurnHolder) {
             // toUser is already performing someone else's turn - clear it to prevent circular assignment
@@ -3795,12 +3808,25 @@ async function executeSwap(swapRequest, requestId, status) {
             turnAssignments.delete(existingHolder);
         }
     }
-    // Also clear if toUser is the key (someone is performing toUser's turn, and we're assigning toUser elsewhere)
+    // 2. If toUser's turn is assigned to someone else (and we're assigning actualTurnHolder to toUser)
     if (turnAssignments.has(toUser) && turnAssignments.get(toUser) !== actualTurnHolder) {
-        // toUser has their turn assigned to someone else, and we're assigning actualTurnHolder to toUser
-        // This would create a circular assignment, so clear the existing one
+        // toUser has their turn assigned to someone else - clear it to prevent circular assignment
         console.log(`🔄 Clearing conflicting assignment: ${toUser} -> ${turnAssignments.get(toUser)} (to prevent circular assignment)`);
         turnAssignments.delete(toUser);
+    }
+    // 3. If actualTurnHolder's turn is already assigned to toUser, clear it first (avoid duplicate)
+    if (turnAssignments.has(actualTurnHolder) && turnAssignments.get(actualTurnHolder) === toUser) {
+        // Already assigned correctly, but clear it first to ensure clean state
+        console.log(`🔄 Clearing existing assignment: ${actualTurnHolder} -> ${toUser} (will be re-set)`);
+        turnAssignments.delete(actualTurnHolder);
+    }
+    // 4. If actualTurnHolder is assigned to perform someone else's turn, clear that too
+    for (const [existingHolder, existingAssignee] of turnAssignments.entries()) {
+        if (existingAssignee === actualTurnHolder && existingHolder !== actualTurnHolder) {
+            // actualTurnHolder is performing someone else's turn - this shouldn't happen, but clear it
+            console.log(`🔄 Clearing unexpected assignment: ${existingHolder} -> ${actualTurnHolder} (actualTurnHolder shouldn't be performing another turn)`);
+            turnAssignments.delete(existingHolder);
+        }
     }
     
     // Handle swap-back: if swapping back to the original turn holder, clear the assignment
@@ -5698,7 +5724,8 @@ async function handleCallback(chatId, userId, userName, data) {
             
             // OPTIMISTIC: Update in-memory state immediately
             // CRITICAL: Prevent circular assignments - clear any conflicting assignments first
-            // Check if secondUser is already assigned to perform someone's turn
+            // Clear ALL assignments that could create circular references:
+            // 1. If secondUser is already assigned to perform someone's turn
             for (const [existingHolder, existingAssignee] of turnAssignments.entries()) {
                 if (existingAssignee === secondUser && existingHolder !== actualTurnHolder) {
                     // secondUser is already performing someone else's turn - clear it to prevent circular assignment
@@ -5706,12 +5733,25 @@ async function handleCallback(chatId, userId, userName, data) {
                     turnAssignments.delete(existingHolder);
                 }
             }
-            // Also clear if secondUser is the key (someone is performing secondUser's turn, and we're assigning secondUser elsewhere)
+            // 2. If secondUser's turn is assigned to someone else (and we're assigning actualTurnHolder to secondUser)
             if (turnAssignments.has(secondUser) && turnAssignments.get(secondUser) !== actualTurnHolder) {
-                // secondUser has their turn assigned to someone else, and we're assigning actualTurnHolder to secondUser
-                // This would create a circular assignment, so clear the existing one
+                // secondUser has their turn assigned to someone else - clear it to prevent circular assignment
                 console.log(`🔄 Clearing conflicting assignment: ${secondUser} -> ${turnAssignments.get(secondUser)} (to prevent circular assignment)`);
                 turnAssignments.delete(secondUser);
+            }
+            // 3. If actualTurnHolder's turn is already assigned to secondUser, clear it first (avoid duplicate)
+            if (turnAssignments.has(actualTurnHolder) && turnAssignments.get(actualTurnHolder) === secondUser) {
+                // Already assigned correctly, but clear it first to ensure clean state
+                console.log(`🔄 Clearing existing assignment: ${actualTurnHolder} -> ${secondUser} (will be re-set)`);
+                turnAssignments.delete(actualTurnHolder);
+            }
+            // 4. If actualTurnHolder is assigned to perform someone else's turn, clear that too
+            for (const [existingHolder, existingAssignee] of turnAssignments.entries()) {
+                if (existingAssignee === actualTurnHolder && existingHolder !== actualTurnHolder) {
+                    // actualTurnHolder is performing someone else's turn - this shouldn't happen, but clear it
+                    console.log(`🔄 Clearing unexpected assignment: ${existingHolder} -> ${actualTurnHolder} (actualTurnHolder shouldn't be performing another turn)`);
+                    turnAssignments.delete(existingHolder);
+                }
             }
             
             // Handle swap-back: if swapping back to the original turn holder, clear the assignment
