@@ -2634,6 +2634,8 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Get current turn user and next 3 turns using score-based system
         const currentUser = getCurrentTurnUser();
+        console.log(`📊 /status - getCurrentTurnUser(): ${currentUser}`);
+        console.log(`📊 /status - turnAssignments:`, Array.from(turnAssignments.entries()));
         const nextThreeTurns = getNextThreeTurns();
         
         // Show current turn (explicitly use currentUser to ensure accuracy with assignment chains)
@@ -3789,10 +3791,16 @@ async function executeSwap(swapRequest, requestId, status) {
         // Swapping back to original holder - remove assignment
         turnAssignments.delete(actualTurnHolder);
         console.log(`🔄 Swap back: Removing assignment from ${actualTurnHolder} to ${fromUser}, now ${actualTurnHolder} performs their own turn`);
+        // Mark as dirty for database save
+        dirtyKeys.add('turnAssignments');
+        isDirty = true;
     } else {
         // Regular swap: assign the actual turn holder to the toUser
         turnAssignments.set(actualTurnHolder, toUser);
         console.log(`🔄 Swap: ${actualTurnHolder}'s turn assigned to ${toUser}`);
+        // Mark as dirty for database save
+        dirtyKeys.add('turnAssignments');
+        isDirty = true;
     }
     
     // OPTIMISTIC: Send notifications immediately (swap is logically done)
@@ -5556,10 +5564,11 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Get current turn user using score-based system
         const currentUser = getCurrentTurnUser();
+        console.log(`🔍 Force Swap Menu - getCurrentTurnUser(): ${currentUser}`);
+        console.log(`🔍 Force Swap Menu - turnAssignments:`, Array.from(turnAssignments.entries()));
+        
         const royalCurrentUser = addRoyalEmojiTranslated(currentUser, userId);
         const buttons = [[{ text: t(userId, 'current_turn_button', {user: royalCurrentUser}), callback_data: `force_swap_select_${currentUser}` }]];
-        
-        console.log(`🔍 Force Swap - Current turn user: ${currentUser}`);
         
         sendMessageWithButtons(chatId, 
             `${t(userId, 'force_swap_current_turn')} **${royalCurrentUser}**\n\n${t(userId, 'swap_current_turn_with')}`, 
@@ -5676,10 +5685,33 @@ async function handleCallback(chatId, userId, userName, data) {
                 // Swapping back to original holder - remove assignment
                 turnAssignments.delete(actualTurnHolder);
                 console.log(`🔄 Force swap back: Removing assignment from ${actualTurnHolder} to ${firstUser}, now ${actualTurnHolder} performs their own turn`);
+                // Mark as dirty for database save
+                dirtyKeys.add('turnAssignments');
+                isDirty = true;
             } else {
                 // Regular swap: assign the actual turn holder to the second user
                 turnAssignments.set(actualTurnHolder, secondUser);
                 console.log(`🔄 Force swap: ${actualTurnHolder}'s turn assigned to ${secondUser}`);
+                console.log(`📋 Debug: turnAssignments after set:`, Array.from(turnAssignments.entries()));
+                // Mark as dirty for database save
+                dirtyKeys.add('turnAssignments');
+                isDirty = true;
+            }
+            
+            // Verify assignment immediately after setting
+            const verifyAssignment = turnAssignments.get(actualTurnHolder);
+            console.log(`✅ Debug: Verifying assignment - ${actualTurnHolder} -> ${verifyAssignment} (expected: ${secondUser})`);
+            const verifyCurrentTurn = getCurrentTurnUser();
+            console.log(`✅ Debug: getCurrentTurnUser() after swap: ${verifyCurrentTurn} (expected: ${secondUser})`);
+            
+            // CRITICAL VERIFICATION: Ensure assignment is correctly set and getCurrentTurnUser() reflects it
+            if (verifyAssignment !== secondUser) {
+                console.error(`❌ CRITICAL ERROR: Assignment mismatch! Expected ${secondUser}, got ${verifyAssignment}`);
+            }
+            if (verifyCurrentTurn !== secondUser) {
+                console.error(`❌ CRITICAL ERROR: getCurrentTurnUser() mismatch! Expected ${secondUser}, got ${verifyCurrentTurn}`);
+                console.error(`❌ turnAssignments contents:`, Array.from(turnAssignments.entries()));
+                console.error(`❌ originalTurnHolder: ${originalTurnHolder}, actualTurnHolder: ${actualTurnHolder}`);
             }
             
             // Track admin force swap for monthly report
