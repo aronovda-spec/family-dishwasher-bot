@@ -1660,7 +1660,6 @@ const translations = {
         
         // More popup messages
         'force_swap_completed': '✅ **החלפה בכוח הושלמה!**',
-        'admin_force_swap_executed': 'האדמין בוצעה החלפה בכוח',
         'assigned_to_perform': 'קיבל אישור לבצע את התור של',
         'current_turn_label': 'התור הנוכחי',
         'turn': 'תור',
