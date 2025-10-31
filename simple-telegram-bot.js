@@ -2157,7 +2157,12 @@ function addRoyalEmoji(userName) {
 
 // Function to add royal emoji AND translate names based on user's language
 function addRoyalEmojiTranslated(userName, userId) {
-    const translatedName = translateName(userName, userId);
+    // Safety check for null/undefined userName
+    if (!userName) {
+        return '👤 Unknown';
+    }
+    
+    const translatedName = translateName(userName, userId) || userName;
     
     // Check if it's an admin first (admins get priority emojis)
     const adminArray = Array.from(admins);
@@ -3718,6 +3723,15 @@ async function executeSwap(swapRequest, requestId, status) {
     // This check is important because the turn might have changed between request and approval
     const originalTurnHolder = getOriginalTurnHolder();
     const currentPerformingUser = getCurrentTurnUser();
+    
+    if (!originalTurnHolder || !currentPerformingUser) {
+        console.log(`⚠️ No current turn holder found when validating swap. originalTurnHolder: ${originalTurnHolder}, currentPerformingUser: ${currentPerformingUser}`);
+        // Notify requester
+        sendMessage(fromUserId, t(getUserIdFromChatId(fromUserId), 'swap_request_expired'));
+        // Remove the invalid request
+        pendingSwaps.delete(requestId);
+        return;
+    }
     
     if (fromUser !== originalTurnHolder && fromUser !== currentPerformingUser) {
         console.log(`❌ Swap request expired: ${fromUser} is no longer the current turn`);
@@ -5313,6 +5327,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Allow swap if:
         // 1. userName is the original turn holder (they have their own turn), OR
         // 2. userName is the currently performing user (they can swap the turn they're performing)
+        if (!originalTurnHolder || !currentPerformingUser) {
+            console.log(`⚠️ No current turn holder found. originalTurnHolder: ${originalTurnHolder}, currentPerformingUser: ${currentPerformingUser}`);
+            sendMessage(chatId, t(userId, 'no_one_in_queue'));
+            return;
+        }
+        
         if (userName !== originalTurnHolder && userName !== currentPerformingUser) {
             const royalUserName = addRoyalEmojiTranslated(userName, userId);
             const royalCurrentUser = addRoyalEmojiTranslated(currentPerformingUser, userId);
@@ -5603,6 +5623,12 @@ async function handleCallback(chatId, userId, userName, data) {
         // Allow swap if:
         // 1. firstUser is the original turn holder (they have their own turn), OR
         // 2. firstUser is the currently performing user (they can swap the turn they're performing)
+        if (!originalTurnHolder || !currentPerformingUser) {
+            console.log(`⚠️ No current turn holder found. originalTurnHolder: ${originalTurnHolder}, currentPerformingUser: ${currentPerformingUser}`);
+            sendMessage(chatId, t(userId, 'no_one_in_queue'));
+            return;
+        }
+        
         if (firstUser !== originalTurnHolder && firstUser !== currentPerformingUser) {
             const royalFirstUser = addRoyalEmojiTranslated(firstUser, userId);
             const royalCurrentUser = addRoyalEmojiTranslated(currentPerformingUser, userId);
