@@ -471,9 +471,50 @@ function getCurrentTurnUser(checkAssignments = true) {
     
     // Only check assignments if requested (for current turn)
     if (checkAssignments) {
-    const assignedTo = turnAssignments.get(currentUser);
-    if (assignedTo) {
-        return assignedTo; // Return the assigned user instead
+        // Follow assignment chain recursively
+        let finalUser = currentUser;
+        const visited = new Set(); // Prevent infinite loops
+        
+        while (turnAssignments.has(finalUser)) {
+            if (visited.has(finalUser)) {
+                // Circular assignment detected - break the loop
+                console.log(`⚠️ Circular assignment detected for ${finalUser}`);
+                break;
+            }
+            visited.add(finalUser);
+            finalUser = turnAssignments.get(finalUser);
+        }
+        
+        return finalUser; // Return the final assigned user in the chain
+    }
+    
+    return currentUser;
+}
+
+// Get the original turn holder (without checking assignments)
+function getOriginalTurnHolder() {
+    // Same logic as getCurrentTurnUser but without checking assignments
+    let lowestScore = Infinity;
+    let currentUser = null;
+    
+    for (const user of authorizedUsers) {
+        // Skip suspended users
+        if (suspendedUsers.has(user)) {
+            continue;
+        }
+        
+        const score = userScores.get(user) || 0;
+        if (score < lowestScore) {
+            lowestScore = score;
+            currentUser = user;
+        } else if (score === lowestScore && currentUser) {
+            // Tie-breaker: use originalQueue order
+            const userIndex = originalQueue ? originalQueue.indexOf(user) : -1;
+            const currentUserIndex = originalQueue ? originalQueue.indexOf(currentUser) : -1;
+            
+            if (userIndex !== -1 && currentUserIndex !== -1 && userIndex < currentUserIndex) {
+                currentUser = user; // User comes first in tie-breaker order
+            }
         }
     }
     
@@ -514,15 +555,24 @@ function getNextThreeTurns() {
         }
         
         if (nextUser) {
-            // Check if this user has been assigned to someone else
-            const assignedTo = tempAssignments.get(nextUser);
-            if (assignedTo) {
-                turns.push(assignedTo); // Show the assigned user
-                // Clear the assignment after using it
-                tempAssignments.delete(nextUser);
-            } else {
-                turns.push(nextUser);
+            // Follow assignment chain recursively to find the final performing user
+            let finalUser = nextUser;
+            const visited = new Set(); // Prevent infinite loops
+            
+            while (tempAssignments.has(finalUser)) {
+                if (visited.has(finalUser)) {
+                    // Circular assignment detected - break the loop
+                    console.log(`⚠️ Circular assignment detected in getNextThreeTurns for ${finalUser}`);
+                    break;
+                }
+                visited.add(finalUser);
+                finalUser = tempAssignments.get(finalUser);
             }
+            
+            turns.push(finalUser); // Show the final assigned user in the chain
+            // Clear the assignment after using it (clear from original holder)
+            tempAssignments.delete(nextUser);
+            
             // Increment the original user's score for next iteration
             tempScores.set(nextUser, (tempScores.get(nextUser) || 0) + 1);
         }
@@ -1204,6 +1254,7 @@ const translations = {
         'canceled_swap_with': 'You canceled your swap request with',
         'error_users_not_found': '❌ **Error:** Could not find users in queue.',
         'error_queue_position': '❌ **Error:** Could not find your queue position.',
+        'error_not_original_turn_holder': '❌ **Cannot force swap!**\n\n👤 **{firstUser}** is not the original turn holder.\n\n🎯 **Original turn holder:** {originalUser}\n💡 Only the original turn holder can be force swapped.',
         'punishment_request_expired': '❌ **Punishment request not found or expired!**',
         'not_your_punishment': '❌ **This punishment request is not yours!**',
         'not_your_swap': '❌ **This swap request is not for you!**',
@@ -1622,6 +1673,7 @@ const translations = {
         'canceled_swap_with': 'ביטלת את בקשת החלפה שלך עם',
         'error_users_not_found': '❌ **שגיאה:** לא ניתן למצוא משתמשים בתור.',
         'error_queue_position': '❌ **שגיאה:** לא ניתן למצוא את מיקומך בתור.',
+        'error_not_original_turn_holder': '❌ **לא ניתן לבצע החלפה בכוח!**\n\n👤 **{firstUser}** אינו מחזיק התור המקורי.\n\n🎯 **מחזיק התור המקורי:** {originalUser}\n💡 רק מחזיק התור המקורי יכול להיות מוחלף בכוח.',
         'punishment_request_expired': '❌ **בקשת עונש לא נמצאה או פגה תוקפה!**',
         'not_your_punishment': '❌ **בקשת עונש זו לא שלך!**',
         'not_your_swap': '❌ **בקשת החלפה זו לא מיועדת לך!**',
@@ -2557,21 +2609,29 @@ async function handleCommand(chatId, userId, userName, text) {
         const currentUser = getCurrentTurnUser();
         const nextThreeTurns = getNextThreeTurns();
         
-        // Show current turn and next 3 turns
-        for (let i = 0; i < 3; i++) {
+        // Show current turn (explicitly use currentUser to ensure accuracy with assignment chains)
+        if (currentUser) {
+            const royalName = addRoyalEmojiTranslated(currentUser, userId);
+            const isAuthorized = isUserAuthorized(currentUser);
+            const authText = isAuthorized ? '' : ` ${t(userId, 'not_authorized_user')}`;
+            statusMessage += `🔄 1. ${royalName} ${t(userId, 'current_turn')}${authText}\n`;
+        }
+        
+        // Show next turns (skip first if it matches currentUser, otherwise show all)
+        let startIndex = (nextThreeTurns[0] === currentUser) ? 1 : 0;
+        for (let i = startIndex; i < Math.min(nextThreeTurns.length, 3 + startIndex); i++) {
             const name = nextThreeTurns[i];
             if (!name) continue;
             
             const royalName = addRoyalEmojiTranslated(name, userId);
-            const isCurrentTurn = i === 0;
-            const turnIcon = isCurrentTurn ? '🔄' : '⏳';
-            const turnText = isCurrentTurn ? ` ${t(userId, 'current_turn')}` : '';
+            const turnIcon = '⏳';
+            const turnNumber = i - startIndex + 2; // Start from 2 (since 1 is current turn)
             
             // Check if this queue member is authorized
             const isAuthorized = isUserAuthorized(name);
             const authText = isAuthorized ? '' : ` ${t(userId, 'not_authorized_user')}`;
             
-            statusMessage += `${turnIcon} ${i + 1}. ${royalName}${turnText}${authText}\n`;
+            statusMessage += `${turnIcon} ${turnNumber}. ${royalName}${authText}\n`;
         }
         
         statusMessage += `\n${t(userId, 'authorized_users')} ${authorizedUsers.size}/3`;
@@ -3622,108 +3682,112 @@ async function executeSwap(swapRequest, requestId, status) {
     }
     
     console.log(`🔄 Executing swap: ${fromUser} ↔ ${toUser}`);
-    console.log(`🔍 Current queue:`, queue);
-    console.log(`🔍 User queue mapping:`, userQueueMapping);
     
-    // Find queue positions
-    // Since fromUser is canonical ("Adele"), we need to find their queue representation
-    let fromQueueName = null;
-    for (const [canonicalName, queueName] of userQueueMapping.entries()) {
-        if (canonicalName === fromUser) {
-            fromQueueName = queueName;
+    // Validate users exist in original queue
+    if (!originalQueue.includes(fromUser) || !originalQueue.includes(toUser)) {
+        console.log(`❌ Invalid swap: users not in original queue`);
+        // Notify requester
+        sendMessage(fromUserId, t(fromUserId, 'swap_request_expired'));
+        return;
+    }
+    
+    // Validate that swap request is still valid (fromUser must still be current turn holder or performing user)
+    // This check is important because the turn might have changed between request and approval
+    const originalTurnHolder = getOriginalTurnHolder();
+    const currentPerformingUser = getCurrentTurnUser();
+    
+    if (fromUser !== originalTurnHolder && fromUser !== currentPerformingUser) {
+        console.log(`❌ Swap request expired: ${fromUser} is no longer the current turn`);
+        // Notify both users that the swap request is no longer valid
+        sendMessage(fromUserId, `❌ **Swap request expired!**\n\n🔄 The swap request with ${translateName(toUser, fromUserId)} is no longer valid.\n\n🎯 **Current turn:** ${translateName(currentPerformingUser, fromUserId)}\n💡 Only the person whose turn it is can be swapped.`);
+        const targetUserId = getUserIdFromChatId(toUserId);
+        sendMessage(toUserId, `❌ **Swap request expired!**\n\n🔄 The swap request from ${translateName(fromUser, targetUserId)} is no longer valid.\n\n🎯 **Current turn:** ${translateName(currentPerformingUser, targetUserId)}\n💡 The turn has changed since the request was made.`);
+        // Remove the expired request
+        pendingSwaps.delete(requestId);
+        return;
+    }
+    
+    // In the score-based system, swap means:
+    // The toUser performs the fromUser's turn (favor/debt)
+    // Only the performing user's score increases
+    
+    // Determine the actual turn holder whose assignment will be updated
+    
+    // Find the original turn holder for fromUser (if they're performing someone's turn)
+    let turnHolderForFromUser = fromUser;
+    for (const [user, assignedTo] of turnAssignments.entries()) {
+        if (assignedTo === fromUser) {
+            turnHolderForFromUser = user; // fromUser is performing this user's turn
             break;
         }
     }
     
-    // Fallback: if not found in mapping, use fromUser directly
-    if (!fromQueueName) {
-        fromQueueName = fromUser;
+    // Determine the actual turn holder
+    let actualTurnHolder = fromUser;
+    if (fromUser === currentPerformingUser && fromUser !== originalTurnHolder) {
+        // fromUser is performing someone else's turn - find who they're performing for
+        actualTurnHolder = turnHolderForFromUser;
     }
-    const fromIndex = queue.indexOf(fromQueueName);
-    const toIndex = queue.indexOf(toUser);
     
-    console.log(`🔍 From user: ${fromUser} → Queue name: ${fromQueueName} → Index: ${fromIndex}`);
-    console.log(`🔍 To user: ${toUser} → Index: ${toIndex}`);
+    // OPTIMISTIC: Update in-memory state immediately
+    // Handle swap-back: if swapping back to the original turn holder, clear the assignment
+    if (toUser === actualTurnHolder) {
+        // Swapping back to original holder - remove assignment
+        turnAssignments.delete(actualTurnHolder);
+        console.log(`🔄 Swap back: Removing assignment from ${actualTurnHolder} to ${fromUser}, now ${actualTurnHolder} performs their own turn`);
+    } else {
+        // Regular swap: assign the actual turn holder to the toUser
+        turnAssignments.set(actualTurnHolder, toUser);
+        console.log(`🔄 Swap: ${actualTurnHolder}'s turn assigned to ${toUser}`);
+    }
     
-    if (fromIndex !== -1 && toIndex !== -1) {
-        // Capture the original current turn user BEFORE the swap
-        const originalCurrentTurnUser = getCurrentTurnUser();
-        
-        // Swap positions in queue
-        [queue[fromIndex], queue[toIndex]] = [queue[toIndex], queue[fromIndex]];
-        
-        // Update current turn if needed
-        // IMPORTANT: currentTurn should follow the user who had the turn to their new position
-        if (currentTurn === fromIndex) {
-            currentTurn = toIndex;  // The user who had the turn is now at toIndex
-        } else if (currentTurn === toIndex) {
-            currentTurn = fromIndex;  // The user who had the turn is now at fromIndex
-        }
-        
-        // FIX: After swapping, we need to update currentTurn to reflect the new positions
-        // The user who was at currentTurn position before the swap should now be at their new position
-        if (fromIndex === currentTurn) {
-            // The user who had the current turn (fromUser) is now at toIndex
-            currentTurn = toIndex;
-        } else if (toIndex === currentTurn) {
-            // The user who had the current turn (toUser) is now at fromIndex  
-            currentTurn = fromIndex;
-        }
-        // If currentTurn was not involved in the swap, it stays the same
-        
-        // TEMPORARY SWAP: Mark this as a temporary swap that will revert after the original current turn person completes their turn
-        const tempSwap = {
-            firstUser: fromQueueName,
-            secondUser: toUser,
-            originalCurrentTurnUser: originalCurrentTurnUser, // Who was originally at current turn position
-            isActive: true,
-            swapType: 'user_swap'
-        };
-        
-        // Store the temporary swap info with unique ID
-        if (!global.tempSwaps) global.tempSwaps = new Map();
-        const swapId = `user_swap_${Date.now()}`;
-        global.tempSwaps.set(swapId, tempSwap);
-        
-        
-        // Notify both users in their language
-        // Create queue starting from current turn
-        const currentTurnUser = getCurrentTurnUser();
-        const queueDisplay = originalQueue.map((name, index) => {
-            const isCurrentTurn = name === currentTurnUser;
-            return `${index + 1}. ${name}${isCurrentTurn ? ` (${t(fromUserId, 'current_turn_status')})` : ''}`;
-        }).join('\n');
-        
-        const fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(fromUser, fromUserId)} ↔ ${translateName(toUser, fromUserId)}**\n\n🔄 **${t(fromUserId, 'next_lap')}:**\n${queueDisplay}`;
-        const toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(fromUser, toUserId)} ↔ ${translateName(toUser, toUserId)}**\n\n🔄 **${t(toUserId, 'next_lap')}:**\n${queueDisplay}`;
-        
-        sendMessage(fromUserId, fromUserMessage);
-        sendMessage(toUserId, toUserMessage);
-        
-        // Notify all other authorized users and admins using userChatIds in their language
-        [...authorizedUsers, ...admins].forEach(user => {
-            if (user !== fromUser && user !== toUser) {
-                let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
-                
-                // If not found in userChatIds, check if this user is an admin
-                if (!userChatId && isUserAdmin(user)) {
-                    userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
-                }
-                
-                if (userChatId) {
-                    // Get the correct userId for language preference
-                    const recipientUserId = getUserIdFromChatId(userChatId);
-                    
-                    // Create swap notification in recipient's language
-                    const swapNotification = `🔄 **${t(recipientUserId, 'queue_update')}:** ${translateName(fromUser, recipientUserId)} ↔ ${translateName(toUser, recipientUserId)} ${t(recipientUserId, 'swapped_positions')}!`;
-                    console.log(`🔔 Sending swap approval notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
-                    sendMessage(userChatId, swapNotification);
-                } else {
-                    console.log(`🔔 No chat ID found for ${user}`);
-                }
+    // OPTIMISTIC: Send notifications immediately (swap is logically done)
+    const currentTurnUser = getCurrentTurnUser();
+    
+    // Notify both users in their language
+    let fromUserMessage;
+    let toUserMessage;
+    if (toUser === actualTurnHolder) {
+        // Swap back
+        fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'turn')}** (Swap back)\n\n🎯 **${t(fromUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserId)}`;
+        toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'turn')}** (Swap back)\n\n🎯 **${t(toUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserId)}`;
+    } else {
+        // Regular swap
+        fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, fromUserId)} ${t(fromUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'turn')}**\n\n🎯 **${t(fromUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserId)}`;
+        toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, toUserId)} ${t(toUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'turn')}**\n\n🎯 **${t(toUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserId)}`;
+    }
+    
+    sendMessage(fromUserId, fromUserMessage);
+    sendMessage(toUserId, toUserMessage);
+    
+    // Notify all other authorized users and admins using userChatIds in their language
+    [...authorizedUsers, ...admins].forEach(user => {
+        if (user !== fromUser && user !== toUser) {
+            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+            
+            // If not found in userChatIds, check if this user is an admin
+            if (!userChatId && isUserAdmin(user)) {
+                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
             }
-        });
-    }
+            
+            if (userChatId) {
+                // Get the correct userId for language preference
+                const recipientUserId = getUserIdFromChatId(userChatId);
+                
+                // Create swap notification in recipient's language
+                let swapNotification;
+                if (toUser === actualTurnHolder) {
+                    swapNotification = `🔄 **${t(recipientUserId, 'queue_update')}:** ${translateName(actualTurnHolder, recipientUserId)} ↔ ${translateName(actualTurnHolder, recipientUserId)} (Swap back)`;
+                } else {
+                    swapNotification = `🔄 **${t(recipientUserId, 'queue_update')}:** ${translateName(toUser, recipientUserId)} ${t(recipientUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, recipientUserId)} ${t(recipientUserId, 'turn')}`;
+                }
+                console.log(`🔔 Sending swap approval notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
+                sendMessage(userChatId, swapNotification);
+            } else {
+                console.log(`🔔 No chat ID found for ${user}`);
+            }
+        }
+    });
     
     // Save to database
     await saveBotData();
@@ -5200,10 +5264,19 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        // Check if it's the current user's turn
-        const currentUserIndex = queue.indexOf(currentUserQueueName);
-        if (currentTurn !== currentUserIndex) {
-            sendMessage(chatId, t(userId, 'not_your_turn_swap'));
+        // Validate: userName must be either the original turn holder OR the currently performing user
+        // (Same validation as force swap - allows swap from current turn)
+        const originalTurnHolder = getOriginalTurnHolder();
+        const currentPerformingUser = getCurrentTurnUser(); // The user currently performing the turn
+        
+        // Allow swap if:
+        // 1. userName is the original turn holder (they have their own turn), OR
+        // 2. userName is the currently performing user (they can swap the turn they're performing)
+        if (userName !== originalTurnHolder && userName !== currentPerformingUser) {
+            const royalUserName = addRoyalEmojiTranslated(userName, userId);
+            const royalCurrentUser = addRoyalEmojiTranslated(currentPerformingUser, userId);
+            sendMessage(chatId, `❌ **Cannot swap!**\n\n👤 **${royalUserName}** is not the current turn.\n\n🎯 **Current turn:** ${royalCurrentUser}\n💡 Only the person whose turn it is can request a swap.`);
+            console.log(`⚠️ Swap request rejected: ${userName} is neither the original turn holder (${originalTurnHolder}) nor the performing user (${currentPerformingUser})`);
             return;
         }
         
@@ -5470,6 +5543,37 @@ async function handleCallback(chatId, userId, userName, data) {
         // The second user performs the first user's turn (favor/debt)
         // Only the performing user's score increases
         
+        // Validate: firstUser must be either the original turn holder OR the currently performing user
+        const originalTurnHolder = getOriginalTurnHolder();
+        const currentPerformingUser = getCurrentTurnUser(); // The user currently performing the turn
+        
+        // Find the original turn holder for the current performing user (if they're performing someone's turn)
+        let turnHolderForFirstUser = firstUser;
+        for (const [user, assignedTo] of turnAssignments.entries()) {
+            if (assignedTo === firstUser) {
+                turnHolderForFirstUser = user; // firstUser is performing this user's turn
+                break;
+            }
+        }
+        
+        // Allow swap if:
+        // 1. firstUser is the original turn holder (they have their own turn), OR
+        // 2. firstUser is the currently performing user (they can swap the turn they're performing)
+        if (firstUser !== originalTurnHolder && firstUser !== currentPerformingUser) {
+            const royalFirstUser = addRoyalEmojiTranslated(firstUser, userId);
+            const royalCurrentUser = addRoyalEmojiTranslated(currentPerformingUser, userId);
+            sendMessage(chatId, `❌ **Cannot force swap!**\n\n👤 **${royalFirstUser}** is not the current turn.\n\n🎯 **Current turn:** ${royalCurrentUser}\n💡 Only the person whose turn it is can be force swapped.`);
+            console.log(`⚠️ Force swap rejected: ${firstUser} is neither the original turn holder (${originalTurnHolder}) nor the performing user (${currentPerformingUser})`);
+            return;
+        }
+        
+        // Determine the actual turn holder whose assignment will be updated
+        let actualTurnHolder = firstUser;
+        if (firstUser === currentPerformingUser && firstUser !== originalTurnHolder) {
+            // firstUser is performing someone else's turn - find who they're performing for
+            actualTurnHolder = turnHolderForFirstUser;
+        }
+        
         if (originalQueue.includes(firstUser) && originalQueue.includes(secondUser)) {
             // Initialize anti-cheating tracking for swaps
             if (!global.swapTimestamps) global.swapTimestamps = [];
@@ -5494,10 +5598,19 @@ async function handleCallback(chatId, userId, userName, data) {
             }
             
             // OPTIMISTIC: Update in-memory state immediately
-            turnAssignments.set(firstUser, secondUser);
+            // Handle swap-back: if swapping back to the original turn holder, clear the assignment
+            if (secondUser === actualTurnHolder) {
+                // Swapping back to original holder - remove assignment
+                turnAssignments.delete(actualTurnHolder);
+                console.log(`🔄 Force swap back: Removing assignment from ${actualTurnHolder} to ${firstUser}, now ${actualTurnHolder} performs their own turn`);
+            } else {
+                // Regular swap: assign the actual turn holder to the second user
+                turnAssignments.set(actualTurnHolder, secondUser);
+                console.log(`🔄 Force swap: ${actualTurnHolder}'s turn assigned to ${secondUser}`);
+            }
             
             // Track admin force swap for monthly report
-            trackMonthlyAction('admin_force_swap', firstUser, userName);
+            trackMonthlyAction('admin_force_swap', actualTurnHolder, userName);
             
             // OPTIMISTIC: Send notifications immediately (swap is logically done)
             const currentTurnUser = getCurrentTurnUser();
@@ -5516,7 +5629,14 @@ async function handleCallback(chatId, userId, userName, data) {
                     const recipientUserId = getUserIdFromChatId(userChatId);
                     
                     // Create message in recipient's language
-                    const message = `⚡ **${t(recipientUserId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(secondUser, recipientUserId)} ${t(recipientUserId, 'assigned_to_perform')} ${translateName(firstUser, recipientUserId)} ${t(recipientUserId, 'turn')}**\n\n🎯 **${t(recipientUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, recipientUserId)}`;
+                    let message;
+                    if (secondUser === actualTurnHolder) {
+                        // Swap back - assignment removed
+                        message = `⚡ **${t(recipientUserId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(actualTurnHolder, recipientUserId)} ${t(recipientUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, recipientUserId)} ${t(recipientUserId, 'turn')}** (Swap back)\n\n🎯 **${t(recipientUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, recipientUserId)}`;
+                    } else {
+                        // Regular swap
+                        message = `⚡ **${t(recipientUserId, 'admin_force_swap_executed')}**\n\n🔄 **${translateName(secondUser, recipientUserId)} ${t(recipientUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, recipientUserId)} ${t(recipientUserId, 'turn')}**\n\n🎯 **${t(recipientUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, recipientUserId)}`;
+                    }
                     console.log(`🔔 Sending force swap notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
                     sendMessage(userChatId, message);
                 } else {
@@ -5525,7 +5645,15 @@ async function handleCallback(chatId, userId, userName, data) {
             });
             
             // Send confirmation to admin
-            sendMessage(chatId, `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(secondUser, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(firstUser, userId)} ${t(userId, 'turn')}**\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`);
+            let confirmationMessage;
+            if (secondUser === actualTurnHolder) {
+                // Swap back
+                confirmationMessage = `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(actualTurnHolder, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(actualTurnHolder, userId)} ${t(userId, 'turn')}** (Swap back)\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`;
+            } else {
+                // Regular swap
+                confirmationMessage = `${t(userId, 'force_swap_completed')}\n\n🔄 **${translateName(secondUser, userId)} ${t(userId, 'assigned_to_perform')} ${translateName(actualTurnHolder, userId)} ${t(userId, 'turn')}**\n\n🎯 **${t(userId, 'current_turn_label')}:** ${translateName(currentTurnUser, userId)}`;
+            }
+            sendMessage(chatId, confirmationMessage);
             
             // BACKGROUND: Retry database operations
             const dbSuccess = await retryDatabaseOperation(async () => {
