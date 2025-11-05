@@ -1178,6 +1178,7 @@ const hebrewNames = {
 const translations = {
     en: {
         // Menu titles
+        'menu_title': 'Dishwasher Bot Menu',
         'admin_menu': 'Admin Menu - Full Access',
         'user_menu': 'User Menu - Queue Access',
         'guest_menu': 'Guest Menu - Limited Access',
@@ -1602,6 +1603,7 @@ const translations = {
     },
     he: {
         // Menu titles
+        'menu_title': 'תפריט בוט מדיח הכלים',
         'admin_menu': 'תפריט מנהל - גישה מלאה',
         'user_menu': 'תפריט משתמש - גישה לתור',
         'guest_menu': 'תפריט אורח - גישה מוגבלת',
@@ -2555,7 +2557,7 @@ async function handleCommand(chatId, userId, userName, text) {
             console.log(`👨‍💼 Admin ${userName} (${userId}) chat ID ${chatId} added to adminChatIds and adminNameToChatId`);
         }
         
-        let text = `Dishwasher Bot Menu`;
+        let text = t(userId, 'menu_title');
         let buttons = [];
         
         // Show grace period restoration message if applicable
@@ -3539,7 +3541,7 @@ async function handleCommand(chatId, userId, userName, text) {
             return;
         }
         
-        if (punishmentRequest.fromUserId !== userId) {
+        if (punishmentRequest.fromUserId !== chatId) {
             sendMessage(chatId, t(userId, 'not_your_punishment'));
             return;
         }
@@ -3713,9 +3715,10 @@ async function executeSwap(swapRequest, requestId, status) {
     if (global.swapTimestamps.length >= 3) {
         // Only send alert if we haven't already alerted for this rapid swap session
         if (!global.swapTimestamps.alertSent) {
-            alertAdminsAboutCheating(fromUserId, fromUser, 'rapid_swap', { swapCount: global.swapTimestamps.length });
+            const fromUserUserId = getUserIdFromChatId(fromUserId);
+            alertAdminsAboutCheating(fromUserUserId, fromUser, 'rapid_swap', { swapCount: global.swapTimestamps.length });
             global.swapTimestamps.alertSent = true;
-            console.log(`🚨 RAPID SWAP DETECTED: ${fromUser} (${fromUserId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
+            console.log(`🚨 RAPID SWAP DETECTED: ${fromUser} (${fromUserUserId}) - ${global.swapTimestamps.length} swaps in 10 minutes`);
         }
     } else {
         // Reset alert flag when swap count drops below threshold
@@ -3728,7 +3731,8 @@ async function executeSwap(swapRequest, requestId, status) {
     if (!originalQueue.includes(fromUser) || !originalQueue.includes(toUser)) {
         console.log(`❌ Invalid swap: users not in original queue`);
         // Notify requester
-        sendMessage(fromUserId, t(fromUserId, 'swap_request_expired'));
+        const requesterUserId = getUserIdFromChatId(fromUserId);
+        sendMessage(fromUserId, t(requesterUserId, 'swap_request_expired'));
         return;
     }
     
@@ -3850,17 +3854,21 @@ async function executeSwap(swapRequest, requestId, status) {
     // After the swap, the current turn is performed by toUser (or actualTurnHolder if swap-back)
     const currentTurnUser = (toUser === actualTurnHolder) ? actualTurnHolder : toUser;
 
+    // Get user IDs for translation
+    const fromUserUserId = getUserIdFromChatId(fromUserId);
+    const toUserUserId = getUserIdFromChatId(toUserId);
+
     // Notify both users in their language
     let fromUserMessage;
     let toUserMessage;
     if (toUser === actualTurnHolder) {
         // Swap back - actualTurnHolder performs their own turn
-        fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'turn')}** (Swap back)\n\n🎯 **${t(fromUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserId)}`;
-        toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'turn')}** (Swap back)\n\n🎯 **${t(toUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserId)}`;
+        fromUserMessage = `✅ **${t(fromUserUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, fromUserUserId)} ${t(fromUserUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserUserId)} ${t(fromUserUserId, 'turn')}** (Swap back)\n\n🎯 **${t(fromUserUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserUserId)}`;
+        toUserMessage = `✅ **${t(toUserUserId, 'swap_completed')}**\n\n🔄 **${translateName(actualTurnHolder, toUserUserId)} ${t(toUserUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserUserId)} ${t(toUserUserId, 'turn')}** (Swap back)\n\n🎯 **${t(toUserUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserUserId)}`;
     } else {
         // Regular swap - toUser is now performing the turn
-        fromUserMessage = `✅ **${t(fromUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, fromUserId)} ${t(fromUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserId)} ${t(fromUserId, 'turn')}**\n\n🎯 **${t(fromUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserId)}`;
-        toUserMessage = `✅ **${t(toUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, toUserId)} ${t(toUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserId)} ${t(toUserId, 'turn')}**\n\n🎯 **${t(toUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserId)}`;
+        fromUserMessage = `✅ **${t(fromUserUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, fromUserUserId)} ${t(fromUserUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, fromUserUserId)} ${t(fromUserUserId, 'turn')}**\n\n🎯 **${t(fromUserUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, fromUserUserId)}`;
+        toUserMessage = `✅ **${t(toUserUserId, 'swap_completed')}**\n\n🔄 **${translateName(toUser, toUserUserId)} ${t(toUserUserId, 'assigned_to_perform')} ${translateName(actualTurnHolder, toUserUserId)} ${t(toUserUserId, 'turn')}**\n\n🎯 **${t(toUserUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, toUserUserId)}`;
     }
     
     sendMessage(fromUserId, fromUserMessage);
@@ -5326,7 +5334,7 @@ async function handleCallback(chatId, userId, userName, data) {
         // Since userName is canonical ("Adele"), we need to find their queue representation
         let currentUserQueueName = null;
         for (const [canonicalName, queueName] of userQueueMapping.entries()) {
-            if (canonicalName === userName) {
+            if (canonicalName && userName && canonicalName.toLowerCase() === userName.toLowerCase()) {
                 currentUserQueueName = queueName;
                 break;
             }
@@ -5337,9 +5345,12 @@ async function handleCallback(chatId, userId, userName, data) {
             currentUserQueueName = userName;
         }
         
-        // Show all users except the current user (can't swap with yourself)
+        // Show all users except the current user (can't swap with yourself) - case-insensitive comparison
         const uniqueUsers = [...new Set(queue)];
-        const availableUsers = uniqueUsers.filter(name => name !== currentUserQueueName);
+        const availableUsers = uniqueUsers.filter(name => {
+            if (!name || !currentUserQueueName) return true;
+            return name.toLowerCase() !== currentUserQueueName.toLowerCase();
+        });
         const buttons = availableUsers.map(name => [{ text: addRoyalEmojiTranslated(name, userId), callback_data: `swap_request_${name}` }]);
         
         sendMessageWithButtons(chatId, 
@@ -5354,7 +5365,7 @@ async function handleCallback(chatId, userId, userName, data) {
         // Since userName is canonical ("Adele"), we need to find their queue representation
         let currentUserQueueName = null;
         for (const [canonicalName, queueName] of userQueueMapping.entries()) {
-            if (canonicalName === userName) {
+            if (canonicalName && userName && canonicalName.toLowerCase() === userName.toLowerCase()) {
                 currentUserQueueName = queueName;
                 break;
             }
@@ -5397,15 +5408,75 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Check if user already has a pending swap request
         for (const [requestId, request] of pendingSwaps.entries()) {
-            if (request.fromUserId === userId) {
+            if (request.fromUserId === chatId) {
                 sendMessage(chatId, t(userId, 'pending_swap_exists', {fromUser: request.fromUser, toUser: request.toUser, requestId: requestId}));
                 return;
             }
         }
         
-        // Check if target user already has a pending swap request
+        // Find the canonical name for the target user (targetUser is a queue name)
+        // Handle case-insensitive matching and Hebrew names
+        let targetCanonicalName = targetUser;
+        
+        // First, try to find exact match (case-insensitive)
+        for (const [canonicalName, queueName] of userQueueMapping.entries()) {
+            if (queueName && targetUser && queueName.toLowerCase() === targetUser.toLowerCase()) {
+                targetCanonicalName = canonicalName;
+                break;
+            }
+        }
+        
+        // If not found, try matching against Hebrew names or partial matches
+        if (targetCanonicalName === targetUser) {
+            // Check if targetUser contains a known English name (case-insensitive)
+            const lowerTargetUser = targetUser.toLowerCase();
+            for (const [englishName, hebrewName] of Object.entries(hebrewNames)) {
+                // Check if targetUser contains the English name (case-insensitive)
+                // or contains the Hebrew name (exact or partial match)
+                const englishMatch = lowerTargetUser.includes(englishName.toLowerCase());
+                const hebrewMatch = targetUser.includes(hebrewName);
+                
+                if (englishMatch || hebrewMatch) {
+                    // Find the canonical name for this English name
+                    for (const [canonicalName, queueName] of userQueueMapping.entries()) {
+                        if (canonicalName && canonicalName.toLowerCase() === englishName.toLowerCase()) {
+                            targetCanonicalName = canonicalName;
+                            break;
+                        }
+                    }
+                    // Also try direct match in userQueueMapping if queueName contains the English name
+                    if (targetCanonicalName === targetUser) {
+                        for (const [canonicalName, queueName] of userQueueMapping.entries()) {
+                            if (queueName && (
+                                queueName.toLowerCase().includes(englishName.toLowerCase()) ||
+                                queueName.includes(hebrewName)
+                            )) {
+                                targetCanonicalName = canonicalName;
+                                break;
+                            }
+                        }
+                    }
+                    if (targetCanonicalName !== targetUser) break;
+                }
+            }
+        }
+        
+        // Get the actual chat ID for the target user using the canonical name
+        let targetChatId = userChatIds.get(targetCanonicalName) || (targetCanonicalName ? userChatIds.get(targetCanonicalName.toLowerCase()) : null);
+        
+        // If not found in userChatIds, check if this user is an admin
+        if (!targetChatId && isUserAdmin(targetCanonicalName)) {
+            targetChatId = adminNameToChatId.get(targetCanonicalName) || (targetCanonicalName ? adminNameToChatId.get(targetCanonicalName.toLowerCase()) : null);
+        }
+        
+        if (!targetChatId) {
+            sendMessage(chatId, t(userId, 'target_user_not_found', {targetUser: targetUser}));
+            return;
+        }
+        
+        // Check if target user already has a pending swap request (using chat ID)
         for (const [requestId, request] of pendingSwaps.entries()) {
-            if (request.toUserId === targetUserId || request.fromUserId === targetUserId) {
+            if (request.toUserId === targetChatId || request.fromUserId === targetChatId) {
                 sendMessage(chatId, t(userId, 'target_has_pending_swap', {targetUser: targetUser, fromUser: request.fromUser, toUser: request.toUser, requestId: requestId}));
                 return;
             }
@@ -5413,20 +5484,11 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Create swap request
         const requestId = ++swapRequestCounter;
-        const targetUserId = queueUserMapping.get(targetUser);
-        
-        // Get the actual chat ID for the target user
-        const targetChatId = userChatIds.get(targetUserId) || (targetUserId ? userChatIds.get(targetUserId.toLowerCase()) : null);
-        
-        if (!targetChatId) {
-            sendMessage(chatId, t(userId, 'target_user_not_found', {targetUser: targetUser}));
-            return;
-        }
         
         pendingSwaps.set(requestId, {
             fromUser: userName,
             toUser: targetUser,
-            fromUserId: userId,
+            fromUserId: chatId, // Store the actual chat ID for consistency with toUserId
             toUserId: targetChatId, // Store the actual chat ID, not username
             timestamp: Date.now()
         });
@@ -5446,12 +5508,17 @@ async function handleCallback(chatId, userId, userName, data) {
             // Get the correct userId for language preference
             const targetUserId = getUserIdFromChatId(targetChatId);
             
+            // Translate names based on target user's language preference
+            const translatedFromUser = translateName(userName, targetUserId) || userName;
+            const translatedTargetUser = translateName(targetUser, targetUserId) || targetUser;
+            const translatedCurrentUserQueueName = translateName(currentUserQueueName, targetUserId) || currentUserQueueName;
+            
             sendMessageWithButtons(targetChatId, 
-                `🔄 **${t(targetUserId, 'swap_request_title')}**\n\n👤 **${t(targetUserId, 'from_user')}:** ${userName} (${currentUserQueueName})\n🎯 **${t(targetUserId, 'wants_to_swap_with')}:** ${targetUser}`, 
+                `🔄 **${t(targetUserId, 'swap_request_title')}**\n\n👤 **${t(targetUserId, 'from_user')}:** ${translatedFromUser} (${translatedCurrentUserQueueName})\n🎯 **${t(targetUserId, 'wants_to_swap_with')}:** ${translatedTargetUser}`, 
                 buttons
             );
         } else {
-            console.log(`❌ No chat ID found for target user: ${targetUserId}`);
+            console.log(`❌ No chat ID found for target user: ${targetCanonicalName} (queue name: ${targetUser})`);
         }
         
         // Notify all admins about the swap request in their language
@@ -5460,8 +5527,13 @@ async function handleCallback(chatId, userId, userName, data) {
                 // Get the correct userId for language preference
                 const adminUserId = getUserIdFromChatId(adminChatId);
                 
+                // Translate names based on admin's language preference
+                const translatedFromUser = translateName(userName, adminUserId) || userName;
+                const translatedTargetUser = translateName(targetUser, adminUserId) || targetUser;
+                const translatedCurrentUserQueueName = translateName(currentUserQueueName, adminUserId) || currentUserQueueName;
+                
                 // Create notification in admin's language
-                const adminNotification = `🔄 **${t(adminUserId, 'new_swap_request')}**\n\n👤 **${t(adminUserId, 'from_user')}:** ${userName} (${currentUserQueueName})\n🎯 **${t(adminUserId, 'wants_to_swap_with')}:** ${targetUser}\n📅 **${t(adminUserId, 'time')}:** ${new Date().toLocaleString()}\n\n💡 **${t(adminUserId, 'request_id')}:** ${requestId}`;
+                const adminNotification = `🔄 **${t(adminUserId, 'new_swap_request')}**\n\n👤 **${t(adminUserId, 'from_user')}:** ${translatedFromUser} (${translatedCurrentUserQueueName})\n🎯 **${t(adminUserId, 'wants_to_swap_with')}:** ${translatedTargetUser}\n📅 **${t(adminUserId, 'time')}:** ${new Date().toLocaleString()}\n\n💡 **${t(adminUserId, 'request_id')}:** ${requestId}`;
                 console.log(`🔔 Sending admin swap notification to chat ID: ${adminChatId} (userId: ${adminUserId})`);
                 sendMessage(adminChatId, adminNotification);
             }
@@ -5494,8 +5566,8 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Check if this is the correct user approving
-        console.log(`🔍 Checking approval: swapRequest.toUserId (${swapRequest.toUserId}) === userId (${userId})`);
-        if (swapRequest.toUserId !== userId) {
+        console.log(`🔍 Checking approval: swapRequest.toUserId (${swapRequest.toUserId}) === chatId (${chatId})`);
+        if (swapRequest.toUserId !== chatId) {
             console.log(`❌ Swap request not for this user`);
             sendMessage(chatId, t(userId, 'swap_request_not_for_you'));
             return;
@@ -5521,13 +5593,14 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Check if this is the correct user rejecting
-        if (swapRequest.toUserId !== userId) {
+        if (swapRequest.toUserId !== chatId) {
             sendMessage(chatId, t(userId, 'swap_request_not_for_you'));
             return;
         }
         
         // Notify the requester
-        sendMessage(swapRequest.fromUserId, t(swapRequest.fromUserId, 'swap_request_rejected_simple', {user: translateName(userName, swapRequest.fromUserId)}));
+        const requesterUserId = getUserIdFromChatId(swapRequest.fromUserId);
+        sendMessage(swapRequest.fromUserId, t(requesterUserId, 'swap_request_rejected_simple', {user: translateName(userName, requesterUserId)}));
         sendMessage(chatId, t(userId, 'you_declined_swap_request', {user: translateName(swapRequest.fromUser, userId)}));
         
         // Notify all admins about the rejection in their language
@@ -5562,14 +5635,15 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Check if this is the correct user canceling
-        if (swapRequest.fromUserId !== userId) {
+        if (swapRequest.fromUserId !== chatId) {
             sendMessage(chatId, t(userId, 'swap_request_not_yours'));
             return;
         }
         
         // Notify the target user that the request was canceled
         if (swapRequest.toUserId) {
-            sendMessage(swapRequest.toUserId, t(swapRequest.toUserId, 'swap_request_canceled_notification', {user: translateName(userName, swapRequest.toUserId)}));
+            const targetUserId = getUserIdFromChatId(swapRequest.toUserId);
+            sendMessage(swapRequest.toUserId, t(targetUserId, 'swap_request_canceled_notification', {user: translateName(userName, targetUserId)}));
         }
         
         // Notify the requester
@@ -6059,7 +6133,7 @@ async function handleCallback(chatId, userId, userName, data) {
             fromUser: userName,
             targetUser: targetUser,
             reason: reason,
-            fromUserId: userId,
+            fromUserId: chatId, // Store chatId for consistency with swap requests and for sendMessage
             timestamp: Date.now()
         });
         
@@ -6117,7 +6191,8 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessage(chatId, `${t(userId, 'punishment_approved')}\n\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${punishmentRequest.reason}\n${t(userId, 'approved_by')} ${userName}\n\n${t(userId, 'extra_turns_applied')}`);
         
         // Notify requester
-        sendMessage(punishmentRequest.fromUserId, `${t(punishmentRequest.fromUserId, 'punishment_approved')}\n\n${t(punishmentRequest.fromUserId, 'target_user')} ${punishmentRequest.targetUser}\n${t(punishmentRequest.fromUserId, 'reason')} ${punishmentRequest.reason}\n${t(punishmentRequest.fromUserId, 'approved_by')} ${userName}`);
+        const requesterUserId = getUserIdFromChatId(punishmentRequest.fromUserId);
+        sendMessage(punishmentRequest.fromUserId, `${t(requesterUserId, 'punishment_approved')}\n\n${t(requesterUserId, 'target_user')} ${punishmentRequest.targetUser}\n${t(requesterUserId, 'reason')} ${punishmentRequest.reason}\n${t(requesterUserId, 'approved_by')} ${userName}`);
         
         // Notify all other authorized users and admins about the approval in their language
         
@@ -6174,7 +6249,8 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Notify requester
-        sendMessage(punishmentRequest.fromUserId, `${t(punishmentRequest.fromUserId, 'punishment_request_rejected')}\n\n${t(punishmentRequest.fromUserId, 'declined_punishment_request', {admin: translateName(userName, punishmentRequest.fromUserId), target: translateName(punishmentRequest.targetUser, punishmentRequest.fromUserId)})}`);
+        const requesterUserId = getUserIdFromChatId(punishmentRequest.fromUserId);
+        sendMessage(punishmentRequest.fromUserId, `${t(requesterUserId, 'punishment_request_rejected')}\n\n${t(requesterUserId, 'declined_punishment_request', {admin: translateName(userName, requesterUserId), target: translateName(punishmentRequest.targetUser, requesterUserId)})}`);
         sendMessage(chatId, `${t(userId, 'punishment_request_rejected')}\n\n${t(userId, 'you_declined_punishment', {requester: translateName(punishmentRequest.fromUser, userId)})}`);
         
         // Notify all other authorized users and admins about the rejection in their language
