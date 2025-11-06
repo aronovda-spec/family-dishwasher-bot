@@ -1238,7 +1238,14 @@ const translations = {
         'reason': '📝 **Reason:**',
         'waiting_approval': '⏰ **Waiting for admin approval...**',
         'punishment_applied': '✅ **Punishment Applied!**',
+        'punishment_applied_alert': '⚡ **PUNISHMENT APPLIED!**',
+        'punishment_score_reduced': 'Score reduced by 3 (scheduled sooner)',
+        'scheduled_soon': 'scheduled sooner',
+        'new_score': '📊 **New score:**',
+        'punishment_label': 'Punishment:',
         'applied_by': '👨‍💼 **Applied by:**',
+        'reported_by': '👨‍💼 **Reported by:**',
+        'punishment_request_action': 'Admin can use "Apply Punishment" button if needed',
         'user_authorized': '✅ **User Authorized!**',
         'total_authorized': '📊 **Total authorized users:**',
         'swap_completed': '✅ **Swap completed!**',
@@ -1599,7 +1606,8 @@ const translations = {
         'yes_reset_timer': 'Yes, Reset Timer',
         'cancel': 'Cancel',
         'reset_cancelled': 'Reset cancelled. Dishwasher timer remains unchanged.',
-        'error_occurred': '❌ An error occurred. Please try again.'
+        'error_occurred': '❌ An error occurred. Please try again.',
+        'unknown_button_action': '❌ Unknown button action. Please use the main menu.'
     },
     he: {
         // Menu titles
@@ -1663,7 +1671,14 @@ const translations = {
         'reason': '📝 **סיבה:**',
         'waiting_approval': '⏰ **ממתין לאישור מנהל...**',
         'punishment_applied': '✅ **עונש הופעל!**',
+        'punishment_applied_alert': '⚡ **עונש הופעל!**',
+        'punishment_score_reduced': 'ניקוד הופחת ב-3 (מתוזמן מוקדם יותר)',
+        'scheduled_soon': 'מתוזמן מוקדם יותר',
+        'new_score': '📊 **ניקוד חדש:**',
+        'punishment_label': 'עונש:',
         'applied_by': '👨‍💼 **הופעל על ידי:**',
+        'reported_by': '👨‍💼 **דווח על ידי:**',
+        'punishment_request_action': 'מנהל יכול להשתמש בכפתור "הפעל עונש" במידת הצורך',
         'user_authorized': '✅ **משתמש הורשה!**',
         'total_authorized': '📊 **סך משתמשים מורשים:**',
         'swap_completed': '✅ **החלפה הושלמה!**',
@@ -2023,7 +2038,8 @@ const translations = {
         'yes_reset_timer': 'כן, אפס טיימר',
         'cancel': 'ביטול',
         'reset_cancelled': 'האיפוס בוטל. טיימר המדיח נותר ללא שינוי.',
-        'error_occurred': '❌ אירעה שגיאה. אנא נסה שוב.'
+        'error_occurred': '❌ אירעה שגיאה. אנא נסה שוב.',
+        'unknown_button_action': '❌ פעולת כפתור לא מוכרת. אנא השתמש בתפריט הראשי.'
     }
 };
 
@@ -2076,6 +2092,34 @@ function translateName(name, userId) {
         }
     }
     return getFirstName(name); // Return first name only for English or unknown names
+}
+
+// Translate reason strings based on user's language preference
+function translateReason(reason, userId) {
+    if (!reason) return reason;
+    
+    const userLang = getUserLanguage(userId);
+    if (userLang === 'he') {
+        // Map English reason strings to translation keys
+        const reasonMap = {
+            'Behavior': 'reason_behavior',
+            'Household Rules': 'reason_household',
+            'Respect': 'reason_respect',
+            'Other': 'reason_other'
+        };
+        
+        // Check if reason matches any key (case-insensitive)
+        const reasonLower = reason.toLowerCase().trim();
+        for (const [englishReason, translationKey] of Object.entries(reasonMap)) {
+            if (reasonLower === englishReason.toLowerCase()) {
+                // Get Hebrew translation, but remove emoji prefix for display
+                return t(userId, translationKey).replace(/^[^\s]+\s*/, '').trim();
+            }
+        }
+    }
+    
+    // Return original reason if no translation found or language is English
+    return reason;
 }
 
 // Translate description based on user's language preference
@@ -3549,7 +3593,7 @@ async function handleCommand(chatId, userId, userName, text) {
         // Apply punishment directly (admin doesn't need approval)
         await applyPunishment(punishmentRequest.targetUser, reason, userName);
         
-        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${translateName(punishmentRequest.targetUser, userId)}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${translateName(userName, userId)}`);
+        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${translateName(punishmentRequest.targetUser, userId)}\n${t(userId, 'reason')} ${translateReason(reason, userId)}\n${t(userId, 'applied_by')} ${translateName(userName, userId)}`);
         
         // Remove request
         pendingPunishments.delete(requestId);
@@ -3638,10 +3682,7 @@ async function applyPunishment(targetUser, reason, appliedBy) {
     // Get current turn user for display
     const currentTurnUser = getCurrentTurnUser();
     
-    // Notify all users
-    const message = `⚡ **PUNISHMENT APPLIED!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Applied by:** ${appliedBy}\n\n🚫 **Punishment:** Score reduced by 3 (scheduled sooner)\n📊 **New score:** ${currentScore - 3}\n🎯 **Current turn:** ${currentTurnUser}`;
-    
-    // Send to all authorized users and admins
+    // Notify all users with translated messages
     [...authorizedUsers, ...admins].forEach(user => {
         // Find the canonical name for this user
         let canonicalName = user;
@@ -3661,6 +3702,12 @@ async function applyPunishment(targetUser, reason, appliedBy) {
         }
         
         if (userChatId) {
+            // Get the userId for language preference
+            const recipientUserId = getUserIdFromChatId(userChatId);
+            
+            // Build translated message
+            const message = `${t(recipientUserId, 'punishment_applied_alert')}\n\n${t(recipientUserId, 'target_user')} ${translateName(targetUser, recipientUserId)}\n${t(recipientUserId, 'reason')} ${translateReason(reason, recipientUserId)}\n${t(recipientUserId, 'applied_by')} ${translateName(appliedBy, recipientUserId)}\n\n🚫 **${t(recipientUserId, 'punishment_label')}** ${t(recipientUserId, 'punishment_score_reduced')}\n${t(recipientUserId, 'new_score')} ${currentScore - 3}\n🎯 **${t(recipientUserId, 'current_turn_label')}:** ${translateName(currentTurnUser, recipientUserId)}`;
+            
             sendMessage(userChatId, message);
         }
     });
@@ -3671,9 +3718,7 @@ async function applyPunishment(targetUser, reason, appliedBy) {
 // Report user for punishment (NO strike counting)
 function reportUser(targetUser, reason, reportedBy) {
     // Just notify admins about the report
-    const message = `📢 **PUNISHMENT REQUEST!**\n\n🎯 **Target:** ${targetUser}\n📝 **Reason:** ${reason}\n👨‍💼 **Reported by:** ${reportedBy}\n\n⚡ **Action:** Admin can use "Apply Punishment" button if needed`;
-    
-    // Send to all admins
+    // Send to all admins with translated messages
     admins.forEach(admin => {
         // Find the canonical name for this admin
         let canonicalName = admin;
@@ -3687,6 +3732,12 @@ function reportUser(targetUser, reason, reportedBy) {
         // Get chat ID using the canonical name
         const adminChatId = userChatIds.get(canonicalName) || (canonicalName ? userChatIds.get(canonicalName.toLowerCase()) : null);
         if (adminChatId) {
+            // Get the userId for language preference
+            const adminUserId = getUserIdFromChatId(adminChatId) || adminChatId;
+            
+            // Build translated message
+            const message = `📢 **${t(adminUserId, 'punishment_request_title')}**\n\n${t(adminUserId, 'target_user')} ${translateName(targetUser, adminUserId)}\n${t(adminUserId, 'reason')} ${translateReason(reason, adminUserId)}\n${t(adminUserId, 'reported_by')} ${translateName(reportedBy, adminUserId)}\n\n⚡ ${t(adminUserId, 'punishment_request_action')}`;
+            
             sendMessage(adminChatId, message);
         }
     });
@@ -6117,9 +6168,12 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessageWithButtons(chatId, t(userId, 'request_punishment_select_reason', {user: targetUser}), reasonButtons);
         
     } else if (data.startsWith('punishment_reason_')) {
-        const parts = data ? data.replace('punishment_reason_', '').split('_') : [];
-        const targetUser = parts[0];
-        const reason = parts[1];
+        // Parse callback data: punishment_reason_${targetUser}_${reason}
+        // Reason may contain spaces (e.g., "Household Rules"), so we need to split carefully
+        const dataAfterPrefix = data.replace('punishment_reason_', '');
+        const firstUnderscore = dataAfterPrefix.indexOf('_');
+        const targetUser = firstUnderscore > 0 ? dataAfterPrefix.substring(0, firstUnderscore) : '';
+        const reason = firstUnderscore > 0 ? dataAfterPrefix.substring(firstUnderscore + 1) : '';
         
         if (!targetUser || !reason) {
             sendMessage(chatId, t(userId, 'error_invalid_punishment_data'));
@@ -6148,7 +6202,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 const adminUserId = getUserIdFromChatId(adminChatId);
                 
                 // Create message in admin's language
-                const adminMessage = `${t(adminUserId, 'punishment_request_title')}\n\n${t(adminUserId, 'from_user')}: ${translateName(userName, adminUserId)}\n${t(adminUserId, 'target_user')}: ${translateName(targetUser, adminUserId)}\n${t(adminUserId, 'reason')}: ${reason}`;
+                const adminMessage = `${t(adminUserId, 'punishment_request_title')}\n\n${t(adminUserId, 'from_user')}: ${translateName(userName, adminUserId)}\n${t(adminUserId, 'target_user')}: ${translateName(targetUser, adminUserId)}\n${t(adminUserId, 'reason')}: ${translateReason(reason, adminUserId)}`;
                 const buttons = createLocalizedButtons(adminUserId, [
                     [
                         { translationKey: 'approve', callback_data: `punishment_approve_${requestId}` },
@@ -6160,7 +6214,7 @@ async function handleCallback(chatId, userId, userName, data) {
             }
         }
         
-        sendMessage(chatId, `${t(userId, 'punishment_request_submitted')}\n\n${t(userId, 'target_user')} ${translateName(targetUser, userId)}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'requested_by', {user: translateName(userName, userId)})}\n\n${t(userId, 'admins_notified')}`);
+        sendMessage(chatId, `${t(userId, 'punishment_request_submitted')}\n\n${t(userId, 'target_user')} ${translateName(targetUser, userId)}\n${t(userId, 'reason')} ${translateReason(reason, userId)}\n${t(userId, 'requested_by', {user: translateName(userName, userId)})}\n\n${t(userId, 'admins_notified')}`);
         
     } else if (data.startsWith('punishment_approve_')) {
         const requestId = data ? parseInt(data.replace('punishment_approve_', '')) : 0;
@@ -6188,11 +6242,11 @@ async function handleCallback(chatId, userId, userName, data) {
         await applyPunishment(punishmentRequest.targetUser, punishmentRequest.reason, userName);
         
         // Send confirmation to admin who approved
-        sendMessage(chatId, `${t(userId, 'punishment_approved')}\n\n${t(userId, 'target_user')} ${punishmentRequest.targetUser}\n${t(userId, 'reason')} ${punishmentRequest.reason}\n${t(userId, 'approved_by')} ${userName}\n\n${t(userId, 'extra_turns_applied')}`);
+        sendMessage(chatId, `${t(userId, 'punishment_approved')}\n\n${t(userId, 'target_user')} ${translateName(punishmentRequest.targetUser, userId)}\n${t(userId, 'reason')} ${translateReason(punishmentRequest.reason, userId)}\n${t(userId, 'approved_by')} ${translateName(userName, userId)}\n\n${t(userId, 'extra_turns_applied')}`);
         
         // Notify requester
         const requesterUserId = getUserIdFromChatId(punishmentRequest.fromUserId);
-        sendMessage(punishmentRequest.fromUserId, `${t(requesterUserId, 'punishment_approved')}\n\n${t(requesterUserId, 'target_user')} ${punishmentRequest.targetUser}\n${t(requesterUserId, 'reason')} ${punishmentRequest.reason}\n${t(requesterUserId, 'approved_by')} ${userName}`);
+        sendMessage(punishmentRequest.fromUserId, `${t(requesterUserId, 'punishment_approved')}\n\n${t(requesterUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, requesterUserId)}\n${t(requesterUserId, 'reason')} ${translateReason(punishmentRequest.reason, requesterUserId)}\n${t(requesterUserId, 'approved_by')} ${translateName(userName, requesterUserId)}`);
         
         // Notify all other authorized users and admins about the approval in their language
         
@@ -6204,7 +6258,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 const recipientUserId = getUserIdFromChatId(userChatId);
                 
                 // Create approval message in user's language
-                const approvalMessage = `${t(recipientUserId, 'punishment_request_approved')}\n\n${t(recipientUserId, 'requested_by', {user: translateName(punishmentRequest.fromUser, recipientUserId)})}\n${t(recipientUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, recipientUserId)}\n${t(recipientUserId, 'reason')} ${punishmentRequest.reason}\n${t(recipientUserId, 'approved_by')} ${translateName(userName, recipientUserId)}\n\n${t(recipientUserId, 'extra_turns_applied')}`;
+                const approvalMessage = `${t(recipientUserId, 'punishment_request_approved')}\n\n${t(recipientUserId, 'requested_by', {user: translateName(punishmentRequest.fromUser, recipientUserId)})}\n${t(recipientUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, recipientUserId)}\n${t(recipientUserId, 'reason')} ${translateReason(punishmentRequest.reason, recipientUserId)}\n${t(recipientUserId, 'approved_by')} ${translateName(userName, recipientUserId)}\n\n${t(recipientUserId, 'extra_turns_applied')}`;
                 console.log(`🔔 Sending punishment approval notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
                 sendMessage(userChatId, approvalMessage);
             }
@@ -6217,7 +6271,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 const adminUserId = getUserIdFromChatId(adminChatId);
                 
                 // Create approval message in admin's language
-                const approvalMessage = `${t(adminUserId, 'punishment_request_approved')}\n\n${t(adminUserId, 'requested_by', {user: translateName(punishmentRequest.fromUser, adminUserId)})}\n${t(adminUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, adminUserId)}\n${t(adminUserId, 'reason')} ${punishmentRequest.reason}\n${t(adminUserId, 'approved_by')} ${translateName(userName, adminUserId)}\n\n${t(adminUserId, 'extra_turns_applied')}`;
+                const approvalMessage = `${t(adminUserId, 'punishment_request_approved')}\n\n${t(adminUserId, 'requested_by', {user: translateName(punishmentRequest.fromUser, adminUserId)})}\n${t(adminUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, adminUserId)}\n${t(adminUserId, 'reason')} ${translateReason(punishmentRequest.reason, adminUserId)}\n${t(adminUserId, 'approved_by')} ${translateName(userName, adminUserId)}\n\n${t(adminUserId, 'extra_turns_applied')}`;
                 console.log(`🔔 Sending punishment approval notification to admin chat ID: ${adminChatId} (userId: ${adminUserId})`);
                 sendMessage(adminChatId, approvalMessage);
             }
@@ -6263,7 +6317,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 const recipientUserId = getUserIdFromChatId(userChatId);
                 
                 // Create rejection message in user's language
-                const rejectionMessage = `${t(recipientUserId, 'punishment_request_rejected')}\n\n${t(recipientUserId, 'requested_by', {user: translateName(punishmentRequest.fromUser, recipientUserId)})}\n${t(recipientUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, recipientUserId)}\n${t(recipientUserId, 'reason')} ${punishmentRequest.reason}\n${t(recipientUserId, 'rejected_by', {user: translateName(userName, recipientUserId)})}`;
+                const rejectionMessage = `${t(recipientUserId, 'punishment_request_rejected')}\n\n${t(recipientUserId, 'requested_by', {user: translateName(punishmentRequest.fromUser, recipientUserId)})}\n${t(recipientUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, recipientUserId)}\n${t(recipientUserId, 'reason')} ${translateReason(punishmentRequest.reason, recipientUserId)}\n${t(recipientUserId, 'rejected_by', {user: translateName(userName, recipientUserId)})}`;
                 console.log(`🔔 Sending punishment rejection notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
                 sendMessage(userChatId, rejectionMessage);
             }
@@ -6276,7 +6330,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 const adminUserId = getUserIdFromChatId(adminChatId);
                 
                 // Create rejection message in admin's language
-                const rejectionMessage = `${t(adminUserId, 'punishment_request_rejected')}\n\n${t(adminUserId, 'requested_by', {user: punishmentRequest.fromUser})}\n${t(adminUserId, 'target_user')} ${punishmentRequest.targetUser}\n${t(adminUserId, 'reason')} ${punishmentRequest.reason}\n${t(adminUserId, 'rejected_by', {user: userName})}`;
+                const rejectionMessage = `${t(adminUserId, 'punishment_request_rejected')}\n\n${t(adminUserId, 'requested_by', {user: translateName(punishmentRequest.fromUser, adminUserId)})}\n${t(adminUserId, 'target_user')} ${translateName(punishmentRequest.targetUser, adminUserId)}\n${t(adminUserId, 'reason')} ${translateReason(punishmentRequest.reason, adminUserId)}\n${t(adminUserId, 'rejected_by', {user: translateName(userName, adminUserId)})}`;
                 console.log(`🔔 Sending punishment rejection notification to admin chat ID: ${adminChatId} (userId: ${adminUserId})`);
                 sendMessage(adminChatId, rejectionMessage);
             }
@@ -6324,9 +6378,12 @@ async function handleCallback(chatId, userId, userName, data) {
         sendMessageWithButtons(chatId, t(userId, 'apply_punishment_select_reason', {user: targetUser}), buttons);
         
     } else if (data.startsWith('admin_punishment_reason_')) {
-        const parts = data ? data.replace('admin_punishment_reason_', '').split('_') : [];
-        const targetUser = parts[0];
-        const reason = parts[1];
+        // Parse callback data: admin_punishment_reason_${targetUser}_${reason}
+        // Reason may contain spaces (e.g., "Household Rules"), so we need to split carefully
+        const dataAfterPrefix = data.replace('admin_punishment_reason_', '');
+        const firstUnderscore = dataAfterPrefix.indexOf('_');
+        const targetUser = firstUnderscore > 0 ? dataAfterPrefix.substring(0, firstUnderscore) : '';
+        const reason = firstUnderscore > 0 ? dataAfterPrefix.substring(firstUnderscore + 1) : '';
         
         if (!targetUser || !reason) {
             sendMessage(chatId, t(userId, 'error_invalid_punishment_data'));
@@ -6335,7 +6392,7 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Apply punishment directly with selected reason
         await applyPunishment(targetUser, reason, userName);
-        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${targetUser}\n${t(userId, 'reason')} ${reason}\n${t(userId, 'applied_by')} ${userName}\n\n${t(userId, 'extra_turns_added')}`);
+        sendMessage(chatId, `${t(userId, 'punishment_applied')}\n\n${t(userId, 'target_user')} ${translateName(targetUser, userId)}\n${t(userId, 'reason')} ${translateReason(reason, userId)}\n${t(userId, 'applied_by')} ${translateName(userName, userId)}\n\n${t(userId, 'extra_turns_added')}`);
         
         // Notify all authorized users and admins about the admin direct punishment in their language
         
@@ -6346,8 +6403,8 @@ async function handleCallback(chatId, userId, userName, data) {
                 // Get the correct userId for language preference
                 const recipientUserId = getUserIdFromChatId(userChatId);
                 
-                // Create notification message in user's language
-                const notificationMessage = `${t(recipientUserId, 'admin_direct_punishment')}\n\n${t(recipientUserId, 'target_user')} ${targetUser}\n${t(recipientUserId, 'reason')} ${reason}\n${t(recipientUserId, 'applied_by')} ${userName}\n\n${t(recipientUserId, 'extra_turns_added')}`;
+                // Create notification message in user's language with translated names and reason
+                const notificationMessage = `${t(recipientUserId, 'admin_direct_punishment')}\n\n${t(recipientUserId, 'target_user')} ${translateName(targetUser, recipientUserId)}\n${t(recipientUserId, 'reason')} ${translateReason(reason, recipientUserId)}\n${t(recipientUserId, 'applied_by')} ${translateName(userName, recipientUserId)}\n\n${t(recipientUserId, 'extra_turns_added')}`;
                 console.log(`🔔 Sending admin direct punishment notification to ${user} (${userChatId}, userId: ${recipientUserId})`);
                 sendMessage(userChatId, notificationMessage);
             }
@@ -6359,15 +6416,15 @@ async function handleCallback(chatId, userId, userName, data) {
                 // Get the correct userId for language preference
                 const adminUserId = getUserIdFromChatId(adminChatId);
                 
-                // Create notification message in admin's language
-                const notificationMessage = `${t(adminUserId, 'admin_direct_punishment')}\n\n${t(adminUserId, 'target_user')} ${targetUser}\n${t(adminUserId, 'reason')} ${reason}\n${t(adminUserId, 'applied_by')} ${userName}\n\n${t(adminUserId, 'extra_turns_added')}`;
+                // Create notification message in admin's language with translated names and reason
+                const notificationMessage = `${t(adminUserId, 'admin_direct_punishment')}\n\n${t(adminUserId, 'target_user')} ${translateName(targetUser, adminUserId)}\n${t(adminUserId, 'reason')} ${translateReason(reason, adminUserId)}\n${t(adminUserId, 'applied_by')} ${translateName(userName, adminUserId)}\n\n${t(adminUserId, 'extra_turns_added')}`;
                 console.log(`🔔 Sending admin direct punishment notification to admin chat ID: ${adminChatId} (userId: ${adminUserId})`);
                 sendMessage(adminChatId, notificationMessage);
             }
         }
         
     } else {
-        sendMessage(chatId, '❌ Unknown button action. Please use the main menu.');
+        sendMessage(chatId, t(userId, 'unknown_button_action'));
     }
     } catch (error) {
         console.error('❌ Error in handleCallback:', error);
