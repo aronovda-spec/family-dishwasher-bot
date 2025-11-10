@@ -268,6 +268,12 @@ async function loadBotData() {
         // Load monthly statistics
         const monthlyStatsData = await db.getAllMonthlyStats();
         
+        // Load dishwasher state
+        const dishwasherStartedData = await db.getBotState('dishwasherStarted') || false;
+        const dishwasherAlertSentData = await db.getBotState('dishwasherAlertSent') || false;
+        const dishwasherCompletedData = await db.getBotState('dishwasherCompleted') || false;
+        const dishwasherStartedAtData = await db.getBotState('dishwasherStartedAt') || null;
+        
         console.log(`📂 Loading bot data from Supabase database`);
         console.log(`📊 Found ${authorizedUsersData.length} authorized users, ${adminsData.length} admins, ${Object.keys(queueMappingsData).length} queue mappings`);
         
@@ -366,6 +372,12 @@ async function loadBotData() {
             monthlyStats.set(key, value);
         });
         
+        // Restore dishwasher state
+        global.dishwasherStarted = dishwasherStartedData;
+        global.dishwasherAlertSent = dishwasherAlertSentData;
+        global.dishwasherCompleted = dishwasherCompletedData;
+        global.dishwasherStartedAt = dishwasherStartedAtData;
+        
         console.log('📂 Bot data loaded successfully from Supabase');
         console.log(`👥 Users: ${authorizedUsers.size}, Admins: ${admins.size}, Queue Mappings: ${queueUserMapping.size}, Turn Index: ${currentTurnIndex}`);
         
@@ -391,6 +403,141 @@ async function loadBotData() {
     } catch (error) {
         console.error('❌ Error loading bot data from Supabase:', error);
         return false;
+    }
+}
+
+// Restore dishwasher timer on startup if needed
+async function restoreDishwasherTimer() {
+    try {
+        // Check if dishwasher was started and timer should still be active
+        if (global.dishwasherStarted && !global.dishwasherCompleted && !global.dishwasherAlertSent && global.dishwasherStartedAt) {
+            const now = Date.now();
+            const elapsed = now - global.dishwasherStartedAt;
+            const threeHours = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+            
+            // Check if 3 hours have already passed
+            if (elapsed >= threeHours) {
+                // Timer should have already fired - send alert immediately
+                console.log(`⏰ Restoring dishwasher timer: 3 hours already passed, sending alert immediately`);
+                
+                const currentTurnUser = getCurrentTurnUser();
+                if (currentTurnUser) {
+                    // Send dishwasher alert to all authorized users and admins
+                    [...authorizedUsers, ...admins].forEach(user => {
+                        let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                        
+                        if (!userChatId && isUserAdmin(user)) {
+                            userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                        }
+                        
+                        if (userChatId) {
+                            const recipientUserId = getUserIdFromChatId(userChatId);
+                            const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {
+                                user: translateName(currentTurnUser, recipientUserId), 
+                                sender: t(recipientUserId, 'auto_timer')
+                            });
+                            console.log(`🔔 Sending restored auto dishwasher alert to ${user} (${userChatId})`);
+                            sendMessage(userChatId, alertMessage);
+                        }
+                    });
+                    
+                    // Mark alert as sent
+                    global.dishwasherAlertSent = true;
+                    await db.saveBotState('dishwasherAlertSent', true);
+                }
+            } else {
+                // Timer hasn't fired yet - reschedule it
+                const remainingTime = threeHours - elapsed;
+                console.log(`⏰ Restoring dishwasher timer: ${Math.round(remainingTime / 1000 / 60)} minutes remaining`);
+                
+                // Reschedule the timer with remaining time
+                const autoAlertTimeout = setTimeout(async () => {
+                    // Check if we should still send the auto-alert
+                    if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
+                        const currentTurnUser = getCurrentTurnUser();
+                        
+                        // Check Israeli time for night hours restriction (11pm-7am)
+                        const now = new Date();
+                        const israeliHour = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric', hour12: false}));
+                        const israeliMinute = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+                        const israeliTime = israeliHour + (israeliMinute / 60);
+                        
+                        // Check if it's night hours (11pm-7am Israeli time)
+                        if (israeliTime >= 23 || israeliTime < 7) {
+                            // Night hours - reschedule for 7:15 AM Israeli time
+                            const israeliNow = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'}));
+                            const next7AM = new Date(israeliNow);
+                            next7AM.setHours(7, 15, 0, 0);
+                            
+                            if (next7AM <= israeliNow) {
+                                next7AM.setDate(next7AM.getDate() + 1);
+                            }
+                            
+                            const timeUntil7AM = next7AM.getTime() - israeliNow.getTime();
+                            
+                            const rescheduledTimeout = setTimeout(async () => {
+                                if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
+                                    const currentTurnUserAtAlert = getCurrentTurnUser();
+                                    console.log(`⏰ Auto-alert triggered after night hours delay for ${currentTurnUserAtAlert}`);
+                                    
+                                    [...authorizedUsers, ...admins].forEach(user => {
+                                        let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                                        
+                                        if (!userChatId && isUserAdmin(user)) {
+                                            userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                                        }
+                                        
+                                        if (userChatId) {
+                                            const recipientUserId = getUserIdFromChatId(userChatId);
+                                            const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {
+                                                user: translateName(currentTurnUserAtAlert, recipientUserId), 
+                                                sender: t(recipientUserId, 'auto_timer')
+                                            });
+                                            sendMessage(userChatId, alertMessage);
+                                        }
+                                    });
+                                    
+                                    global.dishwasherAlertSent = true;
+                                    await db.saveBotState('dishwasherAlertSent', true);
+                                }
+                            }, timeUntil7AM);
+                            
+                            global.dishwasherAutoAlertTimer = rescheduledTimeout;
+                            return;
+                        }
+                        
+                        // Day hours - send immediately
+                        console.log(`⏰ Auto-alert triggered after 3 hours for ${currentTurnUser}`);
+                        
+                        [...authorizedUsers, ...admins].forEach(user => {
+                            let userChatId = userChatIds.get(user) || (user ? userChatIds.get(user.toLowerCase()) : null);
+                            
+                            if (!userChatId && isUserAdmin(user)) {
+                                userChatId = adminNameToChatId.get(user) || (user ? adminNameToChatId.get(user.toLowerCase()) : null);
+                            }
+                            
+                            if (userChatId) {
+                                const recipientUserId = getUserIdFromChatId(userChatId);
+                                const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {
+                                    user: translateName(currentTurnUser, recipientUserId), 
+                                    sender: t(recipientUserId, 'auto_timer')
+                                });
+                                sendMessage(userChatId, alertMessage);
+                            }
+                        });
+                        
+                        global.dishwasherAlertSent = true;
+                        await db.saveBotState('dishwasherAlertSent', true);
+                    }
+                }, remainingTime);
+                
+                global.dishwasherAutoAlertTimer = autoAlertTimeout;
+            }
+        } else {
+            console.log('📊 No dishwasher timer to restore');
+        }
+    } catch (error) {
+        console.error('❌ Error restoring dishwasher timer:', error);
     }
 }
 
@@ -706,6 +853,10 @@ let dbReady = false;
         await loadBotData();
         
         dbReady = true;
+        
+        // Restore dishwasher timer if needed
+        await restoreDishwasherTimer();
+        
         console.log('🎯 Bot initialization complete - ready to receive commands');
     } catch (error) {
         console.error('❌ Error during bot initialization:', error);
@@ -2817,6 +2968,12 @@ async function handleCommand(chatId, userId, userName, text) {
             // This ensures that if "dishwasher started" is pressed during DONE execution, the state is already correct
             global.dishwasherCompleted = true;
             global.dishwasherStarted = false; // Reset for next cycle
+            global.dishwasherStartedAt = null; // Clear timer timestamp
+            
+            // Save dishwasher state to database
+            await db.saveBotState('dishwasherCompleted', true);
+            await db.saveBotState('dishwasherStarted', false);
+            await db.saveBotState('dishwasherStartedAt', null);
             
             // Find the original user whose turn this was (in case of assignment)
             let originalUser = currentUser;
@@ -3012,6 +3169,12 @@ async function handleCommand(chatId, userId, userName, text) {
             // This ensures that if "dishwasher started" is pressed during DONE execution, the state is already correct
             global.dishwasherCompleted = true;
             global.dishwasherStarted = false; // Reset for next cycle
+            global.dishwasherStartedAt = null; // Clear timer timestamp
+            
+            // Save dishwasher state to database
+            await db.saveBotState('dishwasherCompleted', true);
+            await db.saveBotState('dishwasherStarted', false);
+            await db.saveBotState('dishwasherStartedAt', null);
             
             // Find the original user whose turn this was (in case of assignment)
             let originalUser = currentUser;
@@ -3306,6 +3469,13 @@ async function handleCommand(chatId, userId, userName, text) {
         // Mark that dishwasher was completed (cancel auto-alert)
         global.dishwasherCompleted = true;
         global.dishwasherStarted = false; // Reset for next cycle
+        global.dishwasherStartedAt = null; // Clear timer timestamp
+        
+        // Save dishwasher state to database
+        await db.saveBotState('dishwasherCompleted', true);
+        await db.saveBotState('dishwasherStarted', false);
+        await db.saveBotState('dishwasherStartedAt', null);
+        
         if (global.dishwasherAutoAlertTimer) {
             clearTimeout(global.dishwasherAutoAlertTimer);
             global.dishwasherAutoAlertTimer = null;
@@ -4336,7 +4506,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Set up auto-alert timer (3 hours)
-        const autoAlertTimeout = setTimeout(() => {
+        const autoAlertTimeout = setTimeout(async () => {
             // Check if we should still send the auto-alert
             if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
                 // Get the CURRENT turn user (in case there was a swap)
@@ -4368,7 +4538,7 @@ async function handleCallback(chatId, userId, userName, data) {
                     console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:15 AM Israeli time`);
                     
                     // Reschedule for 7:15 AM Israeli time
-                    const rescheduledTimeout = setTimeout(() => {
+                    const rescheduledTimeout = setTimeout(async () => {
                         // Check again if we should still send the auto-alert
                         if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
                             // Get the CURRENT turn user (in case there was a swap or DONE executed)
@@ -4396,6 +4566,9 @@ async function handleCallback(chatId, userId, userName, data) {
                             
                             // Mark alert as sent
                             global.dishwasherAlertSent = true;
+                            
+                            // Save alert state to database
+                            await db.saveBotState('dishwasherAlertSent', true);
                         }
                     }, timeUntil7AM);
                     
@@ -4429,6 +4602,9 @@ async function handleCallback(chatId, userId, userName, data) {
                 
                 // Mark alert as sent
                 global.dishwasherAlertSent = true;
+                
+                // Save alert state to database
+                await db.saveBotState('dishwasherAlertSent', true);
             }
         }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
         
@@ -4439,6 +4615,13 @@ async function handleCallback(chatId, userId, userName, data) {
         global.dishwasherStarted = true;
         global.dishwasherAlertSent = false;
         global.dishwasherCompleted = false;
+        global.dishwasherStartedAt = Date.now(); // Save timestamp for timer restoration
+        
+        // Save dishwasher state to database for persistence across restarts
+        await db.saveBotState('dishwasherStarted', true);
+        await db.saveBotState('dishwasherAlertSent', false);
+        await db.saveBotState('dishwasherCompleted', false);
+        await db.saveBotState('dishwasherStartedAt', global.dishwasherStartedAt);
         
         // Send confirmation to admin
         sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${translateName(currentUser, userId)}\n${t(userId, 'sent_to_all')}`);
@@ -4582,7 +4765,7 @@ async function handleCallback(chatId, userId, userName, data) {
         }
         
         // Set up auto-alert timer (3 hours)
-        const autoAlertTimeout = setTimeout(() => {
+        const autoAlertTimeout = setTimeout(async () => {
             // Check if we should still send the auto-alert
             if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
                 // Get the CURRENT turn user (in case there was a swap)
@@ -4614,7 +4797,7 @@ async function handleCallback(chatId, userId, userName, data) {
                     console.log(`🌙 Night hours detected (${israeliHour}:${israeliMinute.toString().padStart(2, '0')} Israeli time), rescheduling alert for 7:15 AM Israeli time`);
                     
                     // Reschedule for 7:15 AM Israeli time
-                    const rescheduledTimeout = setTimeout(() => {
+                    const rescheduledTimeout = setTimeout(async () => {
                         // Check again if we should still send the auto-alert
                         if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
                             // Get the CURRENT turn user (in case there was a swap or DONE executed)
@@ -4642,6 +4825,9 @@ async function handleCallback(chatId, userId, userName, data) {
                             
                             // Mark alert as sent
                             global.dishwasherAlertSent = true;
+                            
+                            // Save alert state to database
+                            await db.saveBotState('dishwasherAlertSent', true);
                         }
                     }, timeUntil7AM);
                     
@@ -4675,6 +4861,9 @@ async function handleCallback(chatId, userId, userName, data) {
                 
                 // Mark alert as sent
                 global.dishwasherAlertSent = true;
+                
+                // Save alert state to database
+                await db.saveBotState('dishwasherAlertSent', true);
             }
         }, 3 * 60 * 60 * 1000); // 3 hours in milliseconds
         
@@ -4685,6 +4874,13 @@ async function handleCallback(chatId, userId, userName, data) {
         global.dishwasherStarted = true;
         global.dishwasherAlertSent = false;
         global.dishwasherCompleted = false;
+        global.dishwasherStartedAt = Date.now(); // Save timestamp for timer restoration
+        
+        // Save dishwasher state to database for persistence across restarts
+        await db.saveBotState('dishwasherStarted', true);
+        await db.saveBotState('dishwasherAlertSent', false);
+        await db.saveBotState('dishwasherCompleted', false);
+        await db.saveBotState('dishwasherStartedAt', global.dishwasherStartedAt);
         
         // Send confirmation to admin
         sendMessage(chatId, `${t(userId, 'dishwasher_started_sent')}\n\n${t(userId, 'alerted_user')} ${translateName(currentUser, userId)}\n${t(userId, 'sent_to_all')}`);
@@ -6072,6 +6268,13 @@ async function handleCallback(chatId, userId, userName, data) {
         // This ensures that if "dishwasher started" is pressed during ASSIST execution, the state is already correct
         global.dishwasherCompleted = true;
         global.dishwasherStarted = false; // Reset for next cycle
+        global.dishwasherStartedAt = null; // Clear timer timestamp
+        
+        // Save dishwasher state to database
+        await db.saveBotState('dishwasherCompleted', true);
+        await db.saveBotState('dishwasherStarted', false);
+        await db.saveBotState('dishwasherStartedAt', null);
+        
         if (global.dishwasherAutoAlertTimer) {
             clearTimeout(global.dishwasherAutoAlertTimer);
             global.dishwasherAutoAlertTimer = null;
