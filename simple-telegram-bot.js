@@ -6767,16 +6767,17 @@ async function getUpdates(offset = 0) {
 
 // Webhook support for Render deployment
 const http = require('http');
-const url = require('url');
-
 // Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
 
 // HTTP server for webhook and health check (Render expects health on main port)
 const server = http.createServer(async (req, res) => {
-    const parsedUrl = url.parse(req.url, true);
-    
-    // Health check endpoint (Render expects this on main port)
-    if (parsedUrl.pathname === '/health') {
+    // Use WHATWG URL API instead of deprecated url.parse()
+    try {
+        const baseUrl = `http://${req.headers.host || 'localhost'}`;
+        const urlObj = new URL(req.url, baseUrl);
+        
+        // Health check endpoint (Render expects this on main port)
+        if (urlObj.pathname === '/health') {
         res.writeHead(200, { 
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
@@ -6804,7 +6805,7 @@ const server = http.createServer(async (req, res) => {
     }
     
     // Simple test endpoint for debugging
-    if (parsedUrl.pathname === '/test') {
+    if (urlObj.pathname === '/test') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             status: 'ok', 
@@ -6817,7 +6818,7 @@ const server = http.createServer(async (req, res) => {
     }
     
     // Webhook endpoint for Telegram
-    if (parsedUrl.pathname === '/webhook' && req.method === 'POST') {
+    if (urlObj.pathname === '/webhook' && req.method === 'POST') {
         let body = '';
         
         req.on('data', chunk => {
@@ -6916,6 +6917,12 @@ const server = http.createServer(async (req, res) => {
     // Default response
     res.writeHead(404);
     res.end('Not Found');
+    } catch (error) {
+        // Handle URL parsing errors gracefully
+        console.log(`❌ Error parsing URL: ${error.message}`);
+        res.writeHead(400);
+        res.end('Bad Request');
+    }
 });
 
 // Start server for Render deployment or if PORT is explicitly set
