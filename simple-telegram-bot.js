@@ -2813,6 +2813,11 @@ async function handleCommand(chatId, userId, userName, text) {
                 return;
             }
             
+            // Mark dishwasher as completed IMMEDIATELY (before async operations) to prevent race condition
+            // This ensures that if "dishwasher started" is pressed during DONE execution, the state is already correct
+            global.dishwasherCompleted = true;
+            global.dishwasherStarted = false; // Reset for next cycle
+            
             // Find the original user whose turn this was (in case of assignment)
             let originalUser = currentUser;
             for (const [user, assignedTo] of turnAssignments.entries()) {
@@ -2963,8 +2968,7 @@ async function handleCommand(chatId, userId, userName, text) {
                 await saveCriticalData();
             }
             
-            // Mark that dishwasher was completed (cancel auto-alert)
-            global.dishwasherCompleted = true;
+            // Cancel auto-alert timer (state already set earlier to prevent race condition)
             if (global.dishwasherAutoAlertTimer) {
                 clearTimeout(global.dishwasherAutoAlertTimer);
                 global.dishwasherAutoAlertTimer = null;
@@ -3003,6 +3007,11 @@ async function handleCommand(chatId, userId, userName, text) {
             
             // Update global dishwasher completion timestamp
             global.lastDishwasherDone = now;
+            
+            // Mark dishwasher as completed IMMEDIATELY (before async operations) to prevent race condition
+            // This ensures that if "dishwasher started" is pressed during DONE execution, the state is already correct
+            global.dishwasherCompleted = true;
+            global.dishwasherStarted = false; // Reset for next cycle
             
             // Find the original user whose turn this was (in case of assignment)
             let originalUser = currentUser;
@@ -3143,8 +3152,7 @@ async function handleCommand(chatId, userId, userName, text) {
                 }, 5000);
             }
             
-            // Mark that dishwasher was completed (cancel auto-alert)
-            global.dishwasherCompleted = true;
+            // Cancel auto-alert timer (state already set earlier to prevent race condition)
             if (global.dishwasherAutoAlertTimer) {
                 clearTimeout(global.dishwasherAutoAlertTimer);
                 global.dishwasherAutoAlertTimer = null;
@@ -3297,6 +3305,7 @@ async function handleCommand(chatId, userId, userName, text) {
         
         // Mark that dishwasher was completed (cancel auto-alert)
         global.dishwasherCompleted = true;
+        global.dishwasherStarted = false; // Reset for next cycle
         if (global.dishwasherAutoAlertTimer) {
             clearTimeout(global.dishwasherAutoAlertTimer);
             global.dishwasherAutoAlertTimer = null;
@@ -4362,7 +4371,9 @@ async function handleCallback(chatId, userId, userName, data) {
                     const rescheduledTimeout = setTimeout(() => {
                         // Check again if we should still send the auto-alert
                         if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
-                            console.log(`⏰ Auto-alert triggered after night hours delay for ${currentTurnUser}`);
+                            // Get the CURRENT turn user (in case there was a swap or DONE executed)
+                            const currentTurnUserAtAlert = getCurrentTurnUser();
+                            console.log(`⏰ Auto-alert triggered after night hours delay for ${currentTurnUserAtAlert}`);
                             
                             // Send dishwasher alert to all authorized users and admins
                             [...authorizedUsers, ...admins].forEach(user => {
@@ -4377,7 +4388,7 @@ async function handleCallback(chatId, userId, userName, data) {
                                     // Get the correct userId for language preference
                                     const recipientUserId = getUserIdFromChatId(userChatId);
                                     
-                                    const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentTurnUser, recipientUserId), sender: t(recipientUserId, 'auto_timer')});
+                                    const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentTurnUserAtAlert, recipientUserId), sender: t(recipientUserId, 'auto_timer')});
                                     console.log(`🔔 Sending delayed auto dishwasher alert to ${user} (${userChatId}, userId: ${recipientUserId})`);
                                     sendMessage(userChatId, alertMessage);
                                 }
@@ -4606,7 +4617,9 @@ async function handleCallback(chatId, userId, userName, data) {
                     const rescheduledTimeout = setTimeout(() => {
                         // Check again if we should still send the auto-alert
                         if (global.dishwasherStarted && !global.dishwasherAlertSent && !global.dishwasherCompleted) {
-                            console.log(`⏰ Auto-alert triggered after night hours delay for ${currentTurnUser}`);
+                            // Get the CURRENT turn user (in case there was a swap or DONE executed)
+                            const currentTurnUserAtAlert = getCurrentTurnUser();
+                            console.log(`⏰ Auto-alert triggered after night hours delay for ${currentTurnUserAtAlert}`);
                             
                             // Send dishwasher alert to all authorized users and admins
                             [...authorizedUsers, ...admins].forEach(user => {
@@ -4621,7 +4634,7 @@ async function handleCallback(chatId, userId, userName, data) {
                                     // Get the correct userId for language preference
                                     const recipientUserId = getUserIdFromChatId(userChatId);
                                     
-                                    const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentTurnUser, recipientUserId), sender: t(recipientUserId, 'auto_timer')});
+                                    const alertMessage = t(recipientUserId, 'dishwasher_alert_message', {user: translateName(currentTurnUserAtAlert, recipientUserId), sender: t(recipientUserId, 'auto_timer')});
                                     console.log(`🔔 Sending delayed auto dishwasher alert to ${user} (${userChatId}, userId: ${recipientUserId})`);
                                     sendMessage(userChatId, alertMessage);
                                 }
@@ -6055,8 +6068,10 @@ async function handleCallback(chatId, userId, userName, data) {
         // Update global dishwasher completion timestamp
         global.lastDishwasherDone = now;
         
-        // Mark that dishwasher was completed (cancel auto-alert)
+        // Mark dishwasher as completed IMMEDIATELY (before async operations) to prevent race condition
+        // This ensures that if "dishwasher started" is pressed during ASSIST execution, the state is already correct
         global.dishwasherCompleted = true;
+        global.dishwasherStarted = false; // Reset for next cycle
         if (global.dishwasherAutoAlertTimer) {
             clearTimeout(global.dishwasherAutoAlertTimer);
             global.dishwasherAutoAlertTimer = null;
