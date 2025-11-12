@@ -1754,7 +1754,9 @@ const translations = {
         
         // Dishwasher confirmation dialog
         'dishwasher_already_running': '⚠️ Dishwasher is already running!\n\nPressing again will:\n• Reset the 3-hour timer\n• Send new notifications to everyone\n• Cancel the current timer\n\nAre you sure you want to reset?',
+        'dishwasher_finished_not_done': '⚠️ Dishwasher is already finished but wasn\'t marked done!\n\nPressing again will:\n• Start a new dishwasher cycle\n• Send new notifications to everyone\n\nAre you sure you want to start a new cycle?',
         'yes_reset_timer': 'Yes, Reset Timer',
+        'yes_start_new': 'Yes, Start New',
         'cancel': 'Cancel',
         'reset_cancelled': 'Reset cancelled. Dishwasher timer remains unchanged.',
         'error_occurred': '❌ An error occurred. Please try again.',
@@ -2186,7 +2188,9 @@ const translations = {
         
         // Dishwasher confirmation dialog
         'dishwasher_already_running': '⚠️ המדיח כבר פועל!\n\nלחיצה שוב תגרום ל:\n• איפוס טיימר של 3 שעות\n• שליחת התראות חדשות לכולם\n• ביטול הטיימר הנוכחי\n\nהאם אתה בטוח שברצונך לאפס?',
+        'dishwasher_finished_not_done': '⚠️ המדיח כבר הסתיים אבל לא סומן כהושלם!\n\nלחיצה שוב תגרום ל:\n• התחלת מחזור מדיח חדש\n• שליחת התראות חדשות לכולם\n\nהאם אתה בטוח שברצונך להתחיל מחזור חדש?',
         'yes_reset_timer': 'כן, אפס טיימר',
+        'yes_start_new': 'כן, התחל חדש',
         'cancel': 'ביטול',
         'reset_cancelled': 'האיפוס בוטל. טיימר המדיח נותר ללא שינוי.',
         'error_occurred': '❌ אירעה שגיאה. אנא נסה שוב.',
@@ -4703,13 +4707,27 @@ async function handleCallback(chatId, userId, userName, data) {
         
         // Check if dishwasher is already running and not completed
         if (global.dishwasherStarted && !global.dishwasherCompleted) {
-            // Show confirmation dialog
+            // Case 1: Within 3 hours (alert not sent yet)
+            // Case 2: After 3 hours (alert already sent)
+            const isCase2 = global.dishwasherAlertSent;
+            
+            let confirmMessage;
+            let buttonText;
+            
+            if (isCase2) {
+                // Case 2: Alert was already sent - starting new cycle
+                confirmMessage = t(userId, 'dishwasher_finished_not_done');
+                buttonText = t(userId, 'yes_start_new');
+            } else {
+                // Case 1: Timer still running - reset timer
+                confirmMessage = t(userId, 'dishwasher_already_running');
+                buttonText = t(userId, 'yes_reset_timer');
+            }
+            
             const buttons = [
-                [{ text: t(userId, 'yes_reset_timer'), callback_data: 'confirm_reset_dishwasher' }],
+                [{ text: buttonText, callback_data: 'confirm_reset_dishwasher' }],
                 [{ text: t(userId, 'cancel'), callback_data: 'cancel_reset_dishwasher' }]
             ];
-            
-            const confirmMessage = t(userId, 'dishwasher_already_running');
             
             sendMessageWithButtons(chatId, confirmMessage, buttons);
             return; // Don't proceed with normal logic
