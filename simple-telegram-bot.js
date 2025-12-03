@@ -1256,8 +1256,6 @@ function broadcastMonthlyReport(monthKey = null, isAutoReport = false) {
     const currentMonthKey = monthKey || getCurrentMonthKey();
     console.log(`📊 Broadcasting monthly report for ${currentMonthKey}${isAutoReport ? ' (automatic)' : ' (manual)'}`);
     
-    let recipientCount = 0;
-    
     // Collect all unique chat IDs to avoid duplicates
     const chatIdsToNotify = new Set();
     
@@ -1272,15 +1270,22 @@ function broadcastMonthlyReport(monthKey = null, isAutoReport = false) {
         }
     });
     
-    // Send to each unique chat ID only once
-    chatIdsToNotify.forEach(chatId => {
-        const report = generateMonthlyReport(currentMonthKey, chatId, isAutoReport);
-        sendMessage(chatId, report);
-        recipientCount++;
+    // Send to each unique chat ID only once with rate limiting (30 messages/second max)
+    // Add small delay between messages to avoid Telegram rate limits
+    const chatIdsArray = Array.from(chatIdsToNotify);
+    const totalRecipients = chatIdsArray.length;
+    
+    chatIdsArray.forEach((chatId, index) => {
+        setTimeout(() => {
+            const report = generateMonthlyReport(currentMonthKey, chatId, isAutoReport);
+            sendMessage(chatId, report);
+            if (index === chatIdsArray.length - 1) {
+                console.log(`📊 Monthly report sent to ${totalRecipients} recipients`);
+            }
+        }, index * 50); // 50ms delay between messages (20 messages/second, well under Telegram's 30/sec limit)
     });
     
-    console.log(`📊 Monthly report sent to ${recipientCount} recipients`);
-    return recipientCount;
+    return totalRecipients;
 }
 
 // Swap request tracking
@@ -7074,28 +7079,177 @@ getUpdates();
 // Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
 
 // Automatic monthly report system
-function checkAndSendMonthlyReport() {
+// Track if report was already sent to prevent duplicates
+let monthlyReportSent = new Map(); // Map: monthKey -> true
+let monthlyReportTimer = null;
+
+// Send monthly report (only called when it's actually time)
+// Sends report for the PREVIOUS month (the month that just ended)
+function sendMonthlyReport() {
     const now = new Date();
+    const israeliDateStr = now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', year: 'numeric', month: 'numeric', day: 'numeric'});
+    const parts = israeliDateStr.match(/(\d+)\/(\d+)\/(\d+)/);
+    if (!parts) {
+        console.error('❌ Failed to parse Israeli date');
+        return;
+    }
     
-    // Check Israeli time for consistency
-    const israeliHour = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric', hour12: false}));
-    const israeliMinute = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+    // Get previous month (the month that just ended)
+    let prevMonth = parseInt(parts[1]) - 1; // Current month (1-indexed) - 1
+    let prevYear = parseInt(parts[3]);
+    if (prevMonth === 0) {
+        prevMonth = 12;
+        prevYear -= 1;
+    }
     
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const isLastDayOfMonth = now.getDate() === lastDayOfMonth;
-    const isMorningTime = israeliHour === 10 && israeliMinute >= 0 && israeliMinute < 5; // Between 10:00-10:04 Israeli time
+    const previousMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    const alreadySent = monthlyReportSent.get(previousMonthKey);
     
-    console.log(`📅 Monthly report check: ${now.toISOString()} - Last day: ${isLastDayOfMonth}, Morning time (Israeli): ${israeliHour}:${israeliMinute.toString().padStart(2, '0')}, isMorningTime: ${isMorningTime}`);
-    
-    if (isLastDayOfMonth && isMorningTime) {
-        console.log('📊 Sending automatic monthly report...');
-        const currentMonthKey = getCurrentMonthKey();
-        broadcastMonthlyReport(currentMonthKey, true);
+    if (!alreadySent) {
+        console.log(`📊 Sending automatic monthly report for ${previousMonthKey}...`);
+        broadcastMonthlyReport(previousMonthKey, true);
+        monthlyReportSent.set(previousMonthKey, true);
+        
+        // Schedule next month's report
+        scheduleNextMonthlyReport();
     }
 }
 
-// Check for monthly reports once daily at 10:00 AM
-setInterval(checkAndSendMonthlyReport, 24 * 60 * 60 * 1000); // 24 hours
+// Schedule the monthly report for the first day of next month at 10:00 AM Israeli time
+let scheduleRecursionDepth = 0;
+const MAX_SCHEDULE_RECURSION = 10; // Safety limit to prevent infinite recursion
+
+function scheduleNextMonthlyReport() {
+    // Safety check to prevent infinite recursion
+    scheduleRecursionDepth++;
+    if (scheduleRecursionDepth > MAX_SCHEDULE_RECURSION) {
+        console.error('❌ Maximum recursion depth reached in scheduleNextMonthlyReport. Resetting...');
+        scheduleRecursionDepth = 0;
+        // Fallback: schedule for next month manually (using Israeli time)
+        const now = new Date();
+        const israeliDateStr = now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', year: 'numeric', month: 'numeric', day: 'numeric'});
+        const fallbackParts = israeliDateStr.match(/(\d+)\/(\d+)\/(\d+)/);
+        if (fallbackParts) {
+            const fallbackMonth = parseInt(fallbackParts[1]) - 1; // 0-indexed
+            const fallbackYear = parseInt(fallbackParts[3]);
+            const nextMonth = fallbackMonth === 11 
+                ? new Date(Date.UTC(fallbackYear + 1, 0, 1, 7, 0, 0)) // January next year, approximate UTC+3
+                : new Date(Date.UTC(fallbackYear, fallbackMonth + 1, 1, 7, 0, 0)); // Next month, approximate UTC+3
+            const msUntilNext = nextMonth.getTime() - now.getTime();
+            if (msUntilNext > 0) {
+                monthlyReportTimer = setTimeout(() => {
+                    scheduleRecursionDepth = 0;
+                    sendMonthlyReport();
+                }, msUntilNext);
+                console.log(`📅 Monthly report scheduled (fallback) for ${nextMonth.toISOString()}`);
+            }
+        }
+        return;
+    }
+    
+    // Clear existing timer
+    if (monthlyReportTimer) {
+        clearTimeout(monthlyReportTimer);
+        monthlyReportTimer = null;
+    }
+    
+    const now = new Date();
+    
+    // Get current Israeli time
+    const israeliNowStr = now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'});
+    const parts = israeliNowStr.match(/(\d+)\/(\d+)\/(\d+),?\s+(\d+):(\d+)/);
+    if (!parts) {
+        console.error('❌ Failed to parse Israeli time');
+        return;
+    }
+    
+    const currentMonth = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
+    const currentDay = parseInt(parts[2]);
+    const currentYear = parseInt(parts[3]);
+    const currentHour = parseInt(parts[4]);
+    
+    // Determine target: first day of next month (or current month if we're before the 1st at 10 AM)
+    let targetYear, targetMonth, targetDay;
+    if (currentDay === 1 && currentHour < 10) {
+        // Today is the 1st but before 10 AM, schedule for today
+        targetYear = currentYear;
+        targetMonth = currentMonth;
+        targetDay = 1;
+    } else {
+        // Schedule for first day of next month
+        if (currentMonth === 11) {
+            targetYear = currentYear + 1;
+            targetMonth = 0; // January
+        } else {
+            targetYear = currentYear;
+            targetMonth = currentMonth + 1;
+        }
+        targetDay = 1; // First day of the month
+    }
+    
+    // Find UTC time that corresponds to 10:00 AM Israeli time on target date
+    // Test different UTC times to find the one that gives us 10:00 AM Israeli time
+    let targetUtcTime = null;
+    for (let utcHour = 6; utcHour <= 8; utcHour++) {
+        const testUtc = new Date(Date.UTC(targetYear, targetMonth, targetDay, utcHour, 0, 0));
+        const israeliTime = testUtc.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric', minute: 'numeric', hour12: false});
+        if (israeliTime === '10:00') {
+            targetUtcTime = testUtc;
+            break;
+        }
+    }
+    
+    // Fallback: approximate (UTC+3, which is common for Israeli summer time)
+    if (!targetUtcTime) {
+        targetUtcTime = new Date(Date.UTC(targetYear, targetMonth, targetDay, 7, 0, 0));
+    }
+    
+    const msUntilTarget = targetUtcTime.getTime() - now.getTime();
+    
+    if (msUntilTarget > 0) {
+        monthlyReportTimer = setTimeout(() => {
+            scheduleRecursionDepth = 0; // Reset recursion counter when timer fires
+            sendMonthlyReport();
+        }, msUntilTarget);
+        const targetDateStr = targetUtcTime.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem'});
+        console.log(`📅 Monthly report scheduled for ${targetDateStr} (in ${Math.round(msUntilTarget / (1000 * 60 * 60 * 24))} days)`);
+        scheduleRecursionDepth = 0; // Reset after successful scheduling
+    } else {
+        // Time has passed, check if we should send now (allow 5-minute window)
+        const currentMinute = parseInt(parts[5]) || 0;
+        if (currentDay === 1 && currentHour === 10 && currentMinute < 5) {
+            scheduleRecursionDepth = 0; // Reset before sending
+            sendMonthlyReport();
+        } else {
+            // Schedule for next month (recursive call, but protected by recursion depth check)
+            scheduleNextMonthlyReport();
+        }
+    }
+}
+
+// Initialize: check if we should send now, then schedule next one
+(function initMonthlyReport() {
+    const now = new Date();
+    const israeliHour = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', hour: 'numeric', hour12: false}));
+    const israeliMinute = parseInt(now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', minute: 'numeric'}));
+    const israeliDateStr = now.toLocaleString('en-US', {timeZone: 'Asia/Jerusalem', year: 'numeric', month: 'numeric', day: 'numeric'});
+    const parts = israeliDateStr.match(/(\d+)\/(\d+)\/(\d+)/);
+    if (parts) {
+        const day = parseInt(parts[2]);
+        
+        // If it's the first day of the month and between 10:00-10:04, send immediately (report for previous month)
+        const isFirstDay = day === 1;
+        const is10AMWindow = israeliHour === 10 && israeliMinute >= 0 && israeliMinute < 5;
+        
+        if (isFirstDay && is10AMWindow) {
+            sendMonthlyReport();
+        } else {
+            scheduleNextMonthlyReport();
+        }
+    } else {
+        scheduleNextMonthlyReport();
+    }
+})();
 
 // Note: Cleanup timer removed - no time limitations on requests
 
