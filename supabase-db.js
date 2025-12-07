@@ -59,9 +59,14 @@ class SupabaseDatabase {
             // Initialize database tables
             this.initTables();
             
-            // Set up periodic keep-alive ping (every 5 minutes) to prevent connection timeout
-            // This works even without undici and ensures connections stay alive during idle periods
+            // Set up periodic keep-alive ping to prevent connection timeout during long idle periods
+            // Since the bot already has auto-save every 10 minutes, this is mainly for overnight/idle periods
+            // Default: 2 hours (configurable via SUPABASE_KEEP_ALIVE_INTERVAL_HOURS)
             if (ENABLE_KEEP_ALIVE && this.supabase) {
+                // Get interval from environment variable (default: 2 hours)
+                const keepAliveIntervalHours = parseFloat(process.env.SUPABASE_KEEP_ALIVE_INTERVAL_HOURS || '2');
+                const keepAliveIntervalMs = keepAliveIntervalHours * 60 * 60 * 1000;
+                
                 this.keepAliveInterval = setInterval(async () => {
                     // Double-check supabase is still available
                     if (!this.supabase) {
@@ -77,7 +82,9 @@ class SupabaseDatabase {
                         // Silently ignore keep-alive errors to avoid log spam
                         // Connection will be re-established on next real query
                     }
-                }, 5 * 60 * 1000); // Every 5 minutes
+                }, keepAliveIntervalMs);
+                
+                console.log(`💓 Keep-alive ping configured: every ${keepAliveIntervalHours} hour(s)`);
             }
         }).catch(() => {
             // If connection test fails, initTables will handle it
