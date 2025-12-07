@@ -2,6 +2,9 @@ const { createClient } = require('@supabase/supabase-js');
 
 class SupabaseDatabase {
     constructor() {
+        // Initialize keep-alive interval reference (before any early returns)
+        this.keepAliveInterval = null;
+        
         // Get Supabase credentials from environment variables
         this.supabaseUrl = process.env.SUPABASE_URL;
         this.supabaseKey = process.env.SUPABASE_ANON_KEY;
@@ -14,6 +17,17 @@ class SupabaseDatabase {
             monthlyStats: new Map()
         };
         
+        // Set up cleanup handlers (always register, even if Supabase unavailable)
+        const cleanup = () => {
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval);
+                this.keepAliveInterval = null;
+            }
+        };
+        process.on('exit', cleanup);
+        process.on('SIGTERM', cleanup);
+        process.on('SIGINT', cleanup);
+        
         if (!this.supabaseUrl || !this.supabaseKey) {
             console.log('⚠️ Supabase credentials not found in environment variables');
             console.log('💡 Set SUPABASE_URL and SUPABASE_ANON_KEY in Render dashboard');
@@ -21,11 +35,14 @@ class SupabaseDatabase {
             return;
         }
         
-        // Initialize Supabase client with IPv4 preference
+        // Enable keep-alive for Supabase connections (default: true)
+        const ENABLE_KEEP_ALIVE = String(process.env.ENABLE_SUPABASE_KEEP_ALIVE || 'true').toLowerCase() === 'true';
+        
+        // Initialize Supabase client with timeout protection
         this.supabase = createClient(this.supabaseUrl, this.supabaseKey, {
             global: {
                 fetch: (url, options = {}) => {
-                    // Force IPv4 by modifying the URL if needed
+                    // Use native fetch with timeout to prevent hanging
                     return fetch(url, {
                         ...options,
                         // Add timeout to prevent hanging
@@ -34,13 +51,38 @@ class SupabaseDatabase {
                 }
             }
         });
-        console.log('📊 Supabase client initialized');
         
-        // Test connection
-        this.testConnection();
+        console.log('📊 Supabase client initialized' + (ENABLE_KEEP_ALIVE ? ' with keep-alive enabled' : ''));
         
-        // Initialize database tables
-        this.initTables();
+        // Test connection and set up keep-alive after connection is verified
+        this.testConnection().then(() => {
+            // Initialize database tables
+            this.initTables();
+            
+            // Set up periodic keep-alive ping (every 5 minutes) to prevent connection timeout
+            // This works even without undici and ensures connections stay alive during idle periods
+            if (ENABLE_KEEP_ALIVE && this.supabase) {
+                this.keepAliveInterval = setInterval(async () => {
+                    // Double-check supabase is still available
+                    if (!this.supabase) {
+                        return;
+                    }
+                    try {
+                        // Perform a lightweight query to keep connection alive
+                        await this.supabase
+                            .from('bot_state')
+                            .select('key')
+                            .limit(1);
+                    } catch (error) {
+                        // Silently ignore keep-alive errors to avoid log spam
+                        // Connection will be re-established on next real query
+                    }
+                }, 5 * 60 * 1000); // Every 5 minutes
+            }
+        }).catch(() => {
+            // If connection test fails, initTables will handle it
+            this.initTables();
+        });
     }
     
     async testConnection() {
