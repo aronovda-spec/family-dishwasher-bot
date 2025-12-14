@@ -2509,7 +2509,7 @@ function notifyDatabaseError(chatId, userId, userName, isAdmin) {
 }
 
 // Send message to Telegram
-function sendMessage(chatId, text) {
+function sendMessage(chatId, text, retryCount = 0) {
     // Validate text before sending
     if (!text || (typeof text === 'string' && text.trim().length === 0)) {
         console.log(`⚠️ Skipping empty message to ${chatId}`);
@@ -2517,6 +2517,8 @@ function sendMessage(chatId, text) {
     }
     
     const url = `${botUrl}/sendMessage`;
+    const MAX_RETRIES = 2;
+    const REQUEST_TIMEOUT = 10000; // 10 seconds
     
     const send = (payload) => {
         const data = JSON.stringify(payload);
@@ -2526,7 +2528,8 @@ function sendMessage(chatId, text) {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data)
             },
-            agent: telegramHttpsAgent
+            agent: telegramHttpsAgent,
+            timeout: REQUEST_TIMEOUT
     };
     const req = https.request(url, options, (res) => {
             let responseData = '';
@@ -2552,9 +2555,33 @@ function sendMessage(chatId, text) {
                 }
             });
         });
-        req.on('error', (err) => {
-            console.log(`❌ HTTPS error sending message: ${err.message}`);
+        
+        // Set request timeout
+        req.setTimeout(REQUEST_TIMEOUT, () => {
+            req.destroy();
+            if (retryCount < MAX_RETRIES) {
+                console.log(`⏱️ Request timeout, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+                setTimeout(() => sendMessage(chatId, text, retryCount + 1), 2000);
+            } else {
+                console.log(`❌ Failed to send message after ${MAX_RETRIES} retries (timeout)`);
+            }
         });
+        
+        req.on('error', (err) => {
+            // Handle network errors gracefully - don't crash
+            if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET') {
+                console.log(`🌐 Network error sending message (${err.code}): ${err.message}`);
+                if (retryCount < MAX_RETRIES) {
+                    console.log(`🔄 Retrying message send (${retryCount + 1}/${MAX_RETRIES})...`);
+                    setTimeout(() => sendMessage(chatId, text, retryCount + 1), 2000);
+                } else {
+                    console.log(`❌ Failed to send message after ${MAX_RETRIES} retries (${err.code})`);
+                }
+            } else {
+                console.log(`❌ HTTPS error sending message: ${err.message} (${err.code})`);
+            }
+        });
+        
         req.write(data);
         req.end();
     };
@@ -2564,17 +2591,21 @@ function sendMessage(chatId, text) {
 }
 
 // Send plain text (no formatting) to avoid Markdown/HTML parse errors
-function sendMessagePlain(chatId, text) {
+function sendMessagePlain(chatId, text, retryCount = 0) {
     const url = `${botUrl}/sendMessage`;
     const payload = { chat_id: chatId, text: typeof text === 'string' ? text : String(text) };
     const data = JSON.stringify(payload);
+    const MAX_RETRIES = 2;
+    const REQUEST_TIMEOUT = 10000; // 10 seconds
+    
         const options = {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data)
             },
-            agent: telegramHttpsAgent
+            agent: telegramHttpsAgent,
+            timeout: REQUEST_TIMEOUT
     };
     const req = https.request(url, options, (res) => {
         let responseData = '';
@@ -2593,15 +2624,39 @@ function sendMessagePlain(chatId, text) {
             }
         });
     });
-    req.on('error', (err) => {
-        console.log(`❌ HTTPS error sending message (plain): ${err.message}`);
+    
+    // Set request timeout
+    req.setTimeout(REQUEST_TIMEOUT, () => {
+        req.destroy();
+        if (retryCount < MAX_RETRIES) {
+            console.log(`⏱️ Plain message request timeout, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+            setTimeout(() => sendMessagePlain(chatId, text, retryCount + 1), 2000);
+        } else {
+            console.log(`❌ Failed to send plain message after ${MAX_RETRIES} retries (timeout)`);
+        }
     });
+    
+    req.on('error', (err) => {
+        // Handle network errors gracefully - don't crash
+        if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET') {
+            console.log(`🌐 Network error sending plain message (${err.code}): ${err.message}`);
+            if (retryCount < MAX_RETRIES) {
+                console.log(`🔄 Retrying plain message send (${retryCount + 1}/${MAX_RETRIES})...`);
+                setTimeout(() => sendMessagePlain(chatId, text, retryCount + 1), 2000);
+            } else {
+                console.log(`❌ Failed to send plain message after ${MAX_RETRIES} retries (${err.code})`);
+            }
+        } else {
+            console.log(`❌ HTTPS error sending message (plain): ${err.message} (${err.code})`);
+        }
+    });
+    
     req.write(data);
     req.end();
 }
 
 // Send message with buttons
-function sendMessageWithButtons(chatId, text, buttons) {
+function sendMessageWithButtons(chatId, text, buttons, retryCount = 0) {
     const url = `${botUrl}/sendMessage`;
     const data = JSON.stringify({
         chat_id: chatId,
@@ -2615,12 +2670,17 @@ function sendMessageWithButtons(chatId, text, buttons) {
     console.log(`🔘 Sending buttons to ${chatId}:`, JSON.stringify(buttons, null, 2));
     console.log(`🔘 Full request data:`, data);
     
+    const MAX_RETRIES = 2;
+    const REQUEST_TIMEOUT = 10000; // 10 seconds
+    
     const options = {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data)
-        }
+        },
+        agent: telegramHttpsAgent,
+        timeout: REQUEST_TIMEOUT
     };
     
     const req = https.request(url, options, (res) => {
@@ -2641,6 +2701,32 @@ function sendMessageWithButtons(chatId, text, buttons) {
                 console.log(`❌ Error parsing button response:`, e.message);
             }
         });
+    });
+    
+    // Set request timeout
+    req.setTimeout(REQUEST_TIMEOUT, () => {
+        req.destroy();
+        if (retryCount < MAX_RETRIES) {
+            console.log(`⏱️ Button request timeout, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+            setTimeout(() => sendMessageWithButtons(chatId, text, buttons, retryCount + 1), 2000);
+        } else {
+            console.log(`❌ Failed to send buttons after ${MAX_RETRIES} retries (timeout)`);
+        }
+    });
+    
+    req.on('error', (err) => {
+        // Handle network errors gracefully - don't crash
+        if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET') {
+            console.log(`🌐 Network error sending buttons (${err.code}): ${err.message}`);
+            if (retryCount < MAX_RETRIES) {
+                console.log(`🔄 Retrying button send (${retryCount + 1}/${MAX_RETRIES})...`);
+                setTimeout(() => sendMessageWithButtons(chatId, text, buttons, retryCount + 1), 2000);
+            } else {
+                console.log(`❌ Failed to send buttons after ${MAX_RETRIES} retries (${err.code})`);
+            }
+        } else {
+            console.log(`❌ HTTPS error sending buttons: ${err.message} (${err.code})`);
+        }
     });
     
     req.write(data);
@@ -7468,6 +7554,25 @@ function scheduleNextMonthlyReport() {
 
 // Global error handlers - restart on critical errors to prevent zombie processes
 process.on('uncaughtException', (error) => {
+    // Check if it's an AggregateError with network timeout errors
+    const isNetworkError = error.code === 'ETIMEDOUT' || error.code === 'ENETUNREACH' ||
+        (error.name === 'AggregateError' && error.code === 'ETIMEDOUT') ||
+        (error.errors && Array.isArray(error.errors) && error.errors.some(e => 
+            e.code === 'ETIMEDOUT' || e.code === 'ENETUNREACH')) ||
+        (error.message && (error.message.includes('ETIMEDOUT') || error.message.includes('ENETUNREACH')));
+    
+    // Ignore network timeout errors - these are handled gracefully
+    if (isNetworkError) {
+        console.error('🌐 Network timeout error (handled gracefully):', error.message || error);
+        if (error.errors && Array.isArray(error.errors)) {
+            error.errors.forEach(err => {
+                console.error(`  - ${err.code}: ${err.message}`);
+            });
+        }
+        console.error('Stack trace:', error.stack);
+        return; // Don't crash on network errors
+    }
+    
     console.error('❌ Uncaught Exception:', error);
     console.error('Stack trace:', error.stack);
     console.log('🔄 Critical error detected - restarting process...');
@@ -7479,6 +7584,26 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
+    // Check if it's an AggregateError or network timeout error
+    const isNetworkError = reason && (
+        reason.code === 'ETIMEDOUT' || reason.code === 'ENETUNREACH' ||
+        (reason.name === 'AggregateError' && reason.code === 'ETIMEDOUT') ||
+        (reason.errors && Array.isArray(reason.errors) && reason.errors.some(e => 
+            e.code === 'ETIMEDOUT' || e.code === 'ENETUNREACH')) ||
+        (reason.message && (reason.message.includes('ETIMEDOUT') || reason.message.includes('ENETUNREACH')))
+    );
+    
+    // Ignore network timeout errors in promises
+    if (isNetworkError) {
+        console.error('🌐 Network timeout in promise (handled gracefully):', reason.message || reason);
+        if (reason.errors && Array.isArray(reason.errors)) {
+            reason.errors.forEach(err => {
+                console.error(`  - ${err.code}: ${err.message}`);
+            });
+        }
+        return; // Don't crash on network errors
+    }
+    
     console.error('❌ Unhandled Promise Rejection at:', promise);
     console.error('Reason:', reason);
     console.log('🔄 Critical promise rejection - restarting process...');
