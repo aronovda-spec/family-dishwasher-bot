@@ -754,6 +754,23 @@ async function incrementUserScore(userName) {
     normalizeScoresIfNeeded();
 }
 
+async function modifyUserScore(userName, amount) {
+    // Modify user score by a specific amount (positive or negative)
+    const currentScore = userScores.get(userName) || 0;
+    const newScore = currentScore + amount;
+    userScores.set(userName, newScore);
+    console.log(`📊 ${userName} score modified: ${currentScore} → ${newScore} (${amount > 0 ? '+' : ''}${amount})`);
+    
+    // Track change for batch saving
+    pendingScoreChanges.set(userName, newScore);
+    isDirty = true;
+    
+    // Check if normalization is needed (when scores get too high)
+    normalizeScoresIfNeeded();
+    
+    return newScore;
+}
+
 function normalizeScoresIfNeeded() {
     const scores = Array.from(userScores.values());
     const maxScore = Math.max(...scores);
@@ -817,6 +834,7 @@ const userQueueMapping = new Map(); // Map: Telegram user ID -> Queue name
 const userStates = new Map(); // userId -> current state
 const pendingAnnouncements = new Map(); // userId -> announcement data
 const pendingMessages = new Map(); // userId -> message data
+const pendingScoreAdjustments = new Map(); // userId -> {user, amount, oldScore}
 const queueUserMapping = new Map(); // Map: Queue name -> Telegram user ID
 
 // Queue management system
@@ -1654,6 +1672,15 @@ const translations = {
         'normalize_now': '✅ Normalize Now',
         'scores_normalized': '✅ Scores Normalized!\n\n📊 New Scores:\n{newScores}\n\n🎯 Relative positions preserved, numbers reduced.',
         
+        // Adjust Score
+        'adjust_score': '📝 Adjust Score',
+        'select_user_adjust_score': 'Select user to adjust their score:',
+        'enter_score_adjustment': 'Enter score adjustment for {user}:\n\n📊 Current score: {score}\n\n💡 Enter a positive number to increase, negative to decrease.\nExample: -1 to reduce by 1, +2 to increase by 2',
+        'score_adjustment_preview': '📝 **Score Adjustment Preview:**\n\n👤 **User:** {user}\n📊 **Current Score:** {oldScore}\n📝 **Adjustment:** {change}\n📊 **New Score:** {newScore}\n\n⚠️ **This will affect turn order.**\n\nConfirm?',
+        'score_adjusted': '✅ Score Adjusted!\n\n{user}: {oldScore} → {newScore} ({change})\n\n🎯 This may affect turn order.',
+        'invalid_score_amount': '❌ Invalid amount! Please enter a valid number.',
+        'confirm_adjust_score': '✅ Confirm & Apply',
+        
         // Reorder Queue
         'reorder_tie_breaker_priority': '🔄 **Reorder Tie-Breaker Priority**\n\n📋 **Current Priority Order:**\n{currentOrder}\n\n💡 **This affects who gets priority when scores are tied.**\n\n**Options:**',
         'set_custom_order': '🔄 Set Custom Order',
@@ -2043,6 +2070,15 @@ const translations = {
         'normalize_scores_title': '📊 נמל ניקודים\n\nניקוד נוכחי:\n{currentScores}\n\nזה יפחית {minScore} מכל הניקודים כדי לשמור על מספרים ניתנים לניהול.\n\nלהמשיך?',
         'normalize_now': '✅ נמל עכשיו',
         'scores_normalized': '✅ ניקודים נומלו!\n\n📊 ניקודים חדשים:\n{newScores}\n\n🎯 מיקומים יחסיים נשמרו, מספרים הופחתו.',
+        
+        // Adjust Score
+        'adjust_score': '📝 התאם ניקוד',
+        'select_user_adjust_score': 'בחר משתמש להתאמת הניקוד שלו:',
+        'enter_score_adjustment': 'הזן התאמת ניקוד עבור {user}:\n\n📊 ניקוד נוכחי: {score}\n\n💡 הזן מספר חיובי כדי להגדיל, שלילי כדי להקטין.\nדוגמה: -1 כדי להפחית ב-1, +2 כדי להגדיל ב-2',
+        'score_adjustment_preview': '📝 **תצוגה מקדימה של התאמת ניקוד:**\n\n👤 **משתמש:** {user}\n📊 **ניקוד נוכחי:** {oldScore}\n📝 **התאמה:** {change}\n📊 **ניקוד חדש:** {newScore}\n\n⚠️ **זה ישפיע על סדר התורות.**\n\nלאשר?',
+        'score_adjusted': '✅ ניקוד הותאם!\n\n{user}: {oldScore} → {newScore} ({change})\n\n🎯 זה עשוי להשפיע על סדר התורות.',
+        'invalid_score_amount': '❌ סכום לא תקין! אנא הזן מספר תקין.',
+        'confirm_adjust_score': '✅ אשר והחל',
         
         // Reorder Queue
         'reorder_tie_breaker_priority': '🔄 **סידור עדיפות קביעות מחדש**\n\n📋 **סדר עדיפות נוכחי:**\n{currentOrder}\n\n💡 **זה משפיע על מי מקבל עדיפות כאשר הניקודים שווים.**\n\n**אפשרויות:**',
@@ -2671,6 +2707,72 @@ async function handleCommand(chatId, userId, userName, text) {
             [
                 { text: t(userId, 'send_to_all'), callback_data: 'confirm_send_message' },
                 { text: t(userId, 'cancel'), callback_data: 'cancel_message' }
+            ]
+        ];
+        
+        sendMessageWithButtons(chatId, previewMessage, buttons);
+        userStates.delete(userId);
+        return;
+        
+    } else if (userState && userState.startsWith('adjusting_score_')) {
+        // Admin is entering score adjustment amount
+        const selectedUser = userState.replace('adjusting_score_', '');
+        
+        // Validate user exists
+        if (!selectedUser || !originalQueue.includes(selectedUser)) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            userStates.delete(userId);
+            return;
+        }
+        
+        const adjustmentText = text.trim();
+        
+        // Validate input is not empty
+        if (!adjustmentText) {
+            sendMessage(chatId, t(userId, 'invalid_score_amount'));
+            return;
+        }
+        
+        // Parse the adjustment amount (handles + and - signs)
+        // Allow formats: "5", "+5", "-5", "0"
+        const amount = parseInt(adjustmentText, 10);
+        
+        // Validate it's a valid integer (not NaN)
+        if (isNaN(amount)) {
+            sendMessage(chatId, t(userId, 'invalid_score_amount'));
+            return;
+        }
+        
+        // Optional: Warn if decimal was entered (parseInt truncates decimals)
+        // But allow it - user might intentionally enter "1.5" expecting truncation
+        
+        // Get current score
+        const oldScore = userScores.get(selectedUser) || 0;
+        const newScore = oldScore + amount;
+        
+        // Format the change display
+        const change = amount > 0 ? `+${amount}` : `${amount}`;
+        
+        // Store pending adjustment for confirmation
+        pendingScoreAdjustments.set(userId, {
+            user: selectedUser,
+            amount: amount,
+            oldScore: oldScore,
+            newScore: newScore
+        });
+        
+        // Show preview with confirmation buttons
+        const previewMessage = t(userId, 'score_adjustment_preview', {
+            user: addRoyalEmojiTranslated(selectedUser, userId),
+            oldScore: oldScore,
+            change: change,
+            newScore: newScore
+        });
+        
+        const buttons = [
+            [
+                { text: t(userId, 'confirm_adjust_score'), callback_data: 'confirm_adjust_score' },
+                { text: t(userId, 'cancel'), callback_data: 'cancel_adjust_score' }
             ]
         ];
         
@@ -5005,6 +5107,63 @@ async function handleCallback(chatId, userId, userName, data) {
         userStates.delete(userId);
         sendMessage(chatId, t(userId, 'cancel'));
         
+    } else if (data === 'confirm_adjust_score') {
+        // Confirm and apply score adjustment
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const adjustment = pendingScoreAdjustments.get(userId);
+        if (!adjustment) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
+        const { user, amount, oldScore } = adjustment;
+        
+        // Validate user still exists
+        if (!user || !originalQueue.includes(user)) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            pendingScoreAdjustments.delete(userId);
+            return;
+        }
+        
+        // Modify the score
+        const newScore = await modifyUserScore(user, amount);
+        
+        // Save to database
+        await saveBotData();
+        
+        // Clear pending adjustment
+        pendingScoreAdjustments.delete(userId);
+        
+        // Format the change display
+        const change = amount > 0 ? `+${amount}` : `${amount}`;
+        
+        // Send confirmation message
+        const message = t(userId, 'score_adjusted', {
+            user: addRoyalEmojiTranslated(user, userId),
+            oldScore: oldScore,
+            newScore: newScore,
+            change: change
+        });
+        
+        sendMessage(chatId, message);
+        
+    } else if (data === 'cancel_adjust_score') {
+        // Cancel score adjustment
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        pendingScoreAdjustments.delete(userId);
+        userStates.delete(userId);
+        sendMessage(chatId, t(userId, 'cancel'));
+        
     } else if (data === 'acknowledge_announcement') {
         // User acknowledges announcement (simple response)
         sendMessage(chatId, '✅');
@@ -5119,6 +5278,7 @@ async function handleCallback(chatId, userId, userName, data) {
                 { text: t(userId, 'remove_user'), callback_data: "remove_queue_user_menu" }
             ],
             [
+                { text: t(userId, 'adjust_score'), callback_data: "adjust_score_menu" },
                 { text: t(userId, 'reset_scores'), callback_data: "reset_scores_menu" }
             ]
         ];
@@ -5587,6 +5747,59 @@ async function handleCallback(chatId, userId, userName, data) {
         
         const message = t(userId, 'scores_normalized', {newScores: newScores});
         sendMessage(chatId, message);
+        
+    } else if (data === 'adjust_score_menu') {
+        // Show user selection for score adjustment
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const buttons = originalQueue.map(user => {
+            const currentScore = userScores.get(user) || 0;
+            return [{ text: `${addRoyalEmojiTranslated(user, userId)} (${currentScore})`, callback_data: `adjust_score_select_${user}` }];
+        });
+        
+        sendMessageWithButtons(chatId, t(userId, 'select_user_adjust_score'), buttons);
+        
+    } else if (data.startsWith('adjust_score_select_')) {
+        // User selected, now ask for amount
+        const isAdmin = isUserAdmin(userName, userId);
+        if (!isAdmin) {
+            sendMessage(chatId, t(userId, 'admin_access_required'));
+            return;
+        }
+        
+        const selectedUser = data ? data.replace('adjust_score_select_', '') : '';
+        
+        if (!selectedUser) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
+        // Validate user exists in originalQueue
+        if (!originalQueue.includes(selectedUser)) {
+            sendMessage(chatId, t(userId, 'error_invalid_selection'));
+            return;
+        }
+        
+        const currentScore = userScores.get(selectedUser) || 0;
+        
+        // Store the selected user in userStates for the next message
+        userStates.set(userId, `adjusting_score_${selectedUser}`);
+        
+        const message = t(userId, 'enter_score_adjustment', {
+            user: addRoyalEmojiTranslated(selectedUser, userId),
+            score: currentScore
+        });
+        
+        // Add cancel button
+        const cancelButton = [
+            [{ text: t(userId, 'cancel'), callback_data: 'cancel_adjust_score' }]
+        ];
+        
+        sendMessageWithButtons(chatId, message, cancelButton);
         
     } else if (data === 'language_switch') {
         const currentLang = getUserLanguage(userId);
