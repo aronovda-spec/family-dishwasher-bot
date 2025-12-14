@@ -7046,25 +7046,41 @@ async function getUpdates(offset = 0) {
                             // Update last action
                             lastUserAction.set(userId, { action: data, timestamp: now });
                             
-                            await handleCallback(chatId, userId, userName, data);
-                            
-                            // Answer callback query
+                            // Answer callback query IMMEDIATELY for instant user feedback
                             const answerUrl = `${botUrl}/answerCallbackQuery`;
                             const answerData = JSON.stringify({
                                 callback_query_id: update.callback_query.id
                             });
-                            
+
                             const answerOptions = {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'Content-Length': answerData.length
-                                }
+                                    'Content-Length': Buffer.byteLength(answerData)
+                                },
+                                agent: telegramHttpsAgent,
+                                timeout: 5000
                             };
-                            
-    const answerReq = https.request(answerUrl, { ...answerOptions, agent: telegramHttpsAgent });
+
+                            const answerReq = https.request(answerUrl, answerOptions, (res) => {
+                                // Silently handle response
+                            });
+
+                            answerReq.on('error', (err) => {
+                                console.log(`⚠️ Error answering callback: ${err.message}`);
+                            });
+
+                            answerReq.setTimeout(5000, () => {
+                                answerReq.destroy();
+                            });
+
                             answerReq.write(answerData);
                             answerReq.end();
+
+                            // Process callback asynchronously AFTER answering (non-blocking)
+                            handleCallback(chatId, userId, userName, data).catch(err => {
+                                console.error('❌ Error in handleCallback:', err);
+                            });
                         }
                     }
                     
@@ -7202,25 +7218,41 @@ const server = http.createServer(async (req, res) => {
                     // Update last action
                     lastUserAction.set(userId, { action: data, timestamp: now });
                     
-                    await handleCallback(chatId, userId, userName, data);
-                    
-                    // Answer callback query
+                    // Answer callback query IMMEDIATELY for instant user feedback
                     const answerUrl = `${botUrl}/answerCallbackQuery`;
                     const answerData = JSON.stringify({
                         callback_query_id: update.callback_query.id
                     });
-                    
+
                     const answerOptions = {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Content-Length': answerData.length
-                        }
+                            'Content-Length': Buffer.byteLength(answerData)
+                        },
+                        agent: telegramHttpsAgent,
+                        timeout: 5000
                     };
-                    
-                    const answerReq = https.request(answerUrl, answerOptions);
+
+                    const answerReq = https.request(answerUrl, answerOptions, (res) => {
+                        // Silently handle response
+                    });
+
+                    answerReq.on('error', (err) => {
+                        console.log(`⚠️ Error answering callback: ${err.message}`);
+                    });
+
+                    answerReq.setTimeout(5000, () => {
+                        answerReq.destroy();
+                    });
+
                     answerReq.write(answerData);
                     answerReq.end();
+
+                    // Process callback asynchronously AFTER answering (non-blocking)
+                    handleCallback(chatId, userId, userName, data).catch(err => {
+                        console.error('❌ Error in handleCallback:', err);
+                    });
                 }
                 
                 res.writeHead(200);
@@ -7832,4 +7864,3 @@ function cleanupOldData() {
 }
 
 // Cleanup timer removed - now combined with maintenance timer above
-
