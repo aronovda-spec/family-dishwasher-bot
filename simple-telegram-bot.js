@@ -7127,6 +7127,77 @@ async function getUpdates(offset = 0) {
     });
 }
 
+// Process Telegram update after webhook HTTP response (Telegram expects a fast 200 OK).
+async function dispatchWebhookUpdate(update) {
+    try {
+        if (update.message) {
+            const chatId = update.message.chat.id;
+            const userId = update.message.from.id;
+            const fullName = update.message.from.first_name +
+                (update.message.from.last_name ? ' ' + update.message.from.last_name : '');
+            const userName = getFirstName(fullName);
+            const text = update.message.text;
+            await handleCommand(chatId, userId, userName, text);
+        }
+
+        if (update.callback_query) {
+            const chatId = update.callback_query.message.chat.id;
+            const userId = update.callback_query.from.id;
+            const fullName = (update.callback_query.from.first_name || '') +
+                (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
+            const userName = getFirstName(fullName || 'Unknown User');
+            const data = update.callback_query.data;
+
+            if (!userName) {
+                console.log(`❌ Error: userName is undefined for callback query from userId ${userId}`);
+                return;
+            }
+
+            const now = Date.now();
+            const lastAction = lastUserAction.get(userId);
+
+            if (lastAction && lastAction.action === data && (now - lastAction.timestamp) < ACTION_COOLDOWN) {
+                console.log(`🔄 Skipping rapid button click: ${data} by ${userName} (cooldown: ${ACTION_COOLDOWN}ms)`);
+                return;
+            }
+
+            lastUserAction.set(userId, { action: data, timestamp: now });
+
+            const answerUrl = `${botUrl}/answerCallbackQuery`;
+            const answerData = JSON.stringify({
+                callback_query_id: update.callback_query.id
+            });
+
+            const answerOptions = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(answerData)
+                },
+                agent: telegramHttpsAgent,
+                timeout: 5000
+            };
+
+            const answerReq = https.request(answerUrl, answerOptions, () => {});
+
+            answerReq.on('error', (err) => {
+                console.log(`⚠️ Error answering callback: ${err.message}`);
+            });
+
+            answerReq.setTimeout(5000, () => {
+                answerReq.destroy();
+            });
+
+            answerReq.write(answerData);
+            answerReq.end();
+
+            await handleCallback(chatId, userId, userName, data);
+        }
+    } catch (err) {
+        console.error('❌ Error in dispatchWebhookUpdate:', err);
+    }
+}
+
 // Note: Time limitations removed - requests stay until manually canceled
 
 // Webhook support for Render deployment
@@ -7189,9 +7260,15 @@ const server = http.createServer(async (req, res) => {
             body += chunk.toString();
         });
         
-        req.on('end', async () => {
+        req.on('end', () => {
             try {
                 const update = JSON.parse(body);
+                
+                if (update.update_id === undefined || update.update_id === null) {
+                    res.writeHead(400);
+                    res.end('Bad Request');
+                    return;
+                }
                 
                 // Deduplication: Skip if this update was already processed
                 if (processedUpdates.has(update.update_id)) {
@@ -7210,80 +7287,15 @@ const server = http.createServer(async (req, res) => {
                     oldestUpdates.forEach(id => processedUpdates.delete(id));
                 }
                 
-                // Process the update
-                if (update.message) {
-                    const chatId = update.message.chat.id;
-                    const userId = update.message.from.id;
-                    const fullName = update.message.from.first_name + 
-                        (update.message.from.last_name ? ' ' + update.message.from.last_name : '');
-                    const userName = getFirstName(fullName); // Use first name only
-                    const text = update.message.text;
-                    
-                    await handleCommand(chatId, userId, userName, text);
-                }
-                
-                if (update.callback_query) {
-                    const chatId = update.callback_query.message.chat.id;
-                    const userId = update.callback_query.from.id;
-                    const fullName = (update.callback_query.from.first_name || '') + 
-                        (update.callback_query.from.last_name ? ' ' + update.callback_query.from.last_name : '');
-                    const userName = getFirstName(fullName || 'Unknown User'); // Use first name only
-                    const data = update.callback_query.data;
-                    
-                    // Button click deduplication: prevent rapid multiple clicks on same button
-    const now = Date.now();
-                    const lastAction = lastUserAction.get(userId);
-                    
-                    if (lastAction && lastAction.action === data && (now - lastAction.timestamp) < ACTION_COOLDOWN) {
-                        console.log(`🔄 Skipping rapid button click: ${data} by ${userName} (cooldown: ${ACTION_COOLDOWN}ms)`);
-                        res.writeHead(200);
-                        res.end('OK');
-                        return;
-                    }
-                    
-                    // Update last action
-                    lastUserAction.set(userId, { action: data, timestamp: now });
-                    
-                    // Answer callback query IMMEDIATELY for instant user feedback
-                    const answerUrl = `${botUrl}/answerCallbackQuery`;
-                    const answerData = JSON.stringify({
-                        callback_query_id: update.callback_query.id
-                    });
-
-                    const answerOptions = {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Content-Length': Buffer.byteLength(answerData)
-                        },
-                        agent: telegramHttpsAgent,
-                        timeout: 5000
-                    };
-
-                    const answerReq = https.request(answerUrl, answerOptions, (res) => {
-                        // Silently handle response
-                    });
-
-                    answerReq.on('error', (err) => {
-                        console.log(`⚠️ Error answering callback: ${err.message}`);
-                    });
-
-                    answerReq.setTimeout(5000, () => {
-                        answerReq.destroy();
-                    });
-
-                    answerReq.write(answerData);
-                    answerReq.end();
-
-                    // Process callback asynchronously AFTER answering (non-blocking)
-                    handleCallback(chatId, userId, userName, data).catch(err => {
-                        console.error('❌ Error in handleCallback:', err);
-                    });
-                }
-                
+                // Acknowledge immediately — Telegram may drop updates if the webhook handler is slow.
                 res.writeHead(200);
                 res.end('OK');
                 
+                setImmediate(() => {
+                    dispatchWebhookUpdate(update).catch((err) => {
+                        console.error('❌ dispatchWebhookUpdate failed:', err);
+                    });
+                });
             } catch (error) {
                 console.log('❌ Error processing webhook:', error.message);
                 res.writeHead(400);
@@ -7377,60 +7389,52 @@ function broadcastMessage(messageText, fromUser, isAnnouncement = false) {
 const PORT = process.env.PORT || 3000;
 if (process.env.RENDER_EXTERNAL_HOSTNAME) {
     // Always start server on Render - bind to 0.0.0.0 for external access
-    server.listen(PORT, '0.0.0.0', async () => {
+    server.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Bot webhook server running on port ${PORT} (0.0.0.0)`);
         console.log(`🌐 Health check: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/health`);
         console.log(`🔗 Webhook endpoint: https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`);
-        
-        // Data is already loaded in db.db.on('open') handler above
         console.log('✅ Bot startup complete - data already loaded');
-});
+        
+        const webhookUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`;
+        console.log(`🔗 Setting webhook to: ${webhookUrl}`);
+        
+        const webhookData = JSON.stringify({
+            url: webhookUrl
+        });
+        
+        const webhookOptions = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(webhookData)
+            }
+        };
+        
+        const webhookReq = https.request(`${botUrl}/setWebhook`, { ...webhookOptions, agent: telegramHttpsAgent }, (res) => {
+            let responseData = '';
+            res.on('data', (chunk) => {
+                responseData += chunk;
+            });
+            res.on('end', () => {
+                console.log('🔗 Webhook response:', responseData);
+                console.log('✅ Bot ready with webhook mode');
+            });
+        });
+        
+        webhookReq.on('error', (err) => {
+            console.error('❌ setWebhook request failed:', err.message);
+        });
+        
+        webhookReq.write(webhookData);
+        webhookReq.end();
+    });
 } else {
     console.log(`🏠 Running in LOCAL MODE - No HTTP server, using polling only`);
-    
-    // Data is already loaded in db.db.on('open') handler above
     console.log('✅ Local mode startup complete - data already loaded');
-}
-
-// Set webhook if deploying to Render
-if (process.env.RENDER_EXTERNAL_HOSTNAME) {
-    const webhookUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/webhook`;
-    console.log(`🔗 Setting webhook to: ${webhookUrl}`);
-    
-    const webhookData = JSON.stringify({
-        url: webhookUrl
-    });
-    
-    const webhookOptions = {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': webhookData.length
-        }
-    };
-    
-    const webhookReq = https.request(`${botUrl}/setWebhook`, { ...webhookOptions, agent: telegramHttpsAgent }, (res) => {
-        let responseData = '';
-        res.on('data', (chunk) => {
-            responseData += chunk;
-        });
-        res.on('end', () => {
-            console.log('🔗 Webhook response:', responseData);
-            console.log('✅ Bot ready with webhook mode');
-        });
-    });
-    
-    webhookReq.write(webhookData);
-    webhookReq.end();
-} else {
-    // Use polling for local development only
-    console.log('🏠 Running in LOCAL MODE - Using polling only');
-console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
-console.log('📱 Bot is now listening for commands...');
-console.log('🔍 Search for: @aronov_dishwasher_bot');
-
-    // Start polling for updates (only in local mode)
-getUpdates();
+    console.log('🤖 Simple Telegram Dishwasher Bot is ready!');
+    console.log('📱 Bot is now listening for commands...');
+    console.log('🔍 Search for: @aronov_dishwasher_bot');
+    getUpdates();
 }
 
 // Keep-alive mechanism removed - now handled by dedicated keep_alive.js process
