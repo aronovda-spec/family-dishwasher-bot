@@ -52,6 +52,7 @@ async function saveBotData() {
         await db.saveBotState('punishmentTurns', Object.fromEntries(punishmentTurns));
         await db.saveBotState('userLanguage', Object.fromEntries(userLanguage));
         await db.saveBotState('chatIdToUserId', Object.fromEntries(chatIdToUserId));
+        await db.saveBotState('lastAutoMonthlyReportKey', lastAutoMonthlyReportKey);
         
         // Save user scores
         for (const [userName, score] of userScores.entries()) {
@@ -187,6 +188,9 @@ async function saveDirtyBotState() {
                 case 'chatIdToUserId':
                     await db.saveBotState('chatIdToUserId', Object.fromEntries(chatIdToUserId));
                     break;
+                case 'lastAutoMonthlyReportKey':
+                    await db.saveBotState('lastAutoMonthlyReportKey', lastAutoMonthlyReportKey);
+                    break;
             }
         }
         
@@ -258,6 +262,7 @@ async function loadBotData() {
         const punishmentTurnsData = await db.getBotState('punishmentTurns') || {};
         const userLanguageData = await db.getBotState('userLanguage') || {};
         const chatIdToUserIdData = await db.getBotState('chatIdToUserId') || {};
+        const lastAutoMonthlyReportKeyData = await db.getBotState('lastAutoMonthlyReportKey') || null;
         
         // Load user scores
         const userScoresData = await db.getAllUserScores();
@@ -365,6 +370,8 @@ async function loadBotData() {
         Object.entries(chatIdToUserIdData).forEach(([key, value]) => {
             chatIdToUserId.set(key, value);
         });
+        
+        lastAutoMonthlyReportKey = lastAutoMonthlyReportKeyData;
         
         // Restore monthly statistics
         monthlyStats.clear();
@@ -840,6 +847,7 @@ const queueUserMapping = new Map(); // Map: Queue name -> Telegram user ID
 // Queue management system
 const suspendedUsers = new Map(); // userName -> { suspendedUntil: Date, reason: string, originalPosition: number }
 const queueStatistics = new Map(); // userName -> { totalCompletions: number, monthlyCompletions: number, lastCompleted: Date }
+let lastAutoMonthlyReportKey = null; // Persisted month key for automatic monthly report delivery
 
 // Check if running on Render
 const isRender = process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_HOSTNAME;
@@ -1276,22 +1284,40 @@ function broadcastMonthlyReport(monthKey = null, isAutoReport = false) {
     
     // Collect all unique chat IDs to avoid duplicates
     const chatIdsToNotify = new Set();
+    const skippedRecipients = [];
     
     // Add adminChatIds
     adminChatIds.forEach(chatId => chatIdsToNotify.add(chatId));
     
-    // Add chat IDs from authorized users
-    authorizedUsers.forEach(userName => {
-        const chatId = userName ? userChatIds.get(userName.toLowerCase()) : null;
-        if (chatId) {
-            chatIdsToNotify.add(chatId);
+    // Add chat IDs from authorized users + admins using robust lookup
+    // (same pattern used in other notification flows).
+    [...authorizedUsers, ...admins].forEach(user => {
+        if (!user) return;
+        
+        const normalizedUser = String(user);
+        let userChatId = userChatIds.get(normalizedUser) || userChatIds.get(normalizedUser.toLowerCase());
+        
+        // Admin fallback by name mapping
+        if (!userChatId && isUserAdmin(normalizedUser)) {
+            userChatId = adminNameToChatId.get(normalizedUser) || adminNameToChatId.get(normalizedUser.toLowerCase());
+        }
+        
+        if (userChatId) {
+            chatIdsToNotify.add(userChatId);
+        } else {
+            skippedRecipients.push(normalizedUser);
         }
     });
+    
+    if (skippedRecipients.length > 0) {
+        console.log(`⚠️ Monthly report skipped ${skippedRecipients.length} users (missing chat IDs): ${skippedRecipients.join(', ')}`);
+    }
     
     // Send to each unique chat ID only once with rate limiting (30 messages/second max)
     // Add small delay between messages to avoid Telegram rate limits
     const chatIdsArray = Array.from(chatIdsToNotify);
     const totalRecipients = chatIdsArray.length;
+    console.log(`📬 Monthly report recipient chat IDs resolved: ${totalRecipients}`);
     
     chatIdsArray.forEach((chatId, index) => {
         setTimeout(() => {
@@ -7434,15 +7460,58 @@ function sendMonthlyReport() {
     }
     
     const previousMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-    const alreadySent = monthlyReportSent.get(previousMonthKey);
+    const alreadySent = monthlyReportSent.get(previousMonthKey) || lastAutoMonthlyReportKey === previousMonthKey;
     
     if (!alreadySent) {
         console.log(`📊 Sending automatic monthly report for ${previousMonthKey}...`);
         broadcastMonthlyReport(previousMonthKey, true);
         monthlyReportSent.set(previousMonthKey, true);
+        lastAutoMonthlyReportKey = previousMonthKey;
+        if (dbReady && db) {
+            db.saveBotState('lastAutoMonthlyReportKey', lastAutoMonthlyReportKey).catch((error) => {
+                console.error('❌ Failed to persist lastAutoMonthlyReportKey:', error);
+            });
+        }
         
         // Schedule next month's report
         scheduleNextMonthlyReport();
+    }
+}
+
+function checkAndSendMissedMonthlyReport() {
+    const now = new Date();
+    const israeliNowStr = now.toLocaleString('en-US', {
+        timeZone: 'Asia/Jerusalem',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+    });
+    const parts = israeliNowStr.match(/(\d+)\/(\d+)\/(\d+),?\s+(\d+):(\d+)/);
+    if (!parts) return;
+    
+    const currentMonth = parseInt(parts[1], 10);
+    const currentDay = parseInt(parts[2], 10);
+    const currentYear = parseInt(parts[3], 10);
+    const currentHour = parseInt(parts[4], 10);
+    
+    let prevMonth = currentMonth - 1;
+    let prevYear = currentYear;
+    if (prevMonth === 0) {
+        prevMonth = 12;
+        prevYear -= 1;
+    }
+    const previousMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    const alreadySent = monthlyReportSent.get(previousMonthKey) || lastAutoMonthlyReportKey === previousMonthKey;
+    
+    if (alreadySent) return;
+    
+    const shouldSendNow = currentDay > 1 || (currentDay === 1 && currentHour >= 10);
+    if (shouldSendNow) {
+        console.log(`📊 Catch-up: sending missed automatic monthly report for ${previousMonthKey}`);
+        sendMonthlyReport();
     }
 }
 
@@ -7575,12 +7644,17 @@ function scheduleNextMonthlyReport() {
         if (isFirstDay && is10AMWindow) {
             sendMonthlyReport();
         } else {
+            checkAndSendMissedMonthlyReport();
             scheduleNextMonthlyReport();
         }
     } else {
+        checkAndSendMissedMonthlyReport();
         scheduleNextMonthlyReport();
     }
 })();
+
+// Safety net: if the process was restarted and missed the exact trigger time, catch up automatically.
+setInterval(checkAndSendMissedMonthlyReport, 60 * 60 * 1000);
 
 // Note: Cleanup timer removed - no time limitations on requests
 
