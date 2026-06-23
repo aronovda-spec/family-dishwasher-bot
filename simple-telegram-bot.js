@@ -1038,7 +1038,24 @@ function checkAndCleanExpiredSuspensions() {
     });
 }
 
-// Helper function to suspend user (preserve score, mark as suspended)
+// Highest score among active peers (authorized, not suspended), excluding one user.
+// Used to preserve a suspended user's relative position when they return.
+// Max is used (instead of average) because punishments subtract from scores,
+// which would skew an average and misrepresent the real "leader" position.
+function getActivePeerMaxScore(excludeUser) {
+    let maxScore = null;
+    for (const user of authorizedUsers) {
+        if (user === excludeUser) continue;
+        if (suspendedUsers.has(user)) continue;
+        const score = userScores.get(user) || 0;
+        if (maxScore === null || score > maxScore) {
+            maxScore = score;
+        }
+    }
+    return maxScore;
+}
+
+// Helper function to suspend user (preserve relative position, mark as suspended)
 function suspendUser(userName, days, reason = null) {
     // Check if user exists in original queue
     if (!originalQueue.includes(userName)) {
@@ -1046,25 +1063,31 @@ function suspendUser(userName, days, reason = null) {
         return false;
     }
     
-    // Store suspension data (preserve current score)
+    // Capture the user's position relative to the active peer max at suspension
+    // time. On reactivation we re-apply this same offset so the user keeps the
+    // exact same gap to the leader: neither penalized (debt) nor rewarded (free
+    // pass) for being away.
     const currentScore = userScores.get(userName) || 0;
+    const peerMax = getActivePeerMaxScore(userName);
+    const scoreOffset = peerMax !== null ? (currentScore - peerMax) : 0;
     const suspendUntil = new Date();
     suspendUntil.setDate(suspendUntil.getDate() + days);
     
     suspendedUsers.set(userName, {
         suspendedUntil: suspendUntil,
         reason: reason || `Suspended for ${days} day${days > 1 ? 's' : ''}`,
-        originalScore: currentScore // Preserve score
+        originalScore: currentScore, // Preserved for reference / backward compatibility
+        scoreOffset: scoreOffset // Gap to active peer max at suspension time (<=0 if behind leader)
     });
     
     // Track suspension for monthly report
     trackMonthlyAction('suspension', userName, null, days);
     
-    console.log(`✈️ ${userName} suspended for ${days} days. Score preserved: ${currentScore}`);
+    console.log(`✈️ ${userName} suspended for ${days} days. Score: ${currentScore}, peer-max offset preserved: ${scoreOffset.toFixed(2)}`);
     return true;
 }
 
-// Helper function to reactivate user (restore original score)
+// Helper function to reactivate user (restore relative position vs. peers)
 function reactivateUser(userName) {
     if (!suspendedUsers.has(userName)) {
         console.log(`⚠️ Cannot reactivate ${userName} - not suspended`);
@@ -1072,16 +1095,33 @@ function reactivateUser(userName) {
     }
     
     const suspension = suspendedUsers.get(userName);
-    const originalScore = suspension.originalScore || 0;
     
-    // Restore original score
-    userScores.set(userName, originalScore);
+    // Re-apply the same offset the user had relative to the active peer max when
+    // they were suspended. This keeps the gap to the leader identical to before
+    // the suspension: no debt accrued while away, but any pre-existing
+    // debt/credit is preserved.
+    const peerMax = getActivePeerMaxScore(userName);
+    let newScore;
+    if (peerMax !== null && typeof suspension.scoreOffset === 'number') {
+        newScore = Math.round(peerMax + suspension.scoreOffset);
+    } else {
+        // Fallback (no peers or legacy suspension without offset): restore old score
+        newScore = suspension.originalScore || 0;
+    }
+    userScores.set(userName, newScore);
     
     // Clear suspension
     suspendedUsers.delete(userName);
     
-    console.log(`✅ ${userName} reactivated. Score restored: ${originalScore}`);
-    return true;
+    // Position relative to the active peer max they return as.
+    // Positive diff => they come back ahead (still/now the leader);
+    // negative diff => behind; zero => level with the leader.
+    const diff = peerMax !== null ? (newScore - peerMax) : 0;
+    const turnsBehind = diff < 0 ? -diff : 0;
+    const turnsAhead = diff > 0 ? diff : 0;
+    
+    console.log(`✅ ${userName} reactivated. Score set to ${newScore} (peer max ${peerMax !== null ? peerMax : 'n/a'}, offset ${typeof suspension.scoreOffset === 'number' ? suspension.scoreOffset.toFixed(2) : 'n/a'}, ${turnsBehind} behind / ${turnsAhead} ahead of leader)`);
+    return { newScore, turnsBehind, turnsAhead };
 }
 
 // Helper function to advance to next user (no need to skip anyone now)
@@ -1656,6 +1696,9 @@ const translations = {
         'user_suspended': '✅ {user} suspended for {duration}',
         'select_user_to_reactivate': 'Select user to reactivate:',
         'user_reactivated': '✅ {user} reactivated successfully!',
+        'reactivated_turns_behind': '📊 Returned {count} turn(s) behind the leader (same gap as before the suspension).',
+        'reactivated_leading': '👑 Returned as the leader, {count} turn(s) ahead (same lead as before the suspension).',
+        'reactivated_level_with_leader': '📊 Returned level with the leader (no turn debt).',
         'no_suspended_users': 'No users are currently suspended.',
         'queue_reset_confirm': '⚠️ Reset queue to original order (Eden→Adele→Emma)?',
         'confirm_reset': '✅ Yes, Reset Queue',
@@ -2148,6 +2191,9 @@ const translations = {
         'user_suspended': '✅ {user} הושעה ל{duration}',
         'select_user_to_reactivate': 'בחר משתמש להפעלה מחדש:',
         'user_reactivated': '✅ {user} הופעל מחדש בהצלחה!',
+        'reactivated_turns_behind': '📊 חזר {count} תורות מאחורי המוביל (אותו פער כמו לפני ההשעיה).',
+        'reactivated_leading': '👑 חזר כמוביל, {count} תורות לפני כולם (אותו יתרון כמו לפני ההשעיה).',
+        'reactivated_level_with_leader': '📊 חזר במקביל למוביל (ללא חוב תורות).',
         'no_suspended_users': 'אין משתמשים מושעים כרגע.',
         'queue_reset_confirm': '⚠️ לאפס את התור לסדר המקורי (עדן→אדל→אמה)?',
         'confirm_reset': '✅ כן, אפס תור',
@@ -5650,12 +5696,20 @@ async function handleCallback(chatId, userId, userName, data) {
             return;
         }
         
-        const success = reactivateUser(selectedUser);
-        if (success) {
+        const result = reactivateUser(selectedUser);
+        if (result) {
             // Save to database
             await saveBotData();
             
-            sendMessage(chatId, t(userId, 'user_reactivated', {user: addRoyalEmoji(selectedUser)}));
+            let reactivateMsg = t(userId, 'user_reactivated', {user: addRoyalEmoji(selectedUser)});
+            if (result.turnsBehind > 0) {
+                reactivateMsg += `\n${t(userId, 'reactivated_turns_behind', {count: result.turnsBehind})}`;
+            } else if (result.turnsAhead > 0) {
+                reactivateMsg += `\n${t(userId, 'reactivated_leading', {count: result.turnsAhead})}`;
+            } else {
+                reactivateMsg += `\n${t(userId, 'reactivated_level_with_leader')}`;
+            }
+            sendMessage(chatId, reactivateMsg);
         } else {
             sendMessage(chatId, `❌ Failed to reactivate ${addRoyalEmoji(selectedUser)}`);
         }
