@@ -1,14 +1,52 @@
 // Simple Telegram Dishwasher Bot (no external dependencies)
 const https = require('https');
 
-// Global HTTPS keep-alive agent for Telegram requests (guarded by env flag)
+// HTTPS keep-alive agent for Telegram — refreshed periodically so long-lived
+// Render instances don't keep dead sockets and silently fail sendMessage.
 const ENABLE_KEEP_ALIVE = String(process.env.ENABLE_KEEP_ALIVE || 'true').toLowerCase() === 'true';
-const telegramHttpsAgent = ENABLE_KEEP_ALIVE ? new https.Agent({
-    keepAlive: true,
-    maxSockets: 50,
-    keepAliveMsecs: 15000,
-    timeout: 15000
-}) : undefined;
+const TELEGRAM_AGENT_REFRESH_MS = 30 * 60 * 1000; // 30 minutes
+let telegramHttpsAgent = null;
+let telegramAgentCreatedAt = 0;
+
+function createTelegramHttpsAgent() {
+    if (!ENABLE_KEEP_ALIVE) return undefined;
+    return new https.Agent({
+        keepAlive: true,
+        maxSockets: 50,
+        maxFreeSockets: 10,
+        keepAliveMsecs: 10000,
+        timeout: 15000,
+        scheduling: 'lifo'
+    });
+}
+
+function getTelegramHttpsAgent() {
+    if (!ENABLE_KEEP_ALIVE) return undefined;
+    const now = Date.now();
+    if (!telegramHttpsAgent || (now - telegramAgentCreatedAt) > TELEGRAM_AGENT_REFRESH_MS) {
+        if (telegramHttpsAgent) {
+            try { telegramHttpsAgent.destroy(); } catch (_) { /* ignore */ }
+        }
+        telegramHttpsAgent = createTelegramHttpsAgent();
+        telegramAgentCreatedAt = now;
+        console.log('🔄 Telegram HTTPS agent refreshed');
+    }
+    return telegramHttpsAgent;
+}
+
+function refreshTelegramHttpsAgent(reason = 'error') {
+    if (!ENABLE_KEEP_ALIVE) return;
+    console.log(`🔄 Forcing Telegram HTTPS agent refresh (${reason})`);
+    if (telegramHttpsAgent) {
+        try { telegramHttpsAgent.destroy(); } catch (_) { /* ignore */ }
+    }
+    telegramHttpsAgent = createTelegramHttpsAgent();
+    telegramAgentCreatedAt = Date.now();
+}
+
+telegramHttpsAgent = createTelegramHttpsAgent();
+telegramAgentCreatedAt = Date.now();
+
 const fs = require('fs');
 const path = require('path');
 const SupabaseDatabase = require('./supabase-db.js');
@@ -2600,7 +2638,7 @@ function sendMessage(chatId, text, retryCount = 0) {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data)
             },
-            agent: telegramHttpsAgent,
+            agent: getTelegramHttpsAgent(),
             timeout: REQUEST_TIMEOUT
     };
     const req = https.request(url, options, (res) => {
@@ -2631,6 +2669,7 @@ function sendMessage(chatId, text, retryCount = 0) {
         // Set request timeout
         req.setTimeout(REQUEST_TIMEOUT, () => {
             req.destroy();
+            refreshTelegramHttpsAgent('timeout');
             if (retryCount < MAX_RETRIES) {
                 console.log(`⏱️ Request timeout, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
                 setTimeout(() => sendMessage(chatId, text, retryCount + 1), 2000);
@@ -2641,8 +2680,9 @@ function sendMessage(chatId, text, retryCount = 0) {
         
         req.on('error', (err) => {
             // Handle network errors gracefully - don't crash
-            if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET') {
+            if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ECONNREFUSED') {
                 console.log(`🌐 Network error sending message (${err.code}): ${err.message}`);
+                refreshTelegramHttpsAgent(err.code);
                 if (retryCount < MAX_RETRIES) {
                     console.log(`🔄 Retrying message send (${retryCount + 1}/${MAX_RETRIES})...`);
                     setTimeout(() => sendMessage(chatId, text, retryCount + 1), 2000);
@@ -2676,7 +2716,7 @@ function sendMessagePlain(chatId, text, retryCount = 0) {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data)
             },
-            agent: telegramHttpsAgent,
+            agent: getTelegramHttpsAgent(),
             timeout: REQUEST_TIMEOUT
     };
     const req = https.request(url, options, (res) => {
@@ -2700,6 +2740,7 @@ function sendMessagePlain(chatId, text, retryCount = 0) {
     // Set request timeout
     req.setTimeout(REQUEST_TIMEOUT, () => {
         req.destroy();
+        refreshTelegramHttpsAgent('timeout');
         if (retryCount < MAX_RETRIES) {
             console.log(`⏱️ Plain message request timeout, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
             setTimeout(() => sendMessagePlain(chatId, text, retryCount + 1), 2000);
@@ -2710,8 +2751,9 @@ function sendMessagePlain(chatId, text, retryCount = 0) {
     
     req.on('error', (err) => {
         // Handle network errors gracefully - don't crash
-        if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET') {
+        if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ECONNREFUSED') {
             console.log(`🌐 Network error sending plain message (${err.code}): ${err.message}`);
+            refreshTelegramHttpsAgent(err.code);
             if (retryCount < MAX_RETRIES) {
                 console.log(`🔄 Retrying plain message send (${retryCount + 1}/${MAX_RETRIES})...`);
                 setTimeout(() => sendMessagePlain(chatId, text, retryCount + 1), 2000);
@@ -2728,19 +2770,21 @@ function sendMessagePlain(chatId, text, retryCount = 0) {
 }
 
 // Send message with buttons
-function sendMessageWithButtons(chatId, text, buttons, retryCount = 0) {
+function sendMessageWithButtons(chatId, text, buttons, retryCount = 0, useParseMode = true) {
     const url = `${botUrl}/sendMessage`;
-    const data = JSON.stringify({
+    const payload = {
         chat_id: chatId,
         text: text,
-        parse_mode: 'HTML',
         reply_markup: {
             inline_keyboard: buttons
         }
-    });
+    };
+    if (useParseMode) {
+        payload.parse_mode = 'HTML';
+    }
+    const data = JSON.stringify(payload);
     
     console.log(`🔘 Sending buttons to ${chatId}:`, JSON.stringify(buttons, null, 2));
-    console.log(`🔘 Full request data:`, data);
     
     const MAX_RETRIES = 2;
     const REQUEST_TIMEOUT = 10000; // 10 seconds
@@ -2751,7 +2795,7 @@ function sendMessageWithButtons(chatId, text, buttons, retryCount = 0) {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data)
         },
-        agent: telegramHttpsAgent,
+        agent: getTelegramHttpsAgent(),
         timeout: REQUEST_TIMEOUT
     };
     
@@ -2768,6 +2812,11 @@ function sendMessageWithButtons(chatId, text, buttons, retryCount = 0) {
                     console.log(`✅ Buttons sent successfully!`);
                 } else {
                     console.log(`❌ Button error:`, response.description);
+                    // Fallback: retry without parse_mode on formatting errors
+                    if (useParseMode && response.description && /parse|entity|html|markdown/i.test(response.description)) {
+                        console.log(`🔄 Retrying buttons without parse_mode...`);
+                        sendMessageWithButtons(chatId, text, buttons, retryCount, false);
+                    }
                 }
             } catch (e) {
                 console.log(`❌ Error parsing button response:`, e.message);
@@ -2778,9 +2827,10 @@ function sendMessageWithButtons(chatId, text, buttons, retryCount = 0) {
     // Set request timeout
     req.setTimeout(REQUEST_TIMEOUT, () => {
         req.destroy();
+        refreshTelegramHttpsAgent('timeout');
         if (retryCount < MAX_RETRIES) {
             console.log(`⏱️ Button request timeout, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-            setTimeout(() => sendMessageWithButtons(chatId, text, buttons, retryCount + 1), 2000);
+            setTimeout(() => sendMessageWithButtons(chatId, text, buttons, retryCount + 1, useParseMode), 2000);
         } else {
             console.log(`❌ Failed to send buttons after ${MAX_RETRIES} retries (timeout)`);
         }
@@ -2788,11 +2838,12 @@ function sendMessageWithButtons(chatId, text, buttons, retryCount = 0) {
     
     req.on('error', (err) => {
         // Handle network errors gracefully - don't crash
-        if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET') {
+        if (err.code === 'ETIMEDOUT' || err.code === 'ENETUNREACH' || err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ECONNREFUSED') {
             console.log(`🌐 Network error sending buttons (${err.code}): ${err.message}`);
+            refreshTelegramHttpsAgent(err.code);
             if (retryCount < MAX_RETRIES) {
                 console.log(`🔄 Retrying button send (${retryCount + 1}/${MAX_RETRIES})...`);
-                setTimeout(() => sendMessageWithButtons(chatId, text, buttons, retryCount + 1), 2000);
+                setTimeout(() => sendMessageWithButtons(chatId, text, buttons, retryCount + 1, useParseMode), 2000);
             } else {
                 console.log(`❌ Failed to send buttons after ${MAX_RETRIES} retries (${err.code})`);
             }
@@ -2807,7 +2858,10 @@ function sendMessageWithButtons(chatId, text, buttons, retryCount = 0) {
 
 // Handle commands
 async function handleCommand(chatId, userId, userName, text) {
-    const command = (text || '').toLowerCase().trim();
+    // Normalize "/start@BotName args" -> "/start args" (Telegram often appends @bot in menus)
+    const rawText = (text || '').trim();
+    const normalizedText = rawText.replace(/^\/([a-zA-Z0-9_]+)@[^\s]+/i, '/$1');
+    const command = normalizedText.toLowerCase();
     
     console.log(`🔍 Processing: "${command}" from ${userName}`);
     
@@ -7138,7 +7192,7 @@ async function getUpdates(offset = 0) {
                                     'Content-Type': 'application/json',
                                     'Content-Length': Buffer.byteLength(answerData)
                                 },
-                                agent: telegramHttpsAgent,
+                                agent: getTelegramHttpsAgent(),
                                 timeout: 5000
                             };
 
@@ -7228,7 +7282,7 @@ async function dispatchWebhookUpdate(update) {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(answerData)
                 },
-                agent: telegramHttpsAgent,
+                agent: getTelegramHttpsAgent(),
                 timeout: 5000
             };
 
@@ -7290,6 +7344,52 @@ const server = http.createServer(async (req, res) => {
         
         res.end(JSON.stringify(healthData, null, 2));
         console.log(`✅ Health check responded: ${new Date().toISOString()}`);
+        return;
+    }
+
+    // Outbound Telegram connectivity probe (does not affect Render health checks)
+    if (urlObj.pathname === '/diag') {
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+        });
+        const diag = {
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            telegramOutbound: 'checking'
+        };
+        const probeReq = https.request(`${botUrl}/getMe`, {
+            method: 'GET',
+            agent: getTelegramHttpsAgent(),
+            timeout: 5000
+        }, (probeRes) => {
+            let probeBody = '';
+            probeRes.on('data', (chunk) => { probeBody += chunk; });
+            probeRes.on('end', () => {
+                try {
+                    const probeJson = JSON.parse(probeBody || '{}');
+                    diag.telegramOutbound = probeJson.ok ? 'ok' : `fail:${probeJson.description || probeRes.statusCode}`;
+                    if (probeJson.ok && probeJson.result) {
+                        diag.bot = { id: probeJson.result.id, username: probeJson.result.username };
+                    }
+                } catch (_) {
+                    diag.telegramOutbound = `fail:bad_json:${probeRes.statusCode}`;
+                }
+                res.end(JSON.stringify(diag, null, 2));
+            });
+        });
+        probeReq.on('error', (err) => {
+            refreshTelegramHttpsAgent(err.code || 'diag_probe');
+            diag.telegramOutbound = `fail:${err.code || err.message}`;
+            res.end(JSON.stringify(diag, null, 2));
+        });
+        probeReq.setTimeout(5000, () => {
+            probeReq.destroy();
+            refreshTelegramHttpsAgent('diag_probe_timeout');
+            diag.telegramOutbound = 'fail:timeout';
+            res.end(JSON.stringify(diag, null, 2));
+        });
+        probeReq.end();
         return;
     }
     
@@ -7464,7 +7564,7 @@ if (process.env.RENDER_EXTERNAL_HOSTNAME) {
             }
         };
         
-        const webhookReq = https.request(`${botUrl}/setWebhook`, { ...webhookOptions, agent: telegramHttpsAgent }, (res) => {
+        const webhookReq = https.request(`${botUrl}/setWebhook`, { ...webhookOptions, agent: getTelegramHttpsAgent() }, (res) => {
             let responseData = '';
             res.on('data', (chunk) => {
                 responseData += chunk;
