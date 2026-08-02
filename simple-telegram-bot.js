@@ -1009,9 +1009,9 @@ function initializeMonthlyStats(monthKey) {
     if (!monthlyStats.has(monthKey)) {
         monthlyStats.set(monthKey, {
             users: {
-                'Eden': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 },
-                'Adele': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 },
-                'Emma': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 }
+                'Eden': { completions: 0, selfCompletions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 },
+                'Adele': { completions: 0, selfCompletions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 },
+                'Emma': { completions: 0, selfCompletions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 }
             },
             admins: {},
             totals: {
@@ -1208,7 +1208,8 @@ function alertAdminsAboutCheating(userId, userName, reason, details) {
 }
 
 // Helper function to update queue statistics
-function updateUserStatistics(userName) {
+// isSelfCompletion: true when the turn holder pressed /done themselves (not admin /done)
+function updateUserStatistics(userName, isSelfCompletion = false) {
     const stats = queueStatistics.get(userName) || { totalCompletions: 0, monthlyCompletions: 0, lastCompleted: null };
     
     stats.totalCompletions++;
@@ -1223,8 +1224,61 @@ function updateUserStatistics(userName) {
     const monthData = monthlyStats.get(monthKey);
     if (monthData.users[userName]) {
         monthData.users[userName].completions++;
+        if (isSelfCompletion) {
+            monthData.users[userName].selfCompletions = (monthData.users[userName].selfCompletions || 0) + 1;
+        }
     }
     monthData.totals.dishesCompleted++;
+}
+
+// Champion score: self /done only (+2), swaps accepted (+2),
+// minus swaps requested (1), force swaps (2), punishments (3).
+// Suspension and admin /done are excluded.
+function getChampionScore(stats) {
+    const selfCompletions = stats.selfCompletions ?? 0;
+    const swapsAccepted = stats.swapsAccepted ?? 0;
+    const swapsRequested = stats.swapsRequested ?? 0;
+    const forceSwaps = stats.forceSwaps ?? 0;
+    const punishments = stats.punishments ?? 0;
+    return (selfCompletions * 2) + (swapsAccepted * 2) - swapsRequested - (forceSwaps * 2) - (punishments * 3);
+}
+
+function pickMonthlyChampion(monthData) {
+    let championName = null;
+    let championStats = null;
+    let bestScore = null;
+
+    Object.entries(monthData.users).forEach(([userName, stats]) => {
+        const score = getChampionScore(stats);
+        const selfCompletions = stats.selfCompletions ?? 0;
+        const punishments = stats.punishments ?? 0;
+        const forceSwaps = stats.forceSwaps ?? 0;
+
+        if (!championName) {
+            championName = userName;
+            championStats = stats;
+            bestScore = score;
+            return;
+        }
+
+        const bestSelf = championStats.selfCompletions ?? 0;
+        const bestPunishments = championStats.punishments ?? 0;
+        const bestForce = championStats.forceSwaps ?? 0;
+
+        const isBetter =
+            score > bestScore ||
+            (score === bestScore && selfCompletions > bestSelf) ||
+            (score === bestScore && selfCompletions === bestSelf && punishments < bestPunishments) ||
+            (score === bestScore && selfCompletions === bestSelf && punishments === bestPunishments && forceSwaps < bestForce);
+
+        if (isBetter) {
+            championName = userName;
+            championStats = stats;
+            bestScore = score;
+        }
+    });
+
+    return championName == null ? null : { name: championName, score: bestScore };
 }
 
 // Helper function to track monthly statistics
@@ -1331,6 +1385,14 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
     }
     
     report += `${t(userId, 'monthly_report_title', {month: monthName, year})}\n\n`;
+
+    const champion = pickMonthlyChampion(monthData);
+    if (champion) {
+        report += `🏆 ${t(userId, 'dishwasher_champion', {
+            user: addRoyalEmojiTranslated(champion.name, userId),
+            score: champion.score
+        })}\n\n`;
+    }
     
     // User statistics
     report += `${t(userId, 'user_statistics')}\n`;
@@ -1820,6 +1882,7 @@ const translations = {
         'auto_monthly_report_header': '🗓️ **AUTOMATIC MONTHLY REPORT**\n\n📅 End of {month} {year}\n\n',
         'user_statistics': 'USER STATISTICS:',
         'admin_statistics': 'ADMIN STATISTICS:',
+        'dishwasher_champion': 'Dishwasher Champion: {user} (score {score})',
         'completions_count': 'Completions: {count}',
         'punishments_received': 'Punishments received: {count}',
         'days_suspended': 'Days suspended: {count}',
@@ -2272,6 +2335,7 @@ const translations = {
         'auto_monthly_report_header': '🗓️ **דוח חודשי אוטומטי**\n\n📅 סוף {month} {year}\n\n',
         'user_statistics': 'סטטיסטיקות משתמשים:',
         'admin_statistics': 'סטטיסטיקות מנהלים:',
+        'dishwasher_champion': 'אלוף המדיח: {user} (ניקוד {score})',
         'completions_count': 'השלמות: {count}',
         'punishments_received': 'עונשים שהתקבלו: {count}',
         'days_suspended': 'ימי השעיה: {count}',
@@ -3579,7 +3643,7 @@ async function handleCommand(chatId, userId, userName, text) {
                 }
                 
                 // Update statistics for the user who completed their turn
-                updateUserStatistics(currentUser);
+                updateUserStatistics(currentUser, true);
                 
                 // Save bot data after score changes
                 await saveBotData();
@@ -3616,7 +3680,7 @@ async function handleCommand(chatId, userId, userName, text) {
                             isDirty = true;
                         }
                         
-                        updateUserStatistics(currentUser);
+                        updateUserStatistics(currentUser, true);
                         await saveBotData();
                     });
                     
