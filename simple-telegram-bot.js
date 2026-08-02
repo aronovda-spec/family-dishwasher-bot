@@ -1009,9 +1009,9 @@ function initializeMonthlyStats(monthKey) {
     if (!monthlyStats.has(monthKey)) {
         monthlyStats.set(monthKey, {
             users: {
-                'Eden': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, punishmentRequests: 0 },
-                'Adele': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, punishmentRequests: 0 },
-                'Emma': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, punishmentRequests: 0 }
+                'Eden': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 },
+                'Adele': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 },
+                'Emma': { completions: 0, punishments: 0, daysSuspended: 0, swapsRequested: 0, forceSwaps: 0, swapsAccepted: 0, punishmentRequests: 0 }
             },
             admins: {},
             totals: {
@@ -1255,6 +1255,16 @@ function trackMonthlyAction(type, userName, adminName = null, count = 1) {
                 monthData.users[userName].swapsRequested++;
             }
             break;
+        case 'force_swap_received':
+            if (monthData.users[userName]) {
+                monthData.users[userName].forceSwaps = (monthData.users[userName].forceSwaps || 0) + 1;
+            }
+            break;
+        case 'swap_accepted':
+            if (monthData.users[userName]) {
+                monthData.users[userName].swapsAccepted = (monthData.users[userName].swapsAccepted || 0) + 1;
+            }
+            break;
         case 'punishment_request':
             if (monthData.users[userName]) {
                 monthData.users[userName].punishmentRequests++;
@@ -1326,11 +1336,13 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
     report += `${t(userId, 'user_statistics')}\n`;
     Object.entries(monthData.users).forEach(([userName, stats]) => {
         report += `${addRoyalEmojiTranslated(userName, userId)}:\n`;
-        report += `  ✅ ${t(userId, 'completions_count', {count: stats.completions})}\n`;
-        report += `  ⚡ ${t(userId, 'punishments_received', {count: stats.punishments})}\n`;
-        report += `  ✈️ ${t(userId, 'days_suspended', {count: stats.daysSuspended})}\n`;
-        report += `  🔄 ${t(userId, 'swaps_requested', {count: stats.swapsRequested})}\n`;
-        report += `  📝 ${t(userId, 'punishment_requests_made', {count: stats.punishmentRequests})}\n\n`;
+        report += `  ✅ ${t(userId, 'completions_count', {count: stats.completions ?? 0})}\n`;
+        report += `  ⚡ ${t(userId, 'punishments_received', {count: stats.punishments ?? 0})}\n`;
+        report += `  ✈️ ${t(userId, 'days_suspended', {count: stats.daysSuspended ?? 0})}\n`;
+        report += `  🔄 ${t(userId, 'swaps_requested', {count: stats.swapsRequested ?? 0})}\n`;
+        report += `  ⚡🔄 ${t(userId, 'force_swaps_received', {count: stats.forceSwaps ?? 0})}\n`;
+        report += `  🤝 ${t(userId, 'swaps_accepted', {count: stats.swapsAccepted ?? 0})}\n`;
+        report += `  📝 ${t(userId, 'punishment_requests_made', {count: stats.punishmentRequests ?? 0})}\n\n`;
     });
     
     // Admin statistics
@@ -1338,19 +1350,19 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
         report += `${t(userId, 'admin_statistics')}\n`;
         Object.entries(monthData.admins).forEach(([adminName, stats]) => {
             report += `👨‍💼 ${adminName}:\n`;
-            report += `  ✅ ${t(userId, 'completions_helped', {count: stats.completions})}\n`;
-            report += `  ⚡ ${t(userId, 'punishments_applied', {count: stats.punishmentsApplied})}\n`;
-            report += `  🔄 ${t(userId, 'force_swaps_executed', {count: stats.forceSwaps})}\n`;
-            report += `  📢 ${t(userId, 'announcements_sent', {count: stats.announcements})}\n`;
-            report += `  🤝 ${t(userId, 'assists_provided', {count: stats.assists})}\n\n`;
+            report += `  ✅ ${t(userId, 'completions_helped', {count: stats.completions ?? 0})}\n`;
+            report += `  ⚡ ${t(userId, 'punishments_applied', {count: stats.punishmentsApplied ?? 0})}\n`;
+            report += `  🔄 ${t(userId, 'force_swaps_executed', {count: stats.forceSwaps ?? 0})}\n`;
+            report += `  📢 ${t(userId, 'announcements_sent', {count: stats.announcements ?? 0})}\n`;
+            report += `  🤝 ${t(userId, 'assists_provided', {count: stats.assists ?? 0})}\n\n`;
         });
     }
     
     // Totals
     report += `📈 ${t(userId, 'totals')}:\n`;
-    report += `- ${t(userId, 'total_dishes_completed', {count: monthData.totals.dishesCompleted})}\n`;
-    report += `- ${t(userId, 'admin_interventions', {count: monthData.totals.adminInterventions})}\n`;
-    report += `- ${t(userId, 'queue_reorders', {count: monthData.totals.queueReorders})}`;
+    report += `- ${t(userId, 'total_dishes_completed', {count: monthData.totals.dishesCompleted ?? 0})}\n`;
+    report += `- ${t(userId, 'admin_interventions', {count: monthData.totals.adminInterventions ?? 0})}\n`;
+    report += `- ${t(userId, 'queue_reorders', {count: monthData.totals.queueReorders ?? 0})}`;
     
     return report;
 }
@@ -1812,6 +1824,8 @@ const translations = {
         'punishments_received': 'Punishments received: {count}',
         'days_suspended': 'Days suspended: {count}',
         'swaps_requested': 'Swaps requested: {count}',
+        'force_swaps_received': 'Force swaps: {count}',
+        'swaps_accepted': 'Swaps accepted: {count}',
         'punishment_requests_made': 'Punishment requests made: {count}',
         'completions_helped': 'Completions (helped): {count}',
         'punishments_applied': 'Punishments applied: {count}',
@@ -2262,6 +2276,8 @@ const translations = {
         'punishments_received': 'עונשים שהתקבלו: {count}',
         'days_suspended': 'ימי השעיה: {count}',
         'swaps_requested': 'החלפות שנתבקשו: {count}',
+        'force_swaps_received': 'החלפות בכוח: {count}',
+        'swaps_accepted': 'החלפות שהתקבלו: {count}',
         'punishment_requests_made': 'בקשות עונש שנשלחו: {count}',
         'completions_helped': 'השלמות (עזרה): {count}',
         'punishments_applied': 'עונשים שהוחלו: {count}',
@@ -2461,8 +2477,9 @@ function t(userId, key, replacements = {}) {
     let text = translations[lang][key] || translations.en[key] || key;
     
     // Replace placeholders like {user}, {admin}, {count}
+    // Use nullish coalescing so 0 displays as "0" (not blank)
     for (const [placeholder, value] of Object.entries(replacements)) {
-        const replacement = value || ''; // Ensure replacement is never undefined/null
+        const replacement = value ?? '';
         text = text.replace(new RegExp(`{${placeholder}}`, 'g'), replacement);
     }
     
@@ -4401,6 +4418,8 @@ async function executeSwap(swapRequest, requestId, status) {
         // Mark as dirty for database save
         dirtyKeys.add('turnAssignments');
         isDirty = true;
+        // toUser accepted a requested swap (accessibility)
+        trackMonthlyAction('swap_accepted', toUser);
     }
     
     // OPTIMISTIC: Send notifications immediately (swap is logically done)
@@ -6580,6 +6599,11 @@ async function handleCallback(chatId, userId, userName, data) {
             
             // Track admin force swap for monthly report
             trackMonthlyAction('admin_force_swap', actualTurnHolder, userName);
+            // Regular force swap (not swap-back): turn holder wasn't ready; secondUser stepped in
+            if (secondUser !== actualTurnHolder) {
+                trackMonthlyAction('force_swap_received', actualTurnHolder);
+                trackMonthlyAction('swap_accepted', secondUser);
+            }
             
             // OPTIMISTIC: Send notifications immediately (swap is logically done)
             // After the swap, the current turn is performed by secondUser (or actualTurnHolder if swap-back)
