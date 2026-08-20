@@ -10,8 +10,16 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - **Turn Completion**: Users can finish their turn (`done`) and the bot moves to the next person
 - **Queue Status**: Real-time queue status with current turn indicator
 
-### 🏆 Monthly Dishwasher Champion
-Shown at the top of the **Monthly Report**. Higher score wins.
+### 🏆 Monthly Dishwasher Champion (podium)
+Shown at the top of the **Monthly Report** as **1st / 2nd / 3rd** with scores. Higher score ranks higher.
+
+**Example:**
+```
+🏅 MONTHLY PODIUM:
+🏆 1st — Champion: Eden (score 15)
+🥈 2nd: Adele (score 11)
+🥉 3rd: Emma (score 8)
+```
 
 **Formula:**
 

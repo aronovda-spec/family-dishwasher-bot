@@ -1243,42 +1243,29 @@ function getChampionScore(stats) {
  return (selfCompletions * 2) + (swapsAccepted * 2) - swapsRequested - (forceSwaps * 2) - (punishments * 9);
 }
 
+function compareChampionEntries(a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.selfCompletions !== a.selfCompletions) return b.selfCompletions - a.selfCompletions;
+    if (a.punishments !== b.punishments) return a.punishments - b.punishments;
+    return a.forceSwaps - b.forceSwaps;
+}
+
+// Rank all users for monthly podium (1st / 2nd / 3rd). Same tie-break as champion.
+function rankMonthlyChampions(monthData) {
+    const ranked = Object.entries(monthData.users).map(([userName, stats]) => ({
+        name: userName,
+        score: getChampionScore(stats),
+        selfCompletions: stats.selfCompletions ?? 0,
+        punishments: stats.punishments ?? 0,
+        forceSwaps: stats.forceSwaps ?? 0
+    }));
+    ranked.sort(compareChampionEntries);
+    return ranked;
+}
+
 function pickMonthlyChampion(monthData) {
- let championName = null;
- let championStats = null;
- let bestScore = null;
-
- Object.entries(monthData.users).forEach(([userName, stats]) => {
- const score = getChampionScore(stats);
- const selfCompletions = stats.selfCompletions ?? 0;
- const punishments = stats.punishments ?? 0;
- const forceSwaps = stats.forceSwaps ?? 0;
-
- if (!championName) {
- championName = userName;
- championStats = stats;
- bestScore = score;
- return;
- }
-
- const bestSelf = championStats.selfCompletions ?? 0;
- const bestPunishments = championStats.punishments ?? 0;
- const bestForce = championStats.forceSwaps ?? 0;
-
- const isBetter =
- score > bestScore ||
- (score === bestScore && selfCompletions > bestSelf) ||
- (score === bestScore && selfCompletions === bestSelf && punishments < bestPunishments) ||
- (score === bestScore && selfCompletions === bestSelf && punishments === bestPunishments && forceSwaps < bestForce);
-
- if (isBetter) {
- championName = userName;
- championStats = stats;
- bestScore = score;
- }
- });
-
- return championName == null ? null : { name: championName, score: bestScore };
+    const ranked = rankMonthlyChampions(monthData);
+    return ranked.length === 0 ? null : { name: ranked[0].name, score: ranked[0].score };
 }
 
 // Helper function to track monthly statistics
@@ -1386,13 +1373,19 @@ function generateMonthlyReport(monthKey, userId, isAutoReport = false) {
  
  report += `${t(userId, 'monthly_report_title', {month: monthName, year})}\n\n`;
 
- const champion = pickMonthlyChampion(monthData);
- if (champion) {
- report += `🏆 ${t(userId, 'dishwasher_champion', {
- user: addRoyalEmojiTranslated(champion.name, userId),
- score: champion.score
- })}\n\n`;
- }
+    const podium = rankMonthlyChampions(monthData);
+    if (podium.length > 0) {
+        report += `${t(userId, 'monthly_podium_title')}\n`;
+        const placeKeys = ['dishwasher_champion', 'dishwasher_second', 'dishwasher_third'];
+        const placeEmojis = ['🏆', '🥈', '🥉'];
+        podium.slice(0, 3).forEach((entry, index) => {
+            report += `${placeEmojis[index]} ${t(userId, placeKeys[index], {
+                user: addRoyalEmojiTranslated(entry.name, userId),
+                score: entry.score
+            })}\n`;
+        });
+        report += `\n`;
+    }
  
  // User statistics
  report += `${t(userId, 'user_statistics')}\n`;
@@ -1882,20 +1875,23 @@ const translations = {
  'auto_monthly_report_header': '🗓️ **AUTOMATIC MONTHLY REPORT**\n\n📅 End of {month} {year}\n\n',
  'user_statistics': 'USER STATISTICS:',
  'admin_statistics': 'ADMIN STATISTICS:',
- 'dishwasher_champion': 'Dishwasher Champion: {user} (score {score})',
+ 'monthly_podium_title': '🏅 MONTHLY PODIUM:',
+ 'dishwasher_champion': '1st — Champion: {user} (score {score})',
+ 'dishwasher_second': '2nd: {user} (score {score})',
+ 'dishwasher_third': '3rd: {user} (score {score})',
  'completions_count': 'Completions: {count}',
  'punishments_received': 'Punishments received: {count}',
  'days_suspended': 'Days suspended: {count}',
  'swaps_requested': 'Swaps requested: {count}',
- 'force_swaps_received': 'Force swaps: {count}',
+ 'force_swaps_received': 'Force swaps received: {count}',
  'swaps_accepted': 'Swaps accepted: {count}',
  'punishment_requests_made': 'Punishment requests made: {count}',
  'completions_helped': 'Completions (helped): {count}',
  'punishments_applied': 'Punishments applied: {count}',
- 'force_swaps_executed': 'Force swaps: {count}',
+ 'force_swaps_executed': 'Force swaps executed: {count}',
  'announcements_sent': 'Announcements: {count}',
  'assists_provided': 'Assists provided: {count}',
- 'total_dishes_completed': 'Total dishes completed: {count}',
+ 'total_dishes_completed': 'Total dishwashers completed: {count}',
  'admin_interventions': 'Admin interventions: {count}',
  'queue_reorders': 'Queue reorders: {count}',
  'no_statistics_available': 'No statistics available yet. Come back after some activity.',
@@ -1922,7 +1918,7 @@ const translations = {
         'help_scoring_system': '📊 **Scoring System:**\n',
         'help_scoring_explanation': '• Each user has a score (number of turns completed)\n• Next turn is determined by lowest score\n• In case of tie, uses fixed order ({Eden} → {Adele} → {Emma})\n• System maintains fairness over time\n\n',
         'help_champion_title': '🏆 **Monthly Dishwasher Champion:**\n',
-        'help_champion_explanation': 'Shown at the top of the monthly report. Higher score wins.\n\n**Formula:**\n`score = (self /done × 2) + (swaps accepted × 2) − (swaps requested × 1) − (force swaps × 2) − (punishments × 9)`\n\n**What counts:**\n• **Self /done (+2)** — you pressed `/done` yourself (admin `/done` does not count)\n• **Swaps accepted (+2)** — you took someone else\'s turn (requested or forced)\n• **Swaps requested (−1)** — you asked someone to cover you\n• **Force swaps (−2)** — admin force-swapped you (you were not ready)\n• **Punishments (−9)** — each punishment applied (one event = 3 extra turns)\n\n**Does not count:** days suspended, punishment requests you made, admin `/assist`\n\n**Tie-break:** more self `/done` → fewer punishments → fewer force swaps\n\n',
+        'help_champion_explanation': 'Shown at the top of the monthly report as a podium (1st / 2nd / 3rd) with scores. Higher score ranks higher.\n\n**Formula:**\n`score = (self /done × 2) + (swaps accepted × 2) − (swaps requested × 1) − (force swaps × 2) − (punishments × 9)`\n\n**What counts:**\n• **Self /done (+2)** — you pressed `/done` yourself (admin `/done` does not count)\n• **Swaps accepted (+2)** — you took someone else\'s turn (requested or forced)\n• **Swaps requested (−1)** — you asked someone to cover you\n• **Force swaps (−2)** — admin force-swapped you (you were not ready)\n• **Punishments (−9)** — each punishment applied (one event = 3 extra turns)\n\n**Does not count:** days suspended, punishment requests you made, admin `/assist`\n\n**Tie-break:** more self `/done` → fewer punishments → fewer force swaps\n\n',
         'help_queue_commands': '📋 **Queue Commands:**\n',
  'help_queue_explanation': '• `/status` - Show current queue, scores, and next turns\n• `/done` - Complete your turn (increases score by 1)\n\n',
  'help_swapping': '🔄 **Turn Swapping:**\n',
@@ -2332,25 +2328,28 @@ const translations = {
  'monthly_report': '📊 דוח חודשי',
  'share_monthly_report': '📤 שתף דוח חודשי',
  'monthly_report_title': '📊 דוח חודשי - {month} {year}',
- 'monthly_report_shared': '✅ **דוח חודשי נשלח!**\n\n📤 הדוח נשלח לכל המשתמשים המורשים והמנהלים.\n\n👥 **נמענים:** {count} משתמשים',
- 'no_data_available': '📊 **אין נתונים זמינים**\n\n❌ לא נמצאו סטטיסטיקות חודשיות לתקופה זו.\n\n💡 **זה בדרך כלל אומר:**\n• הבוט הופעל לאחרונה\n• עדיין לא נרשמה פעילות\n• הנתונים אופסו\n\n📅 **נסה שוב לאחר שתתרחש פעילות.**',
  'auto_monthly_report_header': '🗓️ **דוח חודשי אוטומטי**\n\n📅 סוף {month} {year}\n\n',
+ 'monthly_report_shared': '✅ **הדוח החודשי נשלח!**\n\n📤 הדוח נשלח לכל המשתמשים המורשים והמנהלים.\n\n👥 **נמענים:** {count} משתמשים',
+ 'no_data_available': '📊 **אין נתונים זמינים**\n\n❌ לא נמצאו סטטיסטיקות חודשיות לתקופה זו.\n\n💡 **בדרך כלל זה אומר:**\n• הבוט הופעל לאחרונה\n• עדיין לא נרשמה פעילות\n• הנתונים אופסו\n\n📅 **נסו שוב אחרי שתהיה פעילות.**',
  'user_statistics': 'סטטיסטיקות משתמשים:',
  'admin_statistics': 'סטטיסטיקות מנהלים:',
- 'dishwasher_champion': 'אלוף המדיח: {user} (ניקוד {score})',
+ 'monthly_podium_title': '🏅 פודיום חודשי:',
+ 'dishwasher_champion': 'מקום 1 — אלוף/ת המדיח: {user} (ניקוד {score})',
+ 'dishwasher_second': 'מקום 2: {user} (ניקוד {score})',
+ 'dishwasher_third': 'מקום 3: {user} (ניקוד {score})',
  'completions_count': 'השלמות: {count}',
  'punishments_received': 'עונשים שהתקבלו: {count}',
  'days_suspended': 'ימי השעיה: {count}',
- 'swaps_requested': 'החלפות שנתבקשו: {count}',
- 'force_swaps_received': 'החלפות בכוח: {count}',
- 'swaps_accepted': 'החלפות שהתקבלו: {count}',
- 'punishment_requests_made': 'בקשות עונש שנשלחו: {count}',
- 'completions_helped': 'השלמות (עזרה): {count}',
+ 'swaps_requested': 'החלפות שביקשת: {count}',
+ 'force_swaps_received': 'החלפות בכוח שקיבלת: {count}',
+ 'swaps_accepted': 'החלפות שקיבלת לביצוע: {count}',
+ 'punishment_requests_made': 'בקשות עונש ששלחת: {count}',
+ 'completions_helped': 'השלמות (עזרת מנהל): {count}',
  'punishments_applied': 'עונשים שהוחלו: {count}',
- 'force_swaps_executed': 'החלפות בכוח: {count}',
- 'announcements_sent': 'הודעות רשמיות: {count}',
+ 'force_swaps_executed': 'החלפות בכוח שבוצעו: {count}',
+ 'announcements_sent': 'הודעות שנשלחו: {count}',
  'assists_provided': 'עזרות שסופקו: {count}',
- 'total_dishes_completed': 'סה"כ כלים שהושלמו: {count}',
+ 'total_dishes_completed': 'סה״כ מדיחים שהושלמו: {count}',
  'admin_interventions': 'התערבויות מנהל: {count}',
  'queue_reorders': 'סידורי תור מחדש: {count}',
  'no_statistics_available': 'אין סטטיסטיקות זמינות עדיין. חזרו לאחר פעילות.',
@@ -2360,9 +2359,9 @@ const translations = {
  'database_error_turn_completion': '❌ **שגיאת מסד נתונים:** השלמת התור עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
  'database_updated_admin_completion': '✅ **מסד הנתונים עודכן:** השלמת המנהל נשמרה בהצלחה!',
  'database_error_admin_completion': '❌ **שגיאת מסד נתונים:** השלמת המנהל עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
- 'database_updated_force_swap': '✅ **מסד הנתונים עודכן:** החלפה כפויה נשמרה בהצלחה!',
- 'database_error_force_swap': '❌ **שגיאת מסד נתונים:** החלפה כפויה עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
- 'totals': 'סה"כ',
+ 'database_updated_force_swap': '✅ **מסד הנתונים עודכן:** החלפה בכוח נשמרה בהצלחה!',
+ 'database_error_force_swap': '❌ **שגיאת מסד נתונים:** החלפה בכוח עדיין לא נשמרה. פנו לתמיכה אם הבעיה נמשכת.',
+ 'totals': 'סיכומים',
  
  // Swap status messages
  'temporary_swaps_active': 'החלפות זמניות פעילות:',
@@ -2376,8 +2375,8 @@ const translations = {
  'help_title': '🤖 **בוט מדיח הכלים של המשפחה:**\n\n',
         'help_scoring_system': '📊 **מערכת ניקוד:**\n',
         'help_scoring_explanation': '• כל משתמש יש לו ניקוד (מספר התורות שביצע)\n• התור הבא נקבע לפי הניקוד הנמוך ביותר\n• במקרה של שוויון, משתמשים בסדר הקבוע ({Eden} → {Adele} → {Emma})\n• המערכת שומרת על הוגנות לאורך זמן\n\n',
-        'help_champion_title': '🏆 **אלוף המדיח החודשי:**\n',
-        'help_champion_explanation': 'מוצג בראש הדוח החודשי. ניקוד גבוה יותר מנצח.\n\n**נוסחה:**\n`ניקוד = (השלמה עצמית × 2) + (החלפות שהתקבלו × 2) − (החלפות שנתבקשו × 1) − (החלפות בכוח × 2) − (עונשים × 9)`\n\n**מה נספר:**\n• **השלמה עצמית (+2)** — לחצת `/done` בעצמך (`/done` של מנהל לא נספר)\n• **החלפות שהתקבלו (+2)** — לקחת תור של מישהו אחר (מבוקש או בכוח)\n• **החלפות שנתבקשו (−1)** — ביקשת שמישהו יחליף אותך\n• **החלפות בכוח (−2)** — מנהל החליף אותך בכוח (לא היית מוכן/ה)\n• **עונשים (−9)** — כל עונש שהוחל (אירוע אחד = 3 תורות נוספות)\n\n**לא נספר:** ימי השעיה, בקשות עונש ששלחת, `/assist` של מנהל\n\n**שבירת שוויון:** יותר השלמות עצמיות → פחות עונשים → פחות החלפות בכוח\n\n',
+        'help_champion_title': '🏆 **אלוף/ת המדיח החודשי:**\n',
+        'help_champion_explanation': 'מוצג בראש הדוח החודשי כפודיום (מקום 1 / 2 / 3) עם ניקוד. ניקוד גבוה יותר מדורג גבוה יותר.\n\n**נוסחה:**\n`ניקוד = (השלמה עצמית × 2) + (החלפות שקיבלת לביצוע × 2) − (החלפות שביקשת × 1) − (החלפות בכוח × 2) − (עונשים × 9)`\n\n**מה נספר:**\n• **השלמה עצמית (+2)** — לחצת `/done` בעצמך (`/done` של מנהל לא נספר)\n• **החלפות שקיבלת לביצוע (+2)** — לקחת תור של מישהו אחר (מבוקש או בכוח)\n• **החלפות שביקשת (−1)** — ביקשת שמישהו יחליף אותך\n• **החלפות בכוח (−2)** — מנהל החליף אותך בכוח (לא היית מוכן/ה)\n• **עונשים (−9)** — כל עונש שהוחל (אירוע אחד = 3 תורות נוספות)\n\n**לא נספר:** ימי השעיה, בקשות עונש ששלחת, `/assist` של מנהל\n\n**שבירת שוויון:** יותר השלמות עצמיות → פחות עונשים → פחות החלפות בכוח\n\n',
         'help_queue_commands': '📋 **פקודות התור:**\n',
  'help_queue_explanation': '• `/status` - הצגת התור הנוכחי, ניקודים, והתורות הבאים\n• `/done` - השלמת התור שלך (מעלה את הניקוד ב-1)\n\n',
  'help_swapping': '🔄 **החלפת תורות:**\n',
