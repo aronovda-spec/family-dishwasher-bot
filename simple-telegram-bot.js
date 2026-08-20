@@ -1240,7 +1240,7 @@ function getChampionScore(stats) {
     const swapsRequested = stats.swapsRequested ?? 0;
     const forceSwaps = stats.forceSwaps ?? 0;
     const punishments = stats.punishments ?? 0;
-    return (selfCompletions * 2) + (swapsAccepted * 2) - swapsRequested - (forceSwaps * 2) - (punishments * 3);
+    return (selfCompletions * 2) + (swapsAccepted * 2) - swapsRequested - (forceSwaps * 2) - (punishments * 9);
 }
 
 function pickMonthlyChampion(monthData) {
