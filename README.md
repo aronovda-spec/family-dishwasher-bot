@@ -10,6 +10,37 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 - **Turn Completion**: Users can finish their turn (`done`) and the bot moves to the next person
 - **Queue Status**: Real-time queue status with current turn indicator
 
+### 🏆 Monthly Dishwasher Champion
+Shown at the top of the **Monthly Report**. Higher score wins.
+
+**Formula:**
+
+```
+score = (self /done × 2)
+      + (swaps accepted × 2)
+      − (swaps requested × 1)
+      − (force swaps × 2)
+      − (punishments × 9)
+```
+
+| Term | Points | Meaning |
+|------|--------|---------|
+| Self `/done` | **+2** each | You pressed `/done` yourself. Admin `/done` does **not** count. |
+| Swaps accepted | **+2** each | You took someone else's turn (requested swap or force swap). |
+| Swaps requested | **−1** each | You asked someone to cover you. |
+| Force swaps | **−2** each | Admin force-swapped you (you were not ready for that turn). |
+| Punishments | **−9** each | Each punishment **event** applied (one event = 3 extra turns). |
+
+**Does not count toward champion score:**
+- Days suspended
+- Punishment requests you made (about others)
+- Admin `/assist`
+- Admin `/done` (still counted in report "Completions", but not for champion)
+
+**Tie-break (if scores are equal):** more self `/done` → fewer punishments → fewer force swaps.
+
+The same explanation is available in the bot via `/help` (English and Hebrew).
+
 ### 🔄 Turn Flexibility
 - **Turn Swapping**: Users can request to swap their turn with another user
   - **Assignment System**: Other user performs your turn (you owe them a favor)
@@ -88,8 +119,8 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 1. **Clone or download** this repository to your local machine
 
 2. **Set up your Telegram Bot Token**:
-   - Get a bot token from [@BotFather](https://t.me/BotFather) on Telegram
-   - Set the environment variable:
+ - Get a bot token from [@BotFather](https://t.me/BotFather) on Telegram
+ - Set the environment variable:
      ```bash
      # Windows (PowerShell)
      $env:TELEGRAM_BOT_TOKEN="your_bot_token_here"
@@ -114,18 +145,18 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 
 #### Queue Management
 - `add` - Add yourself to the queue
-- `remove` - Remove yourself from the queue  
+- `remove` - Remove yourself from the queue 
 - `done` - Complete your current turn
 - `status` - Show current queue status
 - `assist` - Admin command to handle dishwasher without affecting queue
 
 #### Turn Flexibility
 - `swap @username` - Request to swap your turn with another user
-  - **Who can swap:** Only the person whose turn it is (current turn holder or performing user)
-  - **How it works:** Other user performs your turn (you owe them a favor)
-  - **Score:** Only the performing user's score increases (+1)
-  - **Consecutive swaps:** Users performing a turn can swap it to someone else
-  - **Swap back:** Can swap back to original turn holder
+ - **Who can swap:** Only the person whose turn it is (current turn holder or performing user)
+ - **How it works:** Other user performs your turn (you owe them a favor)
+ - **Score:** Only the performing user's score increases (+1)
+ - **Consecutive swaps:** Users performing a turn can swap it to someone else
+ - **Swap back:** Can swap back to original turn holder
 - `approve <request_id>` - Approve a swap request (target user only)
 - `reject <request_id>` - Reject a swap request (target user only)
 - `skip [reason]` - Request to skip your turn
@@ -147,29 +178,29 @@ A comprehensive Telegram bot for managing dishwasher queue with turn tracking, p
 #### Data Management
 - `resetbot` - Reset all bot data with confirmation (admin only)
 - `leave` or `quit` - Remove yourself from the bot (any user)
-  - **Debt Protection**: Users with low scores cannot leave to prevent debt reset
-  - **Grace Period**: 24-hour grace period for rejoining with preserved score
+ - **Debt Protection**: Users with low scores cannot leave to prevent debt reset
+ - **Grace Period**: 24-hour grace period for rejoining with preserved score
 
 #### Request Processing
-- `approve punishment <id>` - Approve a punishment request
-- `reject punishment <id>` - Reject a punishment request
-- `approve skip <user>` - Approve a skip request
-- `reject skip <user>` - Reject a skip request
+- `approve punishment ` - Approve a punishment request
+- `reject punishment ` - Reject a punishment request
+- `approve skip ` - Approve a skip request
+- `reject skip ` - Reject a skip request
 
 #### Admin Menu Interface
 - **6-Row Logical Structure**: Organized by function type for better UX
-  - **Row 1**: Core Operations (Status, Done)
-  - **Row 2**: Queue Control (Force Swap, Assist)
-  - **Row 3**: Dishwasher Activity (Started, Alert)
-  - **Row 4**: Administrative Actions (Apply Punishment, Maintenance)
-  - **Row 5**: Communication Tools (Broadcast, Send Message)
-  - **Row 6**: Utility & Settings (Help, Language Switch)
+ - **Row 1**: Core Operations (Status, Done)
+ - **Row 2**: Queue Control (Force Swap, Assist)
+ - **Row 3**: Dishwasher Activity (Started, Alert)
+ - **Row 4**: Administrative Actions (Apply Punishment, Maintenance)
+ - **Row 5**: Communication Tools (Broadcast, Send Message)
+ - **Row 6**: Utility & Settings (Help, Language Switch)
 - **Broadcast Feature**: Renamed from "Create Announcement" for clarity
 - **Assist Feature**: Admin can handle duties without disrupting queue (`/assist` command)
 
 #### Information
 - `admins` - List all admins
-- `help` - Show all available commands
+- `help` - Show all available commands (includes champion formula in EN/HE)
 - `language_switch` - Switch between English and Hebrew (if supported)
 
 ## Setup Guide
@@ -250,26 +281,26 @@ Dishwasher2/
 ### Common Issues
 
 1. **Bot Token Error**:
-   - Make sure you've set the TELEGRAM_BOT_TOKEN environment variable
-   - Verify your bot token is correct by checking with @BotFather
-   - Restart the bot after setting the environment variable
+ - Make sure you've set the TELEGRAM_BOT_TOKEN environment variable
+ - Verify your bot token is correct by checking with @BotFather
+ - Restart the bot after setting the environment variable
 
 2. **Commands Not Working**:
-   - Check if you're authorized (for queue commands)
-   - Verify you're using the correct command syntax
-   - Make sure you're an admin (for admin commands)
+ - Check if you're authorized (for queue commands)
+ - Verify you're using the correct command syntax
+ - Make sure you're an admin (for admin commands)
 
 3. **Data Not Saving**:
-   - Check Supabase connection and credentials
-   - Ensure SUPABASE_URL and SUPABASE_ANON_KEY environment variables are set
-   - Verify Supabase database is accessible and tables exist
-   - Bot automatically retries failed database saves (2 attempts + 5-second retry)
-   - Admins receive notifications about database issues; users get final failure notifications
+ - Check Supabase connection and credentials
+ - Ensure SUPABASE_URL and SUPABASE_ANON_KEY environment variables are set
+ - Verify Supabase database is accessible and tables exist
+ - Bot automatically retries failed database saves (2 attempts + 5-second retry)
+ - Admins receive notifications about database issues; users get final failure notifications
 
 4. **Persistence Issues**:
-   - Check Supabase connection status in console logs
-   - Verify bot loads data on startup (look for "Bot data loaded from Supabase" message)
-   - Ensure optimized auto-save is working (check console for "Optimized auto-save cycle completed" every 10 minutes)
+ - Check Supabase connection status in console logs
+ - Verify bot loads data on startup (look for "Bot data loaded from Supabase" message)
+ - Ensure optimized auto-save is working (check console for "Optimized auto-save cycle completed" every 10 minutes)
 
 ### Getting Help
 
